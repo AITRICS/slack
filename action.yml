@@ -1,7 +1,9 @@
 name: Action
 description: "A simple calculator action"
 runs:
-  using: "composite"
-  steps:
-    - run: echo "Hi, I'm a calculator action!"
-      shell: bash
+  using: "node20"
+  main: "index.js"
+inputs:
+  token:
+    description: "github token"
+    required: false
