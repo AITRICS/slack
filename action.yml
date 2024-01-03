@@ -4,6 +4,6 @@ runs:
   using: "node20"
   main: "index.js"
 inputs:
-  token:
+  SLACK_TOKEN:
     description: "github token"
     required: false
