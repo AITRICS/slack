@@ -57,7 +57,7 @@ function sendSlackMessage(commentBody, commanter, commentUrl, prOwner) {
 
     web.chat.postMessage({
         channel: SLACK_FRONTEND_CHANNEL_ID,
-        text: `*${commenter}* commented on PR <${commentUrl}|${commentBody}>`
+        text: `*${commanter}* commented on PR <${commentUrl}|${commentBody}>`
     });
 }
 
