@@ -42,6 +42,7 @@ async function handleComment(octokit) {
     const [owner, repo] = OWNER_REPO.split('/');
 
     await octokit.request('GET /repos/{owner}/{repo}/issues/comments', {
+        type: 'private',
         owner: owner,
         repo: repo,
         headers: {
