@@ -45,22 +45,23 @@ async function handleComment(octokit) {
   const prOwner = payload.issue ? payload.issue.user.login : null;
   const commanter = payload.comment ? payload.comment.user.login : null;
   const commentBody = payload.comment ? payload.comment.body : null;
+  const prTitle = payload.issue ? payload.issue.title : null;
 
   slackUserMapping(prOwner, commanter);
   if (commentBody && commanter && commentUrl) {
-    sendSlackMessage(commentBody, commanter, commentUrl, prOwner);
+    sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle);
   }
 }
 
 function slackUserMapping(prOwner, commanter) {
 
 }
-function sendSlackMessage(commentBody, commanter, commentUrl, prOwner) {
+function sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle) {
   const web = new WebClient(SLACK_TOKEN);
 
   const message = {
     channel: SLACK_FRONTEND_CHANNEL_ID,
-    text: `*${commanter}* commented on PR of *${prOwner}*:\nSee more <${commentUrl}|here>.`,
+    text: `*${prTitle}*\n*${commanter}* commented on PR of *${prOwner}*:\nSee more <${commentUrl}|here>.`,
     attachments: [
       {
         color: 'good', // Slack에서 '좋음' 상태를 나타내는 기본 색상인 초록색을 사용합니다.
