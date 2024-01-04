@@ -10,3 +10,9 @@ inputs:
   GITHUB_TOKEN:
     description: "github token"
     required: true
+  OWNER_REPO:
+    description: "github token"
+    required: true
+  ACTION_TYPE:
+    description: "github token"
+    required: true
