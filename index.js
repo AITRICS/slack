@@ -62,11 +62,11 @@ function sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle, 
 
   const message = {
     channel: SLACK_FRONTEND_CHANNEL_ID,
-    text: `*<${prUrl}|${prTitle}>*\n*${commanter}* commented on PR of *${prOwner}*:\n`,
+    text: `*<${prUrl}|${prTitle}>*\n*${commanter}* 코멘트를 남겼어요!! *${prOwner}*:\n`,
     attachments: [
       {
-        color: 'good', // Slack에서 '좋음' 상태를 나타내는 기본 색상인 초록색을 사용합니다.
-        text: `${commentBody}\n\nSee more <${commentUrl}|here>.`,
+        color: 'good',
+        text: `${commentBody}\n\n<${commentUrl}|코멘트 보러가기>.`,
       },
     ],
     mrkdwn: true,
