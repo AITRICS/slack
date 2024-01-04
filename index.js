@@ -31,6 +31,7 @@ async function run() {
     const commentId = payload.comment ? payload.comment.id : null;
 
     console.log("Comment ID:", commentId);
+    console.log(payload);
     console.log('Done!!');
 }
 
