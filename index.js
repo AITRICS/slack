@@ -39,14 +39,21 @@ async function handleApprove() {
 }
 
 async function handleComment(octokit) {
+    const [owner, repo] = OWNER_REPO.split('/');
+
     await octokit.request('GET /repos/{owner}/{repo}/issues/comments', {
-        owner: 'OWNER',
-        repo: 'REPO',
+        owner: owner,
+        repo: repo,
         headers: {
             'X-GitHub-Api-Version': '2022-11-28'
         }
     })
+        .then((res) => {
+            const { data } = res;
+            console.log(data);
+        });
 }
+
 
 run();
 // (async () => {
