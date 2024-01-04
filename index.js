@@ -72,11 +72,7 @@ function sendSlackMessage(commentBody, commanter, commentUrl, prOwner) {
     mrkdwn: true,
   };
 
-  web.chat.postMessage({
-    channel: SLACK_FRONTEND_CHANNEL_ID,
-    text: message,
-    mrkdwn: true, // 활성화하여 Markdown을 사용할 수 있습니다.
-  });
+  web.chat.postMessage(message);
 }
 
 run();
