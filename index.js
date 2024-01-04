@@ -4,7 +4,7 @@ const Core = require("@actions/core");
 const Github = require('@actions/github');
 
 const SLACK_TOKEN = Core.getInput("SLACK_TOKEN");
-const GITHUB_TOKEN = Core.getInput("GITGUB_TOKEN");
+const GITHUB_TOKEN = Core.getInput("GITHUB_TOKEN");
 const ACTION_TYPE = Core.getInput("ACTION_TYPE");
 const OWNER_REPO = Core.getInput("OWNER_REPO");
 
