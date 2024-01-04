@@ -5,5 +5,8 @@ runs:
   main: "index.js"
 inputs:
   SLACK_TOKEN:
+    description: "slack token"
+    required: true
+  GITHUB_TOKEN:
     description: "github token"
-    required: false
+    required: true

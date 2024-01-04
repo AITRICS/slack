@@ -1,18 +1,58 @@
 const { WebClient } = require('@slack/web-api');
-const core = require("@actions/core");
+const { Octokit } = require("@octokit/core");
+const Core = require("@actions/core");
+const Github = require('@actions/github');
 
-// An access token (from your Slack app or custom integration - xoxp, xoxb)
-const token = core.getInput("SLACK_TOKEN");
+const SLACK_TOKEN = Core.getInput("SLACK_TOKEN");
+const GITHUB_TOKEN = Core.getInput("GITGUB_TOKEN");
+const ACTION_TYPE = Core.getInput("ACTION_TYPE");
+const REPO = Core.getInput("REPO");
 
-const web = new WebClient(token);
+const SLACK_FRONTEND_CHANNEL_ID = 'C06B5J3KD8F';
+const SLACK_BACKEND_CHANNEL_ID =  'C06C8TLTURE';
+const SLACK_SE_CHANNEL_ID = 'C06CS5Q4L8G';
 
-// This argument can be a channel ID, a DM ID, a MPDM ID, or a group ID
-const conversationId = 'C068EMH12TX';
+async function run() {
+    const web = new WebClient(SLACK_TOKEN);
+    const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
-(async () => {
-    // See: https://api.slack.com/methods/chat.postMessage
-    const res = await web.chat.postMessage({ channel: conversationId, text: 'Hello there' });
+    switch (ACTION_TYPE) {
+        case 'approve':
+            await handleApprove();
+            break;
+        case 'comment':
+            await handleComment();
+            break;
+        default:
+            console.log('error');
+            break;
+    }
+    const payload = Github.context.payload;
+    const commentId = payload.comment ? payload.comment.id : null;
 
-    // `res` contains information about the posted message
-    console.log('Message sent: ', res.ts);
-})();
+    console.log("Comment ID:", commentId);
+    console.log('Done!!');
+}
+
+async function handleApprove() {
+
+}
+
+async function handleComment(octokit) {
+    await octokit.request('GET /repos/{owner}/{repo}/issues/comments', {
+        owner: 'OWNER',
+        repo: 'REPO',
+        headers: {
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+    })
+}
+
+run();
+// (async () => {
+//     // See: https://api.slack.com/methods/chat.postMessage
+//     const res = await web.chat.postMessage({ channel: conversationId, text: 'Hello there' });
+//
+//     // `res` contains information about the posted message
+//     console.log('Message sent: ', res.ts);
+// })();
