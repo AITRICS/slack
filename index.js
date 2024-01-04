@@ -21,7 +21,7 @@ async function run() {
             await handleApprove();
             break;
         case 'comment':
-            await handleComment();
+            await handleComment(octokit);
             break;
         default:
             console.log('error');
