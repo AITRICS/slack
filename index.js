@@ -42,22 +42,23 @@ async function handleApprove() {
 async function handleComment(octokit) {
   const { payload } = Github.context;
   const commentUrl = payload.comment ? payload.comment.html_url : null;
-  const commentId = payload.comment ? payload.comment.id : null;
   const prOwner = payload.pull_request ? payload.pull_request.user.login : null;
   const commanter = payload.comment ? payload.comment.user.login : null;
   const commentBody = payload.comment ? payload.comment.body : null;
 
   if (commentBody && commanter && commentUrl) {
-    sendSlackMessage(commentBody, commanter, commentUrl);
+    sendSlackMessage(commentBody, commanter, commentUrl, prOwner);
   }
 }
 
 function sendSlackMessage(commentBody, commanter, commentUrl, prOwner) {
   const web = new WebClient(SLACK_TOKEN);
 
-  const message = `*${commanter}* commented on PR of *${prOwner}*:\n>`
-      + `${commentBody.substring(0, 100)}...`
-      + `\nSee more <${commentUrl}|here>.`;
+  const formattedComment = commentBody.split('\n').map((line) => `> ${line}`).join('\n');
+
+  const message = `*${commanter}* commented on PR of *${prOwner}*:\n`
+    + `${formattedComment}\n`
+    + `See more <${commentUrl}|here>.`;
 
   web.chat.postMessage({
     channel: SLACK_FRONTEND_CHANNEL_ID,
