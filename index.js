@@ -54,9 +54,33 @@ async function handleComment(octokit) {
   }
 }
 
-function slackUserMapping(prOwner, commanter) {
-
+async function getUserNameToGitHub(octokit, githubName) {
+  try {
+    const res = await octokit.request('GET /users/{username}', {
+      username: githubName,
+      headers: {
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    return res.data.name; // GitHub 사용자의 실제 이름 반환
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    return null; // 에러 발생 시 null 반환
+  }
 }
+
+async function slackUserMapping(octokit, prOwner, commanter) {
+  try {
+    const ownerName = await getUserNameToGitHub(octokit, prOwner);
+    const commanterName = await getUserNameToGitHub(octokit, commanter);
+
+    console.log('PR Owner Name:', ownerName);
+    console.log('Commenter Name:', commanterName);
+  } catch (error) {
+    console.error('Error in slackUserMapping:', error);
+  }
+}
+
 function sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle, prUrl) {
   const web = new WebClient(SLACK_TOKEN);
 
