@@ -58,15 +58,13 @@ function slackUserMapping(prOwner, commanter) {
 function sendSlackMessage(commentBody, commanter, commentUrl, prOwner) {
   const web = new WebClient(SLACK_TOKEN);
 
-  const formattedComment = commentBody.split('\n').map((line) => `> ${line}`).join('\n');
-
   const message = {
     channel: SLACK_FRONTEND_CHANNEL_ID,
     text: `*${commanter}* commented on PR of *${prOwner}*:\nSee more <${commentUrl}|here>.`,
     attachments: [
       {
         color: 'good', // Slack에서 '좋음' 상태를 나타내는 기본 색상인 초록색을 사용합니다.
-        text: formattedComment,
+        text: commentBody,
       },
     ],
     mrkdwn: true,
