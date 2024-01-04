@@ -42,7 +42,7 @@ async function handleApprove() {
 async function handleComment(octokit) {
   const { payload } = Github.context;
   const commentUrl = payload.comment ? payload.comment.html_url : null;
-  const prOwner = payload.pull_request ? payload.pull_request.user.login : null;
+  const prOwner = payload.issue ? payload.issue.user.login : null;
   const commanter = payload.comment ? payload.comment.user.login : null;
   const commentBody = payload.comment ? payload.comment.body : null;
 
