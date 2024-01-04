@@ -43,29 +43,30 @@ async function handleComment(octokit) {
   const { payload } = Github.context;
   const commentUrl = payload.comment ? payload.comment.html_url : null;
   const prOwner = payload.issue ? payload.issue.user.login : null;
+  const prUrl = payload.issue ? payload.issue.html_url : null;
   const commanter = payload.comment ? payload.comment.user.login : null;
   const commentBody = payload.comment ? payload.comment.body : null;
   const prTitle = payload.issue ? payload.issue.title : null;
 
   slackUserMapping(prOwner, commanter);
   if (commentBody && commanter && commentUrl) {
-    sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle);
+    sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle, prUrl);
   }
 }
 
 function slackUserMapping(prOwner, commanter) {
 
 }
-function sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle) {
+function sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle, prUrl) {
   const web = new WebClient(SLACK_TOKEN);
 
   const message = {
     channel: SLACK_FRONTEND_CHANNEL_ID,
-    text: `*${prTitle}*\n*${commanter}* commented on PR of *${prOwner}*:\nSee more <${commentUrl}|here>.`,
+    text: `*<${prUrl}|${prTitle}>*\n*${commanter}* commented on PR of *${prOwner}*:\n`,
     attachments: [
       {
         color: 'good', // Slack에서 '좋음' 상태를 나타내는 기본 색상인 초록색을 사용합니다.
-        text: commentBody,
+        text: `${commentBody}\n\nSee more <${commentUrl}|here>.`,
       },
     ],
     mrkdwn: true,
