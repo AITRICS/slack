@@ -54,7 +54,6 @@ async function handleComment(octokit) {
 
 function sendSlackMessage(commentBody, commanter, commentUrl, prOwner) {
     const web = new WebClient(SLACK_TOKEN);
-    const channel = getChannel(prOwner);
 
     web.chat.postMessage({
         channel: SLACK_FRONTEND_CHANNEL_ID,
