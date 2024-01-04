@@ -28,7 +28,9 @@ async function run() {
             break;
     }
     const payload = Github.context.payload;
+    const commentUrl = payload.comment ? payload.comment.html_url : null;
     const commentId = payload.comment ? payload.comment.id : null;
+    const prOwner = payload.pull_request ? payload.pull_request.user.login : null;
 
     console.log("Comment ID:", commentId);
     console.log(payload);
@@ -40,24 +42,25 @@ async function handleApprove() {
 }
 
 async function handleComment(octokit) {
-    const [owner, repo] = OWNER_REPO.split('/');
+    const payload = Github.context.payload;
+    const commentUrl = payload.comment ? payload.comment.html_url : null;
+    const commentId = payload.comment ? payload.comment.id : null;
+    const prOwner = payload.pull_request ? payload.pull_request.user.login : null;
+    const commanter = payload.comment ? payload.comment.user.login : null;
+    const commentBody = payload.comment ? payload.comment.body : null;
 
-    console.log(owner, repo);
-    console.log(GITHUB_TOKEN)
-    // await octokit.request('GET /repos/{owner}/{repo}/issues/comments', {
-    //     type: 'private',
-    //     owner: owner,
-    //     repo: repo,
-    //     headers: {
-    //         'X-GitHub-Api-Version': '2022-11-28'
-    //     }
-    // })
-    //     .then((res) => {
-    //         const { data } = res;
-    //         console.log(data);
-    //     });
+    sendSlackMessage(commentBody, commanter, commentUrl, prOwner);
 }
 
+function sendSlackMessage(commentBody, commanter, commentUrl, prOwner) {
+    const web = new WebClient(SLACK_TOKEN);
+    const channel = getChannel(prOwner);
+
+    web.chat.postMessage({
+        channel: channel,
+        text: `*${commenter}* commented on PR <${commentUrl}|${commentBody}>`
+    });
+}
 
 run();
 // (async () => {
