@@ -6,14 +6,32 @@ const Github = require('@actions/github');
 const SLACK_TOKEN = Core.getInput('SLACK_TOKEN');
 const GITHUB_TOKEN = Core.getInput('GITHUB_TOKEN');
 const ACTION_TYPE = Core.getInput('ACTION_TYPE');
-const OWNER_REPO = Core.getInput('OWNER_REPO');
-
-const SLACK_FRONTEND_CHANNEL_ID = 'C06B5J3KD8F';
-const SLACK_BACKEND_CHANNEL_ID = 'C06C8TLTURE';
-const SLACK_SE_CHANNEL_ID = 'C06CS5Q4L8G';
+const TEAM_SLUGS = ['SE', 'Platform-frontend', 'Platform-backend'];
+const SLACK_CHANNEL = {
+  SE: 'C06CS5Q4L8G',
+  'Platform-frontend': 'C06B5J3KD8F',
+  'Platform-backend': 'C06C8TLTURE',
+  'git-any': 'C06CMAY8066',
+};
 
 async function handleApprove() {
 
+}
+
+async function selectSlackCheannel(octokit, githubName) {
+  const memberChecks = TEAM_SLUGS.map(async (teamSlug) => {
+    const memberList = await octokit.teams.listMembersInOrg({
+      org: 'aitrics',
+      team_slug: teamSlug,
+    });
+
+    const member = memberList.data.find(({ login }) => login === githubName);
+    return member ? teamSlug : null;
+  });
+
+  const results = await Promise.all(memberChecks);
+  const foundTeamSlug = results.find((slug) => slug !== null);
+  return foundTeamSlug ? SLACK_CHANNEL[foundTeamSlug] : SLACK_CHANNEL['git-any'];
 }
 
 async function getGithubNickNameToGitHub(octokit, githubName) {
@@ -31,11 +49,11 @@ async function getGithubNickNameToGitHub(octokit, githubName) {
   }
 }
 
-function sendSlackMessage(commentData) {
+function sendSlackMessage(commentData, channelId) {
   const web = new WebClient(SLACK_TOKEN);
 
   const message = {
-    channel: SLACK_FRONTEND_CHANNEL_ID,
+    channel: channelId,
     text: `*<${commentData.prUrl}|${commentData.prTitle}>*\n*${commentData.commenterSlackRealName}* 님이 코멘트를 남겼어요!! <@${commentData.ownerSlackId}>:\n`,
     attachments: [
       {
@@ -85,12 +103,12 @@ async function handleComment(octokit, web) {
     commentBody: payload.comment?.body,
     prTitle: payload.issue?.title ?? payload.pull_request?.title,
   };
-
+  const channelId = selectSlackCheannel(commentData.prOwnerGitName);
   commentData.ownerSlackId = await getSlackUserProperty(octokit, web, commentData.prOwnerGitName, 'id');
   commentData.commenterSlackRealName = await getSlackUserProperty(octokit, web, commentData.commenterGitName, 'realName');
 
   if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
-    sendSlackMessage(commentData);
+    sendSlackMessage(commentData, channelId);
   }
 }
 
