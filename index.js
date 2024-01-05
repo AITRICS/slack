@@ -1,5 +1,5 @@
 const { WebClient } = require('@slack/web-api');
-const { Octokit } = require('@octokit/core');
+const { Octokit } = require('@octokit/rest');
 const Core = require('@actions/core');
 const Github = require('@actions/github');
 
@@ -35,18 +35,10 @@ async function selectSlackCheannel(octokit, githubName) {
 }
 
 async function getGithubNickNameToGitHub(octokit, githubName) {
-  try {
-    const res = await octokit.request('GET /users/{username}', {
-      username: githubName,
-      headers: {
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    });
-    return res.data.name; // GitHub 사용자의 실제 이름 반환
-  } catch (error) {
-    console.error('Error fetching user data:', error);
-    return null; // 에러 발생 시 null 반환
-  }
+  const res = await octokit.rest.users.getByUsername({
+    username: githubName,
+  });
+  return res.data.name; // GitHub 사용자의 실제 이름 반환
 }
 
 function sendSlackMessage(commentData, channelId) {
