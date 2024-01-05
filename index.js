@@ -79,9 +79,9 @@ async function handleComment(octokit, web) {
   const { payload } = Github.context;
   const commentData = {
     commentUrl: payload.comment ? payload.comment.html_url : null,
-    prOwnerGitName: payload.issue ? payload.issue.user.login : null,
+    prOwnerGitName: payload.issue ? payload.issue.user.login : payload.pull_request.user.login,
     prUrl: payload.issue ? payload.issue.html_url : null,
-    commenterGitName: payload.comment ? payload.comment.user.login : null,
+    commenterGitName: payload.comment ? payload.comment.user.login : 'unknown',
     commentBody: payload.comment ? payload.comment.body : null,
     prTitle: payload.issue ? payload.issue.title : null,
   };
