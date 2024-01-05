@@ -68,7 +68,7 @@ function sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle, 
 
   const message = {
     channel: SLACK_FRONTEND_CHANNEL_ID,
-    text: `*<${prUrl}|${prTitle}>*\n*${commanter}* 코멘트를 남겼어요!! *${prOwner}*:\n`,
+    text: `*<${prUrl}|${prTitle}>*\n*${commanter}* 가 코멘트를 남겼어요!! *${prOwner}*:\n`,
     attachments: [
       {
         color: 'good',
@@ -97,10 +97,14 @@ async function handleComment(octokit, web) {
 }
 
 async function findSlackUserIdByName(web, searchName) {
-  const result = await web.users.list();
-  const user = result.members.find((member) => (
-    member.real_name && member.real_name.includes(searchName))
-      || (member.profile.display_name && member.profile.display_name.includes(searchName)));
+  const slackUserList = await web.users.list();
+  const lowerCaseSearchName = searchName.toLowerCase();
+
+  const user = slackUserList.members.find(({ real_name: realName, profile }) => {
+    const nameToCheck = [realName, profile.display_name].map((name) => name && name.toLowerCase());
+    return nameToCheck.some((name) => name && name.includes(lowerCaseSearchName));
+  });
+
   return user ? user.id : searchName;
 }
 
