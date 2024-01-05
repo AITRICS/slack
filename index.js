@@ -114,7 +114,7 @@ async function run() {
     console.error('Error executing action:', error);
   }
 
-  console.log(Github.context);
+  console.log(Github.context.payload.user);
   console.log('Done!!');
 }
 
