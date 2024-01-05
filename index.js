@@ -12,29 +12,6 @@ const SLACK_FRONTEND_CHANNEL_ID = 'C06B5J3KD8F';
 const SLACK_BACKEND_CHANNEL_ID = 'C06C8TLTURE';
 const SLACK_SE_CHANNEL_ID = 'C06CS5Q4L8G';
 
-async function run() {
-  const web = new WebClient(SLACK_TOKEN);
-  const octokit = new Octokit({ auth: GITHUB_TOKEN });
-
-  try {
-    switch (ACTION_TYPE) {
-      case 'approve':
-        await handleApprove();
-        break;
-      case 'comment':
-        await handleComment(octokit, web);
-        break;
-      default:
-        console.log('error');
-        break;
-    }
-  } catch (error) {
-    console.error('Error executing action:', error);
-  }
-
-  console.log('Done!!');
-}
-
 async function handleApprove() {
 
 }
@@ -54,16 +31,16 @@ async function getGithubNickNameToGitHub(octokit, githubName) {
   }
 }
 
-function sendSlackMessage(commentBody, commenterSlackRealName, commentUrl, ownerSlackId, prTitle, prUrl) {
+function sendSlackMessage(commentData) {
   const web = new WebClient(SLACK_TOKEN);
 
   const message = {
     channel: SLACK_FRONTEND_CHANNEL_ID,
-    text: `*<${prUrl}|${prTitle}>*\n*${commenterSlackRealName}* 가 코멘트를 남겼어요!! <@${ownerSlackId}>:\n`,
+    text: `*<${commentData.prUrl}|${commentData.prTitle}>*\n*${commentData.commenterSlackRealName}* 님이 코멘트를 남겼어요!! <@${commentData.ownerSlackId}>:\n`,
     attachments: [
       {
         color: 'good',
-        text: `${commentBody}\n\n<${commentUrl}|코멘트 보러가기>.`,
+        text: `${commentData.commentBody}\n\n<${commentData.commentUrl}|코멘트 보러가기>.`,
       },
     ],
     mrkdwn: true,
@@ -100,18 +77,44 @@ async function getSlackUserProperty(octokit, web, searchName, property) {
 
 async function handleComment(octokit, web) {
   const { payload } = Github.context;
-  const commentUrl = payload.comment ? payload.comment.html_url : null;
-  const prOwnerGitName = payload.issue ? payload.issue.user.login : null;
-  const prUrl = payload.issue ? payload.issue.html_url : null;
-  const commenterGitName = payload.comment ? payload.comment.user.login : null;
-  const commentBody = payload.comment ? payload.comment.body : null;
-  const prTitle = payload.issue ? payload.issue.title : null;
-  const ownerSlackId = await getSlackUserProperty(octokit, web, prOwnerGitName, 'id');
-  const commenterSlackRealName = await getSlackUserProperty(octokit, web, commenterGitName, 'realName');
+  const commentData = {
+    commentUrl: payload.comment ? payload.comment.html_url : null,
+    prOwnerGitName: payload.issue ? payload.issue.user.login : null,
+    prUrl: payload.issue ? payload.issue.html_url : null,
+    commenterGitName: payload.comment ? payload.comment.user.login : null,
+    commentBody: payload.comment ? payload.comment.body : null,
+    prTitle: payload.issue ? payload.issue.title : null,
+  };
 
-  if (commentBody && commenterGitName && commentUrl) {
-    sendSlackMessage(commentBody, commenterSlackRealName, commentUrl, ownerSlackId, prTitle, prUrl);
+  commentData.ownerSlackId = await getSlackUserProperty(octokit, web, commentData.prOwnerGitName, 'id');
+  commentData.commenterSlackRealName = await getSlackUserProperty(octokit, web, commentData.commenterGitName, 'realName');
+
+  if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
+    sendSlackMessage(commentData);
   }
+}
+
+async function run() {
+  const web = new WebClient(SLACK_TOKEN);
+  const octokit = new Octokit({ auth: GITHUB_TOKEN });
+
+  try {
+    switch (ACTION_TYPE) {
+      case 'approve':
+        await handleApprove();
+        break;
+      case 'comment':
+        await handleComment(octokit, web);
+        break;
+      default:
+        console.log('error');
+        break;
+    }
+  } catch (error) {
+    console.error('Error executing action:', error);
+  }
+
+  console.log('Done!!');
 }
 
 run();
