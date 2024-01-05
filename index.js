@@ -39,15 +39,6 @@ async function handleApprove() {
 
 }
 
-async function slackUserMapping(octokit, web, prOwner, commanter) {
-  const ownerName = await getUserNameToGitHub(octokit, prOwner);
-  const commanterName = await getUserNameToGitHub(octokit, commanter);
-
-  const ownerSlackId = await findSlackUserIdByName(web, ownerName);
-  const commanterSlackId = await findSlackUserIdByName(web, commanterName);
-  return { ownerSlackId, commanterSlackId };
-}
-
 async function getUserNameToGitHub(octokit, githubName) {
   try {
     const res = await octokit.request('GET /users/{username}', {
@@ -63,12 +54,12 @@ async function getUserNameToGitHub(octokit, githubName) {
   }
 }
 
-function sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle, prUrl) {
+function sendSlackMessage(commentBody, commenter, commentUrl, prOwner, prTitle, prUrl) {
   const web = new WebClient(SLACK_TOKEN);
 
   const message = {
     channel: SLACK_FRONTEND_CHANNEL_ID,
-    text: `*<${prUrl}|${prTitle}>*\n*${commanter}* 가 코멘트를 남겼어요!! *${prOwner}*:\n`,
+    text: `*<${prUrl}|${prTitle}>*\n*${commenter}* 가 코멘트를 남겼어요!! *${prOwner}*:\n`,
     attachments: [
       {
         color: 'good',
@@ -81,21 +72,6 @@ function sendSlackMessage(commentBody, commanter, commentUrl, prOwner, prTitle, 
   web.chat.postMessage(message);
 }
 
-async function handleComment(octokit, web) {
-  const { payload } = Github.context;
-  const commentUrl = payload.comment ? payload.comment.html_url : null;
-  const prOwner = payload.issue ? payload.issue.user.login : null;
-  const prUrl = payload.issue ? payload.issue.html_url : null;
-  const commanter = payload.comment ? payload.comment.user.login : null;
-  const commentBody = payload.comment ? payload.comment.body : null;
-  const prTitle = payload.issue ? payload.issue.title : null;
-
-  const { ownerSlackId, commanterSlackId } = await slackUserMapping(octokit, web, prOwner, commanter);
-  if (commentBody && commanter && commentUrl) {
-    sendSlackMessage(commentBody, commanterSlackId, commentUrl, ownerSlackId, prTitle, prUrl);
-  }
-}
-
 async function findSlackUserIdByName(web, searchName) {
   const slackUserList = await web.users.list();
   const lowerCaseSearchName = searchName.toLowerCase();
@@ -106,6 +82,25 @@ async function findSlackUserIdByName(web, searchName) {
   });
 
   return user ? user.id : searchName;
+}
+
+async function getSlackIds(octokit, web, searchName) {
+  return findSlackUserIdByName(web, await getUserNameToGitHub(octokit, searchName));
+}
+
+async function handleComment(octokit, web) {
+  const { payload } = Github.context;
+  const commentUrl = payload.comment ? payload.comment.html_url : null;
+  const prOwner = payload.issue ? payload.issue.user.login : null;
+  const prUrl = payload.issue ? payload.issue.html_url : null;
+  const commenter = payload.comment ? payload.comment.user.login : null;
+  const commentBody = payload.comment ? payload.comment.body : null;
+  const prTitle = payload.issue ? payload.issue.title : null;
+
+  const ownerSlackId = await getSlackIds(octokit, web, prOwner);
+  if (commentBody && commenter && commentUrl) {
+    sendSlackMessage(commentBody, commenter, commentUrl, ownerSlackId, prTitle, prUrl);
+  }
 }
 
 run();
