@@ -95,7 +95,7 @@ async function handleComment(octokit, web) {
     commentBody: payload.comment?.body,
     prTitle: payload.issue?.title ?? payload.pull_request?.title,
   };
-  const channelId = selectSlackCheannel(commentData.prOwnerGitName);
+  const channelId = selectSlackCheannel(octokit, commentData.prOwnerGitName);
   commentData.ownerSlackId = await getSlackUserProperty(octokit, web, commentData.prOwnerGitName, 'id');
   commentData.commenterSlackRealName = await getSlackUserProperty(octokit, web, commentData.commenterGitName, 'realName');
 
