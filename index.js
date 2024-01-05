@@ -83,7 +83,7 @@ async function handleComment(octokit, web) {
     prUrl: payload.issue?.html_url,
     commenterGitName: payload.comment?.user.login,
     commentBody: payload.comment?.body,
-    prTitle: payload.issue?.title,
+    prTitle: payload.issue?.title ?? payload.pull_request?.title,
   };
 
   commentData.ownerSlackId = await getSlackUserProperty(octokit, web, commentData.prOwnerGitName, 'id');
