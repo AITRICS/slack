@@ -39,7 +39,7 @@ async function handleApprove() {
 
 }
 
-async function getUserNameToGitHub(octokit, githubName) {
+async function getGithubNickNameToGitHub(octokit, githubName) {
   try {
     const res = await octokit.request('GET /users/{username}', {
       username: githubName,
@@ -54,12 +54,12 @@ async function getUserNameToGitHub(octokit, githubName) {
   }
 }
 
-function sendSlackMessage(commentBody, commenter, commentUrl, prOwner, prTitle, prUrl) {
+function sendSlackMessage(commentBody, commenterSlackRealName, commentUrl, ownerSlackId, prTitle, prUrl) {
   const web = new WebClient(SLACK_TOKEN);
 
   const message = {
     channel: SLACK_FRONTEND_CHANNEL_ID,
-    text: `*<${prUrl}|${prTitle}>*\n*${commenter}* 가 코멘트를 남겼어요!! *${prOwner}*:\n`,
+    text: `*<${prUrl}|${prTitle}>*\n*${commenterSlackRealName}* 가 코멘트를 남겼어요!! <@${ownerSlackId}>:\n`,
     attachments: [
       {
         color: 'good',
@@ -72,34 +72,45 @@ function sendSlackMessage(commentBody, commenter, commentUrl, prOwner, prTitle, 
   web.chat.postMessage(message);
 }
 
-async function findSlackUserIdByName(web, searchName) {
+async function findSlackUserPropertyByGitName(web, searchName, property) {
   const slackUserList = await web.users.list();
   const lowerCaseSearchName = searchName.toLowerCase();
 
   const user = slackUserList.members.find(({ real_name: realName, profile }) => {
-    const nameToCheck = [realName, profile.display_name].map((name) => name && name.toLowerCase());
-    return nameToCheck.some((name) => name && name.includes(lowerCaseSearchName));
+    const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
+    return nameToCheck.some((name) => name?.includes(lowerCaseSearchName));
   });
 
-  return user ? user.id : searchName;
+  if (user) {
+    if (property === 'id') {
+      return user.id;
+    }
+    if (property === 'realName') {
+      return user.profile.display_name;
+    }
+  }
+
+  return searchName;
 }
 
-async function getSlackIds(octokit, web, searchName) {
-  return findSlackUserIdByName(web, await getUserNameToGitHub(octokit, searchName));
+async function getSlackUserProperty(octokit, web, searchName, property) {
+  const githubNickName = await getGithubNickNameToGitHub(octokit, searchName);
+  return findSlackUserPropertyByGitName(web, githubNickName, property);
 }
 
 async function handleComment(octokit, web) {
   const { payload } = Github.context;
   const commentUrl = payload.comment ? payload.comment.html_url : null;
-  const prOwner = payload.issue ? payload.issue.user.login : null;
+  const prOwnerGitName = payload.issue ? payload.issue.user.login : null;
   const prUrl = payload.issue ? payload.issue.html_url : null;
-  const commenter = payload.comment ? payload.comment.user.login : null;
+  const commenterGitName = payload.comment ? payload.comment.user.login : null;
   const commentBody = payload.comment ? payload.comment.body : null;
   const prTitle = payload.issue ? payload.issue.title : null;
+  const ownerSlackId = await getSlackUserProperty(octokit, web, prOwnerGitName, 'id');
+  const commenterSlackRealName = await getSlackUserProperty(octokit, web, commenterGitName, 'realName');
 
-  const ownerSlackId = await getSlackIds(octokit, web, prOwner);
-  if (commentBody && commenter && commentUrl) {
-    sendSlackMessage(commentBody, commenter, commentUrl, ownerSlackId, prTitle, prUrl);
+  if (commentBody && commenterGitName && commentUrl) {
+    sendSlackMessage(commentBody, commenterSlackRealName, commentUrl, ownerSlackId, prTitle, prUrl);
   }
 }
 
