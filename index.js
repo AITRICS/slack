@@ -104,7 +104,7 @@ async function run() {
         await handleApprove();
         break;
       case 'comment':
-        await handleComment(octokit, web);
+        // await handleComment(octokit, web);
         break;
       default:
         console.log('error');
