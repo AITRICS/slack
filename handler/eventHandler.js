@@ -74,8 +74,12 @@ class EventHandler {
     };
 
     if (payload.comment.in_reply_to_id) {
-      commentData.reviewerGitName = commentData.prOwnerGitName;
-      commentData.prOwnerGitName = await this.getCommentAuthor('aitrics', payload.repository.name, payload.comment.in_reply_to_id);
+      const reviewerGitName = await this.getCommentAuthor('aitrics', payload.repository.name, payload.comment.in_reply_to_id);
+
+      if (reviewerGitName !== commentData.reviewerGitName) {
+        commentData.reviewerGitName = commentData.prOwnerGitName;
+        commentData.prOwnerGitName = await this.getCommentAuthor('aitrics', payload.repository.name, payload.comment.in_reply_to_id);
+      }
     }
 
     const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
