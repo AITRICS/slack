@@ -30,7 +30,7 @@ async function run() {
     console.error('Error executing action:', error);
   }
 
-  console.log(payload.data);
+  console.log(payload);
   console.log('Done!!');
 }
 
