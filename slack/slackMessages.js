@@ -7,7 +7,7 @@ class SlackMessages {
     try {
       const message = {
         channel: channelId,
-        text: `*<${commentData.prUrl}|${commentData.prTitle}>*\n*${commentData.commenterSlackRealName}* 님이 코멘트를 남겼어요!! <@${commentData.ownerSlackId}>:\n`,
+        text: `*<${commentData.prUrl}|${commentData.prTitle}>*\n:pencil: *${commentData.commenterSlackRealName}* 님이 코멘트를 남겼어요!! <@${commentData.ownerSlackId}>:\n`,
         attachments: [
           {
             color: 'good',
@@ -28,7 +28,7 @@ class SlackMessages {
     try {
       const message = {
         channel: channelId,
-        text: `:white_check_mark:*<${commentData.prUrl}|${commentData.prTitle}>*\n*${commentData.commenterSlackRealName}* 님이 Approve를 했습니다!! <@${commentData.ownerSlackId}>:\n`,
+        text: `*<${commentData.prUrl}|${commentData.prTitle}>*\n:white_check_mark: *${commentData.commenterSlackRealName}* 님이 Approve를 했습니다!! <@${commentData.ownerSlackId}>:\n`,
         attachments: [
           {
             color: 'good',
