@@ -28,15 +28,15 @@ async function findTeamSlugForGithubUser(octokit, githubName, githubTeamSlugs) {
 
 /**
  * Retrieves the GitHub username of the author of a specific review comment.
- * @param {string} owner - The owner of the repository (GitHub username or organization name).
+ * @param {Octokit} octokit - The Octokit instance.
  * @param {string} repo - The name of the repository.
  * @param {number} commentId - The ID of the review comment.
  * @returns {Promise<string|null>} The GitHub username of the comment author, or null if an error occurs.
  */
-async function getCommentAuthor(repo, commentId) {
+async function getCommentAuthor(octokit, repo, commentId) {
   try {
     // Fetching the review comment from GitHub using the Octokit client.
-    const response = await this.octokit.rest.pulls.getReviewComment({
+    const response = await octokit.rest.pulls.getReviewComment({
       owner: 'aitrics',
       repo,
       comment_id: commentId,

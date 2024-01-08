@@ -77,6 +77,7 @@ class EventHandler {
     if (payload.comment.in_reply_to_id) {
       // Get the author of the original comment this one is replying to.
       const previousCommentAuthor = await getCommentAuthor(
+        this.octokit,
         payload.repository.name,
         payload.comment.in_reply_to_id,
       );
