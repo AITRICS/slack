@@ -85,6 +85,23 @@ class EventHandler {
       await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
     }
   }
+
+  async handleReviewRequested(payload) {
+    const commentData = {
+      prOwnerGitName: payload.pull_request?.user.login,
+      prUrl: payload.pull_request?.html_url,
+      commenterGitName: payload.requested_reviewer?.login,
+      prTitle: payload.pull_request?.title,
+    };
+
+    const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
+    commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'id');
+    commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
+
+    if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
+      await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
+    }
+  }
 }
 
 module.exports = EventHandler;

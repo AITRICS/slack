@@ -22,6 +22,9 @@ async function run() {
       case 'comment':
         await handler.handleComment(payload);
         break;
+      case 'review_requested':
+        await handler.handleReviewRequested(payload);
+        break;
       default:
         console.log('error');
         break;
