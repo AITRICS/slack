@@ -97,7 +97,7 @@ class EventHandler {
     const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
     commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'id');
     commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
-
+    console.log(commentData);
     if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
       await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
     }

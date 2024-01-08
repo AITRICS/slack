@@ -46,6 +46,7 @@ class SlackMessages {
   }
 
   async sendSlackMessageToReviewRequested(commentData, channelId) {
+    console.log('sendSlackMessageToReviewRequested');
     try {
       const message = {
         channel: channelId,
@@ -58,7 +59,7 @@ class SlackMessages {
         ],
         mrkdwn: true,
       };
-
+      console.log(message);
       await this.web.chat.postMessage(message);
     } catch (error) {
       console.error('Error sending Slack message:', error);
