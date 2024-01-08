@@ -53,7 +53,7 @@ class SlackMessages {
         attachments: [
           {
             color: 'good',
-            text: `${commentData.commentBody}\n\n<${commentData.prUrl}|PR 보러가기>.`,
+            text: `\n<${commentData.prUrl}|PR 보러가기>.`,
           },
         ],
         mrkdwn: true,
