@@ -19,7 +19,8 @@ async function findTeamSlugForGithubUser(octokit, githubName, githubTeamSlugs) {
     });
 
     const results = await Promise.all(memberChecks);
-    return results.find((slug) => slug !== null);
+    const a = results.find((slug) => slug !== null);
+    return a;
   } catch (error) {
     console.error('Error finding team slug for GitHub user:', error);
     throw error;
