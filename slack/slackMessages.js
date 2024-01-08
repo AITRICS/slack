@@ -47,7 +47,7 @@ class SlackMessages {
   async sendSlackMessageToComment(commentData, channelId) {
     const attachments = [{
       color: 'good',
-      text: `\`\`\`${commentData.commentDetail}\`\`\`\n*코맨트 내용 :*\n${commentData.commentBody}\n\n<${commentData.commentUrl}|코멘트 보러가기>\n\n`,
+      text: `\`\`\`${commentData.commentContent}\`\`\`\n*코맨트 내용 :*\n${commentData.commentBody}\n\n<${commentData.commentUrl}|코멘트 보러가기>\n\n`,
     }];
 
     const message = SlackMessages.#createMessage(
