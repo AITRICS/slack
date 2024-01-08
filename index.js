@@ -30,7 +30,7 @@ async function run() {
     console.error('Error executing action:', error);
   }
 
-  console.log(payload);
+  // console.log(payload.pull_request);
   console.log('Done!!');
 }
 
