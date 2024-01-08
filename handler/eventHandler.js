@@ -64,7 +64,6 @@ class EventHandler {
 
     return searchName;
   }
-  }
 
   /**
    * Retrieves a Slack user property based on a GitHub username.
