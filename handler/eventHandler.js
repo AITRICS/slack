@@ -1,5 +1,5 @@
 const { getGithubNickNameToGitHub, getCommentAuthor, findTeamSlugForGithubUser } = require('../github/githubUtils');
-const findSlackUserPropertyByGitName = require('../slack/findSlackUserPropertyByGitName');
+const getSlackUserList = require('../slack/getSlackUserList');
 const SlackMessages = require('../slack/slackMessages');
 
 const GITHUB_TEAM_SLUGS = ['SE', 'Platform-frontend', 'Platform-backend'];
@@ -38,12 +38,46 @@ class EventHandler {
   }
 
   /**
+   * Finds a specific property of a Slack user by matching their real name or display name with the given GitHub username.
+   * @param {Array} members - The list of Slack users.
+   * @param {string} searchName - The GitHub username to search for in Slack user profiles.
+   * @param {string} property - The property to retrieve from the Slack user ('id' or 'realName').
+   * @returns {string} The requested property of the found Slack user or the searchName if no user is found.
+   * @throws Will throw an error if the Slack API request fails.
+   */
+  static #findSlackUserPropertyByGitName(members, searchName, property) {
+    try {
+      const lowerCaseSearchName = searchName.toLowerCase();
+
+      const user = members.find(({ real_name: realName, profile }) => {
+        const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
+        return nameToCheck.some((name) => name?.includes(lowerCaseSearchName));
+      });
+
+      if (user) {
+        if (property === 'id') {
+          return user.id;
+        }
+        if (property === 'realName') {
+          return user.profile.display_name;
+        }
+      }
+
+      return searchName;
+    } catch (error) {
+      console.error('Error finding Slack user property:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Retrieves a Slack user property based on a GitHub username.
+   * @param {Array} members - The list of Slack users.
    * @param {string} searchName - The GitHub username.
    * @param {string} property - The Slack user property to retrieve ('id' or 'realName').
    * @returns {Promise<string>} The Slack user property value.
    */
-  async #getSlackUserProperty(searchName, property) {
+  async #getSlackUserProperty(members, searchName, property) {
     if (!searchName) {
       console.error('Invalid searchName: must be a non-empty string.');
       return null;
@@ -55,11 +89,12 @@ class EventHandler {
     }
 
     const githubNickName = await getGithubNickNameToGitHub(this.octokit, searchName);
-    return findSlackUserPropertyByGitName(this.web, githubNickName, property);
+    return EventHandler.#findSlackUserPropertyByGitName(members, githubNickName, property);
   }
 
   /**
-   * Responds to a GitHub comment event by sending a Slack message.
+   * EventHandler class processes different GitHub event types and sends corresponding notifications to Slack.
+   * It handles three main types of events: comment, approve, and review request.
    * @param {object} payload - The payload of the GitHub comment event.
    */
   async handleComment(payload) {
@@ -90,8 +125,9 @@ class EventHandler {
     }
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    commentData.mentionedSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
-    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
+    const members = await getSlackUserList(this.web);
+    commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'id');
+    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.commentAuthorGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToComment(commentData, channelId);
   }
@@ -107,8 +143,9 @@ class EventHandler {
     };
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    commentData.mentionedSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
-    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
+    const members = await getSlackUserList(this.web);
+    commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'id');
+    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.commentAuthorGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
   }
@@ -122,8 +159,9 @@ class EventHandler {
     };
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    commentData.mentionedSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
-    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
+    const members = await getSlackUserList(this.web);
+    commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'id');
+    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.commentAuthorGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
   }
