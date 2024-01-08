@@ -1,7 +1,7 @@
 const findTeamSlugForGithubUser = require('../github/findTeamSlugForGithubUser');
 const getGithubNickNameToGitHub = require('../github/getGithubNickNameToGitHub');
 const findSlackUserPropertyByGitName = require('../slack/findSlackUserPropertyByGitName');
-const sendSlackMessageToComment = require('../slack/sendSlackMessages');
+const SlackMessages = require('../slack/slackMessages');
 
 const GITHUB_TEAM_SLUGS = ['SE', 'Platform-frontend', 'Platform-backend'];
 const SLACK_CHANNEL = {
@@ -18,6 +18,7 @@ class EventHandler {
    * @param {WebClient} web - The Slack WebClient instance.
    */
   constructor(octokit, web) {
+    this.slackMessages = new SlackMessages();
     this.octokit = octokit;
     this.web = web;
   }
@@ -62,7 +63,7 @@ class EventHandler {
     commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
 
     if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
-      await sendSlackMessageToComment(this.web, commentData, channelId);
+      await this.slackMessages.sendSlackMessageToComment(this.web, commentData, channelId);
     }
   }
 
@@ -81,7 +82,7 @@ class EventHandler {
     commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
 
     if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
-      await sendSlackMessageToApprove(this.web, commentData, channelId);
+      await this.slackMessages.sendSlackMessageToApprove(this.web, commentData, channelId);
     }
   }
 }

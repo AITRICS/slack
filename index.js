@@ -17,7 +17,7 @@ async function run() {
   try {
     switch (ACTION_TYPE) {
       case 'approve':
-        await handler.handleApprove();
+        await handler.handleApprove(payload);
         break;
       case 'comment':
         await handler.handleComment(payload);
