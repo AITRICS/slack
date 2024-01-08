@@ -24,8 +24,8 @@ async function run() {
   // For instance, for a pull request event, it will contain details about the pull request.
   const { payload } = Github.context;
 
-  if (!payload || !payload.comment) {
-    console.error('Invalid payload or payload.comment');
+  if (!payload) {
+    console.error('Invalid payload');
     process.exit(1);
   }
 
