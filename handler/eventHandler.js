@@ -67,7 +67,7 @@ class EventHandler {
   }
 
   async handleApprove() {
-
+    console.log('approve');
   }
 }
 
