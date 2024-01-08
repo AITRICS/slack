@@ -23,6 +23,7 @@ async function run() {
         await handler.handleComment(payload);
         break;
       case 'review_requested':
+      case 'changes_requested':
         await handler.handleReviewRequested(payload);
         break;
       default:
