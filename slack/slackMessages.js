@@ -71,7 +71,7 @@ class SlackMessages {
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*<${commentData.prUrl}|${commentData.prTitle}>*\n:white_check_mark: *${commentData.reviewerSlackRealName}* 님이 Approve를 했습니다!! <@${commentData.ownerSlackId}>:\n`,
+      `*<${commentData.prUrl}|${commentData.prTitle}>*\n:white_check_mark: *${commentData.commentAuthorSlackRealName}* 님이 Approve를 했습니다!! <@${commentData.mentionedSlackId}>:\n`,
       attachments,
     );
 
@@ -86,7 +86,7 @@ class SlackMessages {
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*<${commentData.prUrl}|${commentData.prTitle}>*\n:eyes: *${commentData.ownerSlackRealName}* 님이 Review를 요청했습니다!! <@${commentData.reviewerSlackId}>:\n`,
+      `*<${commentData.prUrl}|${commentData.prTitle}>*\n:eyes: *${commentData.commentAuthorSlackRealName}* 님이 Review를 요청했습니다!! <@${commentData.mentionedSlackId}>:\n`,
       attachments,
     );
 
