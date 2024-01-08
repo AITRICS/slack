@@ -46,28 +46,24 @@ class EventHandler {
    * @throws Will throw an error if the Slack API request fails.
    */
   static #findSlackUserPropertyByGitName(members, searchName, property) {
-    try {
-      const lowerCaseSearchName = searchName.toLowerCase();
+    const lowerCaseSearchName = searchName.toLowerCase();
 
-      const user = members.find(({ real_name: realName, profile }) => {
-        const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
-        return nameToCheck.some((name) => name?.includes(lowerCaseSearchName));
-      });
+    const user = members.find(({ real_name: realName, profile }) => {
+      const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
+      return nameToCheck.some((name) => name?.includes(lowerCaseSearchName));
+    });
 
-      if (user) {
-        if (property === 'id') {
-          return user.id;
-        }
-        if (property === 'realName') {
-          return user.profile.display_name;
-        }
+    if (user) {
+      if (property === 'id') {
+        return user.id;
       }
-
-      return searchName;
-    } catch (error) {
-      console.error('Error finding Slack user property:', error);
-      throw error;
+      if (property === 'realName') {
+        return user.profile.display_name;
+      }
     }
+
+    return searchName;
+  }
   }
 
   /**
