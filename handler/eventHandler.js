@@ -154,14 +154,14 @@ class EventHandler {
     const commentData = {
       mentionedGitName: payload.pull_request?.user.login,
       prUrl: payload.pull_request?.html_url,
-      commentAuthorGitName: payload.requested_reviewer?.login,
+      reviewerGitName: payload.requested_reviewer?.login,
       prTitle: payload.pull_request?.title,
     };
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
     const members = await getSlackUserList(this.web);
-    commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'id');
-    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.commentAuthorGitName, 'realName');
+    commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.reviewerGitName, 'id');
+    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
   }
