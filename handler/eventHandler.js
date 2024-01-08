@@ -5,10 +5,10 @@ const sendSlackMessageToComment = require('../slack/sendSlackMessages');
 
 const GITHUB_TEAM_SLUGS = ['SE', 'Platform-frontend', 'Platform-backend'];
 const SLACK_CHANNEL = {
-  'SE': 'C06CS5Q4L8G',
+  SE: 'C06CS5Q4L8G',
   'Platform-frontend': 'C06B5J3KD8F',
   'Platform-backend': 'C06C8TLTURE',
-  'git-any': 'C06CMAY8066',
+  gitAny: 'C06CMAY8066',
 };
 
 class EventHandler {
@@ -29,7 +29,7 @@ class EventHandler {
    */
   async #selectSlackChannel(searchName) {
     const teamSlug = await findTeamSlugForGithubUser(this.octokit, searchName, GITHUB_TEAM_SLUGS);
-    return teamSlug ? SLACK_CHANNEL[teamSlug] : SLACK_CHANNEL['git-any'];
+    return teamSlug ? SLACK_CHANNEL[teamSlug] : SLACK_CHANNEL.gitAny;
   }
 
   /**

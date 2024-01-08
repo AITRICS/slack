@@ -11,7 +11,7 @@ const ACTION_TYPE = Core.getInput('ACTION_TYPE');
 async function run() {
   const web = new WebClient(SLACK_TOKEN);
   const octokit = new Octokit({ auth: GITHUB_TOKEN });
-  const payload = Github.context.payload;
+  const { payload } = Github.context;
   const handler = new EventHandler(octokit, web);
 
   try {
@@ -30,6 +30,7 @@ async function run() {
     console.error('Error executing action:', error);
   }
 
+  console.log(payload.data);
   console.log('Done!!');
 }
 
