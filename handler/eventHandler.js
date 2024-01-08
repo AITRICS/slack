@@ -107,8 +107,8 @@ class EventHandler {
     };
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
-    commentData.reviewerSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
+    commentData.mentionedSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
+    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
   }
@@ -122,8 +122,8 @@ class EventHandler {
     };
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    commentData.ownerSlackRealName = await this.#getSlackUserProperty(commentData.mentionedGitName, 'realName');
-    commentData.reviewerSlackId = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'id');
+    commentData.mentionedSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
+    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
   }
