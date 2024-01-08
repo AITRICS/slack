@@ -18,7 +18,7 @@ class EventHandler {
    * @param {WebClient} web - The Slack WebClient instance.
    */
   constructor(octokit, web) {
-    this.slackMessages = new SlackMessages();
+    this.slackMessages = new SlackMessages(web);
     this.octokit = octokit;
     this.web = web;
   }
