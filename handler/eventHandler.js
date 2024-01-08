@@ -1,5 +1,4 @@
-const findTeamSlugForGithubUser = require('../github/findTeamSlugForGithubUser');
-const getGithubNickNameToGitHub = require('../github/getGithubNickNameToGitHub');
+const { getGithubNickNameToGitHub, getCommentAuthor, findTeamSlugForGithubUser } = require('../github/githubUtils');
 const findSlackUserPropertyByGitName = require('../slack/findSlackUserPropertyByGitName');
 const SlackMessages = require('../slack/slackMessages');
 
@@ -29,6 +28,11 @@ class EventHandler {
    * @returns {Promise<string>} The Slack channel ID.
    */
   async #selectSlackChannel(searchName) {
+    if (!searchName) {
+      console.error('Invalid searchName');
+      return null;
+    }
+
     const teamSlug = await findTeamSlugForGithubUser(this.octokit, searchName, GITHUB_TEAM_SLUGS);
     return teamSlug ? SLACK_CHANNEL[teamSlug] : SLACK_CHANNEL.gitAny;
   }
@@ -40,22 +44,18 @@ class EventHandler {
    * @returns {Promise<string>} The Slack user property value.
    */
   async #getSlackUserProperty(searchName, property) {
-    const githubNickName = await getGithubNickNameToGitHub(this.octokit, searchName);
-    return findSlackUserPropertyByGitName(this.web, githubNickName, property);
-  }
-
-  async #getCommentAuthor(owner, repo, commentId) {
-    try {
-      const response = await this.octokit.rest.pulls.getReviewComment({
-        owner,
-        repo,
-        comment_id: commentId,
-      });
-      return response.data.user.login;
-    } catch (error) {
-      console.error(error);
+    if (!searchName) {
+      console.error('Invalid searchName: must be a non-empty string.');
       return null;
     }
+
+    if (!['id', 'realName'].includes(property)) {
+      console.error('Invalid property: must be either "id" or "realName".');
+      return null;
+    }
+
+    const githubNickName = await getGithubNickNameToGitHub(this.octokit, searchName);
+    return findSlackUserPropertyByGitName(this.web, githubNickName, property);
   }
 
   /**
@@ -73,18 +73,24 @@ class EventHandler {
       commentDiff: payload.comment?.diff_hunk,
     };
 
+    // Check if the comment is a reply to another comment.
     if (payload.comment.in_reply_to_id) {
-      const previousCommentAuthor = await this.#getCommentAuthor('aitrics', payload.repository.name, payload.comment.in_reply_to_id);
+      // Get the author of the original comment this one is replying to.
+      const previousCommentAuthor = await getCommentAuthor(
+        payload.repository.name,
+        payload.comment.in_reply_to_id,
+      );
 
+      // If the author of the previous comment is different from the author of the current comment,
+      // update the mentionedGitName to the previous comment's author.
       if (previousCommentAuthor !== commentData.commentAuthorGitName) {
-        // commentData.reviewerGitName = commentData.prOwnerGitName;
         commentData.mentionedGitName = previousCommentAuthor;
       }
     }
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
-    commentData.reviewerSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
+    commentData.mentionedSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
+    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToComment(commentData, channelId);
   }
@@ -92,31 +98,31 @@ class EventHandler {
   async handleApprove(payload) {
     const commentData = {
       commentUrl: payload.review?.html_url,
-      prOwnerGitName: payload.pull_request?.user.login,
+      mentionedGitName: payload.pull_request?.user.login,
       prUrl: payload.review?.pull_request_url,
-      reviewerGitName: payload.review?.user.login,
+      commentAuthorGitName: payload.review?.user.login,
       commentBody: payload.review?.body,
       prTitle: payload.pull_request?.title,
     };
 
-    const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
-    commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'id');
-    commentData.reviewerSlackRealName = await this.#getSlackUserProperty(commentData.reviewerGitName, 'realName');
+    const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
+    commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.mentionedGitName, 'id');
+    commentData.reviewerSlackRealName = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
   }
 
   async handleReviewRequested(payload) {
     const commentData = {
-      prOwnerGitName: payload.pull_request?.user.login,
+      mentionedGitName: payload.pull_request?.user.login,
       prUrl: payload.pull_request?.html_url,
-      reviewerGitName: payload.requested_reviewer?.login,
+      commentAuthorGitName: payload.requested_reviewer?.login,
       prTitle: payload.pull_request?.title,
     };
 
-    const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
-    commentData.ownerSlackRealName = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'realName');
-    commentData.reviewerSlackId = await this.#getSlackUserProperty(commentData.reviewerGitName, 'id');
+    const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
+    commentData.ownerSlackRealName = await this.#getSlackUserProperty(commentData.mentionedGitName, 'realName');
+    commentData.reviewerSlackId = await this.#getSlackUserProperty(commentData.commentAuthorGitName, 'id');
 
     await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
   }

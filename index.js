@@ -8,11 +8,26 @@ const SLACK_TOKEN = Core.getInput('SLACK_TOKEN');
 const GITHUB_TOKEN = Core.getInput('GITHUB_TOKEN');
 const ACTION_TYPE = Core.getInput('ACTION_TYPE');
 
+/**
+ * The main function to run the GitHub Action.
+ * It initializes the Slack and GitHub clients, and handles different types of GitHub events.
+ *
+ * @throws Will throw an error and exit the process if there is an issue with the payload or the action type.
+ */
 async function run() {
   const web = new WebClient(SLACK_TOKEN);
   const octokit = new Octokit({ auth: GITHUB_TOKEN });
-  const { payload } = Github.context;
   const handler = new EventHandler(octokit, web);
+
+  // Github.context provides the payload of the GitHub event that triggered the action.
+  // The structure of the payload object depends on the type of event that triggered the workflow.
+  // For instance, for a pull request event, it will contain details about the pull request.
+  const { payload } = Github.context;
+
+  if (!payload || !payload.comment) {
+    console.error('Invalid payload or payload.comment');
+    process.exit(1);
+  }
 
   try {
     switch (ACTION_TYPE) {
@@ -27,15 +42,15 @@ async function run() {
         await handler.handleReviewRequested(payload);
         break;
       default:
-        console.log('error');
-        break;
+        console.error('Unknown action type:', ACTION_TYPE);
+        process.exit(1);
     }
   } catch (error) {
     console.error('Error executing action:', error);
+    process.exit(1);
   }
 
-  console.log(payload);
-  console.log('Done!!');
+  console.log('Message sent to Slack!');
 }
 
 run();
