@@ -11,13 +11,13 @@ const ACTION_TYPE = Core.getInput('ACTION_TYPE');
 async function run() {
   const web = new WebClient(SLACK_TOKEN);
   const octokit = new Octokit({ auth: GITHUB_TOKEN });
-  const payload = Github.context.payload;
+  const { payload } = Github.context;
   const handler = new EventHandler(octokit, web);
 
   try {
     switch (ACTION_TYPE) {
       case 'approve':
-        await handler.handleApprove();
+        await handler.handleApprove(payload);
         break;
       case 'comment':
         await handler.handleComment(payload);
@@ -30,6 +30,7 @@ async function run() {
     console.error('Error executing action:', error);
   }
 
+  // console.log(payload.pull_request);
   console.log('Done!!');
 }
 

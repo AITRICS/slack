@@ -1,14 +1,14 @@
 const findTeamSlugForGithubUser = require('../github/findTeamSlugForGithubUser');
 const getGithubNickNameToGitHub = require('../github/getGithubNickNameToGitHub');
 const findSlackUserPropertyByGitName = require('../slack/findSlackUserPropertyByGitName');
-const sendSlackMessageToComment = require('../slack/sendSlackMessages');
+const SlackMessages = require('../slack/slackMessages');
 
 const GITHUB_TEAM_SLUGS = ['SE', 'Platform-frontend', 'Platform-backend'];
 const SLACK_CHANNEL = {
-  'SE': 'C06CS5Q4L8G',
+  SE: 'C06CS5Q4L8G',
   'Platform-frontend': 'C06B5J3KD8F',
   'Platform-backend': 'C06C8TLTURE',
-  'git-any': 'C06CMAY8066',
+  gitAny: 'C06CMAY8066',
 };
 
 class EventHandler {
@@ -18,6 +18,7 @@ class EventHandler {
    * @param {WebClient} web - The Slack WebClient instance.
    */
   constructor(octokit, web) {
+    this.slackMessages = new SlackMessages(web);
     this.octokit = octokit;
     this.web = web;
   }
@@ -29,7 +30,7 @@ class EventHandler {
    */
   async #selectSlackChannel(searchName) {
     const teamSlug = await findTeamSlugForGithubUser(this.octokit, searchName, GITHUB_TEAM_SLUGS);
-    return teamSlug ? SLACK_CHANNEL[teamSlug] : SLACK_CHANNEL['git-any'];
+    return teamSlug ? SLACK_CHANNEL[teamSlug] : SLACK_CHANNEL.gitAny;
   }
 
   /**
@@ -62,12 +63,27 @@ class EventHandler {
     commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
 
     if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
-      await sendSlackMessageToComment(this.web, commentData, channelId);
+      await this.slackMessages.sendSlackMessageToComment(commentData, channelId);
     }
   }
 
-  async handleApprove() {
+  async handleApprove(payload) {
+    const commentData = {
+      commentUrl: payload.review?.html_url,
+      prOwnerGitName: payload.pull_request?.user.login,
+      prUrl: payload.review?.pull_request_url,
+      commenterGitName: payload.review?.user.login,
+      commentBody: payload.review?.body,
+      prTitle: payload.pull_request?.title,
+    };
 
+    const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
+    commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'id');
+    commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
+
+    if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
+      await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
+    }
   }
 }
 
