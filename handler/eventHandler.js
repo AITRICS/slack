@@ -44,6 +44,20 @@ class EventHandler {
     return findSlackUserPropertyByGitName(this.web, githubNickName, property);
   }
 
+  async getCommentAuthor(owner, repo, commentId) {
+    try {
+      const response = await this.octokit.rest.pulls.getReviewComment({
+        owner,
+        repo,
+        comment_id: commentId,
+      });
+      return response.data.user.login;
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  }
+
   /**
    * Responds to a GitHub comment event by sending a Slack message.
    * @param {object} payload - The payload of the GitHub comment event.
@@ -58,6 +72,11 @@ class EventHandler {
       prTitle: payload.issue?.title ?? payload.pull_request?.title,
       commentDiff: payload.comment?.diff_hunk,
     };
+
+    if (payload.comment.in_reply_to_id) {
+      commentData.reviewerGitName = commentData.prOwnerGitName;
+      commentData.prOwnerGitName = await this.getCommentAuthor('aitrics', payload.repository.name, payload.comment.in_reply_to_id);
+    }
 
     const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
     commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'id');
