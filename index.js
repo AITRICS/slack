@@ -33,7 +33,7 @@ async function run() {
     console.error('Error executing action:', error);
   }
 
-  console.log(payload);
+  // console.log(payload);
   console.log('Done!!');
 }
 
