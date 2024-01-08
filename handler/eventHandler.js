@@ -70,7 +70,7 @@ class EventHandler {
       commentAuthorGitName: payload.comment?.user.login,
       commentBody: payload.comment?.body,
       prTitle: payload.issue?.title ?? payload.pull_request?.title,
-      commentContent: payload.comment?.diff_hunk ?? payload.pull_request?.body,
+      commentContent: payload.comment?.diff_hunk,
     };
 
     // Check if the comment is a reply to another comment.
