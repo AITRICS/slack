@@ -10,7 +10,7 @@ async function getGithubNickNameToGitHub(octokit, githubName) {
     const res = await octokit.rest.users.getByUsername({
       username: githubName,
     });
-    return res.data.name;
+    return res.data.name || githubName;
   } catch (error) {
     console.error('Error fetching GitHub username:', error);
     throw error;
