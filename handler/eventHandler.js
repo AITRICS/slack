@@ -56,6 +56,7 @@ class EventHandler {
       reviewerGitName: payload.comment?.user.login,
       commentBody: payload.comment?.body,
       prTitle: payload.issue?.title ?? payload.pull_request?.title,
+      commentDiff: payload.comment?.diff_hunk,
     };
 
     const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
