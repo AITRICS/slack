@@ -63,7 +63,7 @@ class EventHandler {
     commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
 
     if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
-      await this.slackMessages.sendSlackMessageToComment(this.web, commentData, channelId);
+      await this.slackMessages.sendSlackMessageToComment(commentData, channelId);
     }
   }
 
@@ -82,7 +82,7 @@ class EventHandler {
     commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
 
     if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
-      await this.slackMessages.sendSlackMessageToApprove(this.web, commentData, channelId);
+      await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
     }
   }
 }
