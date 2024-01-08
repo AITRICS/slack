@@ -11,7 +11,7 @@ class SlackMessages {
         attachments: [
           {
             color: 'good',
-            text: `${commentData.commentDiff}\n${commentData.commentBody}\n\n<${commentData.commentUrl}|코멘트 보러가기>.`,
+            text: `\`\`\`${commentData.commentDiff}\`\`\`\n${commentData.commentBody}\n\n<${commentData.commentUrl}|코멘트 보러가기>.`,
           },
         ],
         mrkdwn: true,
