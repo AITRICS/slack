@@ -22,6 +22,9 @@ async function run() {
       case 'comment':
         await handler.handleComment(payload);
         break;
+      case 'review_requested':
+        await handler.handleReviewRequested(payload);
+        break;
       default:
         console.log('error');
         break;
@@ -30,7 +33,7 @@ async function run() {
     console.error('Error executing action:', error);
   }
 
-  // console.log(payload.pull_request);
+  // console.log(payload);
   console.log('Done!!');
 }
 

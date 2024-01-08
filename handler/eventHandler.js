@@ -53,18 +53,16 @@ class EventHandler {
       commentUrl: payload.comment?.html_url,
       prOwnerGitName: payload.issue?.user.login ?? payload.pull_request?.user.login,
       prUrl: payload.issue?.html_url ?? payload.pull_request?.html_url,
-      commenterGitName: payload.comment?.user.login,
+      reviewerGitName: payload.comment?.user.login,
       commentBody: payload.comment?.body,
       prTitle: payload.issue?.title ?? payload.pull_request?.title,
     };
 
     const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
     commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'id');
-    commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
+    commentData.reviewerSlackRealName = await this.#getSlackUserProperty(commentData.reviewerGitName, 'realName');
 
-    if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
-      await this.slackMessages.sendSlackMessageToComment(commentData, channelId);
-    }
+    await this.slackMessages.sendSlackMessageToComment(commentData, channelId);
   }
 
   async handleApprove(payload) {
@@ -72,18 +70,31 @@ class EventHandler {
       commentUrl: payload.review?.html_url,
       prOwnerGitName: payload.pull_request?.user.login,
       prUrl: payload.review?.pull_request_url,
-      commenterGitName: payload.review?.user.login,
+      reviewerGitName: payload.review?.user.login,
       commentBody: payload.review?.body,
       prTitle: payload.pull_request?.title,
     };
 
     const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
     commentData.ownerSlackId = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'id');
-    commentData.commenterSlackRealName = await this.#getSlackUserProperty(commentData.commenterGitName, 'realName');
+    commentData.reviewerSlackRealName = await this.#getSlackUserProperty(commentData.reviewerGitName, 'realName');
 
-    if (commentData.commentBody && commentData.commenterGitName && commentData.commentUrl) {
-      await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
-    }
+    await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
+  }
+
+  async handleReviewRequested(payload) {
+    const commentData = {
+      prOwnerGitName: payload.pull_request?.user.login,
+      prUrl: payload.pull_request?.html_url,
+      reviewerGitName: payload.requested_reviewer?.login,
+      prTitle: payload.pull_request?.title,
+    };
+
+    const channelId = await this.#selectSlackChannel(commentData.prOwnerGitName);
+    commentData.ownerSlackRealName = await this.#getSlackUserProperty(commentData.prOwnerGitName, 'realName');
+    commentData.reviewerSlackId = await this.#getSlackUserProperty(commentData.reviewerGitName, 'id');
+
+    await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
   }
 }
 
