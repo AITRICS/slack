@@ -1,5 +1,5 @@
-name: Action
-description: "A simple calculator action"
+name: Slack Notification Action
+description: "Send notifications to Slack based on GitHub events"
 runs:
   using: "node20"
   main: "index.js"
@@ -13,3 +13,4 @@ inputs:
   ACTION_TYPE:
     description: "github token"
     required: true
+
