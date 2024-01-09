@@ -39,7 +39,7 @@ async function run() {
         break;
       case 'review_requested':
       case 'changes_requested':
-        await handler.handleReviewRequested(payload);
+        // await handler.handleReviewRequested(payload);
         break;
       default:
         console.error('Unknown action type:', ACTION_TYPE);
@@ -50,6 +50,7 @@ async function run() {
     process.exit(1);
   }
 
+  console.log(payload);
   console.log('Message sent to Slack!');
 }
 
