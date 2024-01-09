@@ -4,7 +4,7 @@
  * @returns {Promise<Array>} The list of Slack users.
  * @throws Will throw an error if the Slack API request fails.
  */
-async function getSlackUserList(web) {
+async function fetchSlackUserList(web) {
   try {
     const slackUserList = await web.users.list();
     return slackUserList.members;
@@ -14,4 +14,4 @@ async function getSlackUserList(web) {
   }
 }
 
-module.exports = getSlackUserList;
+module.exports = fetchSlackUserList;

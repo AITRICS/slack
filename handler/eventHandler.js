@@ -1,12 +1,12 @@
 const {
-  getGithubNickNameToGitHub,
-  getCommentAuthor,
+  fetchGithubNickNameToGitHub,
+  fetchCommentAuthor,
   findTeamSlugForGithubUser,
-  getPullRequestReviews,
-  getPullRequestDetails,
+  fetchPullRequestReviews,
+  fetchPullRequestDetails,
   fetchOpenPullRequests,
 } = require('../github/githubUtils');
-const getSlackUserList = require('../slack/getSlackUserList');
+const fetchSlackUserList = require('../slack/fetchSlackUserList');
 const SlackMessages = require('../slack/slackMessages');
 
 const GITHUB_TEAM_SLUGS = ['SE', 'Platform-frontend', 'Platform-backend'];
@@ -41,24 +41,21 @@ class EventHandler {
   async #getPRReviewersWithStatus(octokit, members, repo, pr) {
     const prNumber = pr.number;
     /**
-    * Note: `getPullRequestReviews` is used to fetch submitted reviews. However, it does not include reviewers
-    * who are requested but have not yet submitted a review. Therefore, `getPullRequestDetails` is also used
+    * Note: `fetchPullRequestReviews` is used to fetch submitted reviews. However, it does not include reviewers
+    * who are requested but have not yet submitted a review. Therefore, `fetchPullRequestDetails` is also used
     * to fetch all requested reviewers. This ensures we capture the status of all reviewers, both who have
     * and have not yet reviewed.
     */
-    const reviewsData = await getPullRequestReviews(octokit, repo, prNumber);
-    const prDetailsData = await getPullRequestDetails(octokit, repo, prNumber);
+    const reviewsData = await fetchPullRequestReviews(octokit, repo, prNumber);
+    const prDetailsData = await fetchPullRequestDetails(octokit, repo, prNumber);
 
-    // Maps each reviewer to their corresponding Slack ID and review status.
     const mapReviewersToSlackIdAndState = async (reviewers, defaultState = null) => Promise.all(
       reviewers.map(async (reviewer) => {
         const slackId = await this.#getSlackUserProperty(members, reviewer.user?.login || reviewer.login, 'id');
-        // Formats the Slack ID in a mention-friendly format.
         return { slackId, state: reviewer.state || defaultState };
       }),
     );
 
-    // Processes both submitted and requested reviewers in parallel.
     const [submittedReviewers, requestedReviewers] = await Promise.all([
       mapReviewersToSlackIdAndState(reviewsData, 'COMMENTED'),
       mapReviewersToSlackIdAndState(prDetailsData.requested_reviewers, 'AWAITING'),
@@ -161,7 +158,7 @@ class EventHandler {
       return null;
     }
 
-    const githubNickName = await getGithubNickNameToGitHub(this.octokit, searchName);
+    const githubNickName = await fetchGithubNickNameToGitHub(this.octokit, searchName);
     return EventHandler.#findSlackUserPropertyByGitName(members, githubNickName, property);
   }
 
@@ -189,13 +186,12 @@ class EventHandler {
    * @param {object} payload - The payload of the GitHub comment event.
    */
   async handleSchedule(payload) {
-    // Extracting repository information and fetching Slack user list.
     const repo = payload.repository.name;
-    const members = await getSlackUserList(this.web);
+    const members = await fetchSlackUserList(this.web);
     const prsDetails = await this.#getPendingReviewPRs(this.octokit, members, repo);
     const teamPRs = EventHandler.#organizePRsByTeam(prsDetails);
 
-    // Using array method to handle PR notifications.
+    // This approach because we have multiple PR notices to send.
     const notificationPromises = Object.entries(teamPRs).flatMap(([teamSlug, prs]) => {
       if (prs.length === 0) return [];
 
@@ -231,7 +227,7 @@ class EventHandler {
     // Check if the comment is a reply to another comment.
     if (payload.comment.in_reply_to_id) {
       // Get the author of the original comment this one is replying to.
-      const previousCommentAuthor = await getCommentAuthor(
+      const previousCommentAuthor = await fetchCommentAuthor(
         this.octokit,
         payload.repository.name,
         payload.comment.in_reply_to_id,
@@ -245,7 +241,7 @@ class EventHandler {
     }
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    const members = await getSlackUserList(this.web);
+    const members = await fetchSlackUserList(this.web);
     commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'id');
     commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.commentAuthorGitName, 'realName');
 
@@ -263,7 +259,7 @@ class EventHandler {
     };
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    const members = await getSlackUserList(this.web);
+    const members = await fetchSlackUserList(this.web);
     commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'id');
     commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.commentAuthorGitName, 'realName');
 
@@ -279,7 +275,7 @@ class EventHandler {
     };
 
     const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    const members = await getSlackUserList(this.web);
+    const members = await fetchSlackUserList(this.web);
     commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.reviewerGitName, 'id');
     commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'realName');
 

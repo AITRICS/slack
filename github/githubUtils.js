@@ -33,7 +33,7 @@ async function findTeamSlugForGithubUser(octokit, githubName, githubTeamSlugs) {
  * @param {number} commentId - The ID of the review comment.
  * @returns {Promise<string|null>} The GitHub username of the comment author, or null if an error occurs.
  */
-async function getCommentAuthor(octokit, repo, commentId) {
+async function fetchCommentAuthor(octokit, repo, commentId) {
   try {
     // Fetching the review comment from GitHub using the Octokit client.
     const response = await octokit.rest.pulls.getReviewComment({
@@ -55,7 +55,7 @@ async function getCommentAuthor(octokit, repo, commentId) {
  * @returns {Promise<string>} The real name of the GitHub user.
  * @throws Will throw an error if the GitHub API request fails.
  */
-async function getGithubNickNameToGitHub(octokit, githubName) {
+async function fetchGithubNickNameToGitHub(octokit, githubName) {
   try {
     const res = await octokit.rest.users.getByUsername({
       username: githubName,
@@ -75,7 +75,7 @@ async function getGithubNickNameToGitHub(octokit, githubName) {
  * @param {number} prNumber - The number of the pull request for which reviews are being fetched.
  * @returns {Promise<Object>} A promise that resolves to review objects for the pull request.
  */
-async function getPullRequestReviews(octokit, repo, prNumber) {
+async function fetchPullRequestReviews(octokit, repo, prNumber) {
   try {
     const reviewsResponse = await octokit.rest.pulls.listReviews({
       owner: 'aitrics',
@@ -97,7 +97,7 @@ async function getPullRequestReviews(octokit, repo, prNumber) {
  * @param {number} prNumber - The number of the pull request.
  * @returns {Promise<Object>} A promise that resolves to an object containing the pull request details.
  */
-async function getPullRequestDetails(octokit, repo, prNumber) {
+async function fetchPullRequestDetails(octokit, repo, prNumber) {
   try {
     const prDetails = await octokit.rest.pulls.get({
       owner: 'aitrics',
@@ -133,10 +133,10 @@ async function fetchOpenPullRequests(octokit, repo) {
 }
 
 module.exports = {
-  getGithubNickNameToGitHub,
-  getCommentAuthor,
+  fetchGithubNickNameToGitHub,
+  fetchCommentAuthor,
   findTeamSlugForGithubUser,
-  getPullRequestReviews,
-  getPullRequestDetails,
+  fetchPullRequestReviews,
+  fetchPullRequestDetails,
   fetchOpenPullRequests,
 };
