@@ -1,7 +1,7 @@
 const {
   fetchGithubNickNameToGitHub,
   fetchCommentAuthor,
-  findTeamSlugForGithubUser,
+  fetchListMembersInOrg,
   fetchPullRequestReviews,
   fetchPullRequestDetails,
   fetchOpenPullRequests,
@@ -32,13 +32,12 @@ class EventHandler {
   /**
    * Fetches the reviewers' Slack IDs and their review status for a given pull request.
    *
-   * @param {Octokit} octokit - The Octokit instance used for GitHub API requests.
    * @param {Array} members - An array of member objects, used to map GitHub usernames to Slack IDs.
    * @param {string} repo - The name of the repository.
    * @param {Object} pr - The pull request object.
    * @returns {Promise<Object>} A promise that resolves to an object mapping Slack IDs to their review status.
    */
-  async #getPRReviewersWithStatus(octokit, members, repo, pr) {
+  async #getPRReviewersWithStatus(members, repo, pr) {
     const prNumber = pr.number;
     /**
     * Note: `fetchPullRequestReviews` is used to fetch submitted reviews. However, it does not include reviewers
@@ -46,8 +45,8 @@ class EventHandler {
     * to fetch all requested reviewers. This ensures we capture the status of all reviewers, both who have
     * and have not yet reviewed.
     */
-    const reviewsData = await fetchPullRequestReviews(octokit, repo, prNumber);
-    const prDetailsData = await fetchPullRequestDetails(octokit, repo, prNumber);
+    const reviewsData = await fetchPullRequestReviews(this.octokit, repo, prNumber);
+    const prDetailsData = await fetchPullRequestDetails(this.octokit, repo, prNumber);
 
     const mapReviewersToSlackIdAndState = async (reviewers, defaultState = null) => Promise.all(
       reviewers.map(async (reviewer) => {
@@ -71,22 +70,39 @@ class EventHandler {
   }
 
   /**
+   * Finds the team slug for a given GitHub user from a list of GitHub team slugs.
+   * @param {string} githubName - The GitHub username to search for.
+   * @param {string[]} githubTeamSlugs - An array of GitHub team slugs.
+   * @returns {Promise<string|null>} The team slug if the user is found, null otherwise.
+   * @throws Will throw an error if the GitHub API request fails.
+   */
+  async #findTeamSlugForGithubUser(githubName, githubTeamSlugs) {
+    const memberChecks = githubTeamSlugs.map(async (teamSlug) => {
+      const members = await fetchListMembersInOrg(this.octokit, teamSlug);
+      const member = members.find(({ login }) => login === githubName);
+      return member ? teamSlug : null;
+    });
+
+    const results = await Promise.all(memberChecks);
+    return results.find((slug) => slug !== null);
+  }
+
+  /**
    * Fetches and compiles details of all non-draft pull requests in a specific GitHub repository,
    * including reviewers' information and the team associated with each pull request.
    *
-   * @param {Octokit} octokit - The Octokit instance used for GitHub API requests.
    * @param {Array} members - An array of member objects, used to map GitHub usernames to Slack IDs.
    * @param {string} repo - The name of the GitHub repository.
    * @returns {Promise<Object>} A promise that resolves to objects, each representing
    * a non-draft pull request with additional details such as reviewers' status and team slug.
    */
-  async #getPendingReviewPRs(octokit, members, repo) {
-    const openPRs = await fetchOpenPullRequests(octokit, repo);
+  async #getPendingReviewPRs(members, repo) {
+    const openPRs = await fetchOpenPullRequests(this.octokit, repo);
     const filteredNonDraftPRs = openPRs.filter((pr) => !pr.draft);
 
     return Promise.all(filteredNonDraftPRs.map(async (pr) => {
-      const reviewersAndStatus = await this.#getPRReviewersWithStatus(octokit, members, repo, pr);
-      const teamSlug = await findTeamSlugForGithubUser(octokit, pr.user.login, GITHUB_TEAM_SLUGS);
+      const reviewersAndStatus = await this.#getPRReviewersWithStatus(members, repo, pr);
+      const teamSlug = await this.#findTeamSlugForGithubUser(pr.user.login, GITHUB_TEAM_SLUGS);
 
       // Format the reviewer's status and mansion as a string.
       const formattedReviewersStatus = Object.entries(reviewersAndStatus)
@@ -108,7 +124,7 @@ class EventHandler {
       return null;
     }
 
-    const teamSlug = await findTeamSlugForGithubUser(this.octokit, searchName, GITHUB_TEAM_SLUGS);
+    const teamSlug = await this.#findTeamSlugForGithubUser(searchName, GITHUB_TEAM_SLUGS);
     return teamSlug ? SLACK_CHANNEL[teamSlug] : SLACK_CHANNEL.gitAny;
   }
 
@@ -188,7 +204,7 @@ class EventHandler {
   async handleSchedule(payload) {
     const repo = payload.repository.name;
     const members = await fetchSlackUserList(this.web);
-    const prsDetails = await this.#getPendingReviewPRs(this.octokit, members, repo);
+    const prsDetails = await this.#getPendingReviewPRs(members, repo);
     const teamPRs = EventHandler.#organizePRsByTeam(prsDetails);
 
     // This approach because we have multiple PR notices to send.
@@ -227,11 +243,7 @@ class EventHandler {
     // Check if the comment is a reply to another comment.
     if (payload.comment.in_reply_to_id) {
       // Get the author of the original comment this one is replying to.
-      const previousCommentAuthor = await fetchCommentAuthor(
-        this.octokit,
-        payload.repository.name,
-        payload.comment.in_reply_to_id,
-      );
+      const previousCommentAuthor = await fetchCommentAuthor(this.octokit, payload.repository.name, payload.comment.in_reply_to_id);
 
       // If the author of the previous comment is different from the author of the current comment,
       // update the mentionedGitName to the previous comment's author.
