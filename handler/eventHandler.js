@@ -29,7 +29,7 @@ class EventHandler {
    */
   async #selectSlackChannel(searchName) {
     if (!searchName) {
-      console.error('Invalid searchName');
+      console.error('(#selectSlackChannel) Invalid searchName: must be a non-empty string.');
       return null;
     }
 
@@ -74,7 +74,7 @@ class EventHandler {
    */
   async #getSlackUserProperty(members, searchName, property) {
     if (!searchName) {
-      console.error('Invalid searchName: must be a non-empty string.');
+      console.error('(#getSlackUserProperty) Invalid searchName: must be a non-empty string.');
       return null;
     }
 
