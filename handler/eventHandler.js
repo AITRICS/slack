@@ -164,27 +164,36 @@ class EventHandler {
     const repo = payload.repository.name;
     const members = await getSlackUserList(this.web);
 
-    await this.getPendingReviewPRs(this.octokit, members, 'aitrics', 'vc-monorepo').then((prsDetails) => {
+    try {
+      const prsDetails = await this.getPendingReviewPRs(this.octokit, members, 'aitrics', 'vc-monorepo');
       const teamPRs = GITHUB_TEAM_SLUGS.reduce((acc, teamSlug) => {
         acc[teamSlug] = prsDetails.filter((pr) => pr.teamSlug === teamSlug);
         return acc;
       }, {});
 
-      Object.entries(teamPRs).forEach(([teamSlug, prs]) => {
-        // 여기서 PRs 배열이 비어있으면 건너뜁니다.
-        if (prs.length === 0) {
+      await Promise.all(Object.entries(teamPRs).map(async ([teamSlug, prs]) => {
+        if (prs.length === 0) return;
+        const channelId = SLACK_CHANNEL[teamSlug];
+        if (!channelId) {
+          console.error(`No Slack channel found for ${teamSlug}`);
           return;
         }
 
-        console.log(`${teamSlug} PRs:`);
-        prs.forEach((pr) => {
-          console.log(`${pr.title} - Reviewers: ${Object.entries(pr.reviewersStatus).map(([reviewer, status]) => `${reviewer} (${status})`).join(', ')}`);
-        });
-        console.log('\n');
-      });
-    }).catch((error) => {
+        await Promise.all(prs.map(async (pr) => {
+          const commentData = {
+            mentionedGitName: pr.author,
+            prUrl: pr.url,
+            body: pr.reviewers,
+            prTitle: pr.title,
+          };
+          console.log(pr);
+          console.log();
+          // await this.slackMessages.sendSlackMessageToSchedule(commentData, channelId);
+        }));
+      }));
+    } catch (error) {
       console.error('Error:', error);
-    });
+    }
   }
 
   async handleComment(payload) {
