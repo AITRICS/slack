@@ -79,8 +79,11 @@ class EventHandler {
       const prsDetails = await Promise.all(nonDraftPRs.map(async (pr) => {
         const reviewersStatus = await this.getPRReviewersWithStatus(octokit, members, owner, repo, pr);
         const teamSlug = await findTeamSlugForGithubUser(octokit, pr.user.login, GITHUB_TEAM_SLUGS);
+        const reviewersString = Object.entries(reviewersStatus)
+          .map(([reviewer, status]) => `<@${reviewer}> (${status})`)
+          .join(', ');
 
-        return { ...pr, reviewersStatus, teamSlug };
+        return { ...pr, reviewersString, teamSlug };
       }));
 
       return prsDetails;
@@ -183,7 +186,7 @@ class EventHandler {
           const commentData = {
             mentionedGitName: pr.author,
             prUrl: pr.url,
-            body: pr.reviewersStatus,
+            body: pr.reviewersString,
             prTitle: pr.title,
           };
 
