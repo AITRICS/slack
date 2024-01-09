@@ -44,7 +44,7 @@ async function getCommentAuthor(octokit, repo, commentId) {
     return response.data.user.login;
   } catch (error) {
     console.error(error);
-    return null;
+    throw error;
   }
 }
 
