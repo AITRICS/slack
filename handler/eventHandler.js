@@ -89,9 +89,13 @@ class EventHandler {
 
   /**
    * EventHandler class processes different GitHub event types and sends corresponding notifications to Slack.
-   * It handles three main types of events: comment, approve, and review request.
+   * It handles three main types of events: comment, approve, schedule and review request.
    * @param {object} payload - The payload of the GitHub comment event.
    */
+  async handleSchedule(payload) {
+    console.log(payload);
+  }
+
   async handleComment(payload) {
     const commentData = {
       commentUrl: payload.comment?.html_url,

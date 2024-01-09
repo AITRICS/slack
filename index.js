@@ -31,6 +31,9 @@ async function run() {
 
   try {
     switch (ACTION_TYPE) {
+      case 'schedule':
+        await handler.handleSchedule(payload);
+        break;
       case 'approve':
         await handler.handleApprove(payload);
         break;
