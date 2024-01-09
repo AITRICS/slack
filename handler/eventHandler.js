@@ -152,7 +152,7 @@ class EventHandler {
   async handleSchedule(payload) {
     const repo = payload.repository.name;
 
-    await this.getPendingReviewPRs('aitrics', repo).then((prsDetails) => {
+    await this.getPendingReviewPRs(this.octokit, 'aitrics', repo).then((prsDetails) => {
       prsDetails.forEach((pr) => {
         const reviewers = Object.entries(pr.reviewersStatus)
           .map(([reviewer, status]) => `${reviewer} (${status})`)
