@@ -149,7 +149,7 @@ class EventHandler {
     const commentData = {
       mentionedGitName: payload.pull_request?.user.login,
       prUrl: payload.pull_request?.html_url,
-      reviewerGitName: payload.requested_reviewer?.login,
+      reviewerGitName: payload.requested_reviewer?.login ?? payload.review?.user.login,
       prTitle: payload.pull_request?.title,
     };
 
