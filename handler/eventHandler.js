@@ -183,7 +183,7 @@ class EventHandler {
           const commentData = {
             mentionedGitName: pr.author,
             prUrl: pr.url,
-            body: pr.reviewers,
+            body: pr.reviewersStatus,
             prTitle: pr.title,
           };
 
