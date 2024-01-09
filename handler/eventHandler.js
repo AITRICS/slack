@@ -40,7 +40,7 @@ class EventHandler {
     // 리뷰를 제출한 리뷰어들의 상태와 Slack ID를 저장합니다.
     const reviewersPromises = reviewsResponse.data.map(async (review) => {
       const slackId = await this.#getSlackUserProperty(members, review.user.login, 'id');
-      return { slackId, state: review.state };
+      return { slackId: `@${slackId}`, state: review.state };
     });
 
     const reviewersResults = await Promise.all(reviewersPromises);
