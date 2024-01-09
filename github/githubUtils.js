@@ -71,15 +71,14 @@ async function getGithubNickNameToGitHub(octokit, githubName) {
  * Retrieves the reviews for a given pull request.
  *
  * @param {Octokit} octokit - The Octokit instance used for GitHub API requests.
- * @param {string} owner - The owner of the repository.
  * @param {string} repo - The name of the repository.
  * @param {number} prNumber - The number of the pull request for which reviews are being fetched.
- * @returns {Promise<Object>} A promise that resolves to an array of review objects for the pull request.
+ * @returns {Promise<Object>} A promise that resolves to review objects for the pull request.
  */
-async function getPullRequestReviews(octokit, owner, repo, prNumber) {
+async function getPullRequestReviews(octokit, repo, prNumber) {
   try {
     const reviewsResponse = await octokit.rest.pulls.listReviews({
-      owner,
+      owner: 'aitrics',
       repo,
       pull_number: prNumber,
     });
@@ -94,15 +93,14 @@ async function getPullRequestReviews(octokit, owner, repo, prNumber) {
  * Fetches the details of a pull request.
  *
  * @param {Octokit} octokit - The Octokit instance.
- * @param {string} owner - The owner of the repository.
  * @param {string} repo - The name of the repository.
  * @param {number} prNumber - The number of the pull request.
  * @returns {Promise<Object>} A promise that resolves to an object containing the pull request details.
  */
-async function getPullRequestDetails(octokit, owner, repo, prNumber) {
+async function getPullRequestDetails(octokit, repo, prNumber) {
   try {
     const prDetails = await octokit.rest.pulls.get({
-      owner,
+      owner: 'aitrics',
       repo,
       pull_number: prNumber,
     });
@@ -113,10 +111,32 @@ async function getPullRequestDetails(octokit, owner, repo, prNumber) {
   }
 }
 
+/**
+ * Fetches all open pull requests for a given repository.
+ *
+ * @param {Octokit} octokit - Octokit instance for GitHub API requests.
+ * @param {string} repo - Repository name.
+ * @returns {Promise<Object>} A promise that resolves to open pull request objects.
+ */
+async function fetchOpenPullRequests(octokit, repo) {
+  try {
+    const response = await octokit.rest.pulls.list({
+      owner: 'aitrics',
+      repo,
+      state: 'open',
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching open PRs for repo ${repo}`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   getGithubNickNameToGitHub,
   getCommentAuthor,
   findTeamSlugForGithubUser,
   getPullRequestReviews,
   getPullRequestDetails,
+  fetchOpenPullRequests,
 };
