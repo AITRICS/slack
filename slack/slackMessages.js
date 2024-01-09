@@ -101,11 +101,11 @@ class SlackMessages {
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*<${commentData.prUrl}|${commentData.prTitle}>*에서 리뷰를 기다리고 있습니다. ${commentData.body}\n`,
+      `*<${commentData.prUrl}|${commentData.prTitle}>* 에서 리뷰를 기다리고 있습니다. ${commentData.body}\n`,
       attachments,
     );
-
-    await this.#sendSlackMessage(message);
+    console.log(message);
+    // await this.#sendSlackMessage(message);
   }
 }
 
