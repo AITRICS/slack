@@ -23,7 +23,7 @@ class EventHandler {
     this.web = web;
   }
 
-  async getPRReviewersWithStatus(octokit, owner, repo, pr) {
+  async getPRReviewersWithStatus(octokit, members, owner, repo, pr) {
     const prNumber = pr.number;
     const reviewsResponse = await octokit.rest.pulls.listReviews({
       owner,
@@ -37,19 +37,29 @@ class EventHandler {
       pull_number: prNumber,
     });
 
-    // 리뷰를 제출한 리뷰어와 그들의 상태를 가져옵니다.
-    const submittedReviewers = reviewsResponse.data.reduce((acc, review) => {
-      acc[review.user.login] = review.state;
+    // 리뷰를 제출한 리뷰어들의 상태와 Slack ID를 저장합니다.
+    const reviewersPromises = reviewsResponse.data.map(async (review) => {
+      const slackId = await this.#getSlackUserProperty(members, review.user.login, 'id');
+      return { slackId, state: review.state };
+    });
+
+    const reviewersResults = await Promise.all(reviewersPromises);
+    const submittedReviewers = reviewersResults.reduce((acc, { slackId, state }) => {
+      acc[slackId] = state;
       return acc;
     }, {});
 
-    // 리뷰를 요청받은 리뷰어 목록을 가져옵니다.
-    const requestedReviewers = prDetails.data.requested_reviewers.map((reviewer) => reviewer.login);
+    // 리뷰를 요청받은 리뷰어들의 Slack ID를 가져옵니다.
+    const requestedReviewersPromises = prDetails.data.requested_reviewers.map(async (reviewer) => {
+      const slackId = await this.#getSlackUserProperty(members, reviewer.login, 'id');
+      return slackId;
+    });
 
-    // 리뷰를 요청받았지만 아직 리뷰를 제출하지 않은 리뷰어를 찾습니다.
-    requestedReviewers.forEach((reviewer) => {
-      if (!(reviewer in submittedReviewers)) {
-        submittedReviewers[reviewer] = 'AWAITING'; // 'AWAITING' 상태로 표시
+    const requestedReviewers = await Promise.all(requestedReviewersPromises);
+
+    requestedReviewers.forEach((slackId) => {
+      if (!(slackId in submittedReviewers)) {
+        submittedReviewers[slackId] = 'AWAITING';
       }
     });
 
@@ -67,18 +77,10 @@ class EventHandler {
       const nonDraftPRs = response.data.filter((pr) => !pr.draft);
 
       const prsDetails = await Promise.all(nonDraftPRs.map(async (pr) => {
-        const reviewersStatus = await this.getPRReviewersWithStatus(octokit, owner, repo, pr);
+        const reviewersStatus = await this.getPRReviewersWithStatus(octokit, members, owner, repo, pr);
         const teamSlug = await findTeamSlugForGithubUser(octokit, pr.user.login, GITHUB_TEAM_SLUGS);
 
-        // 각 리뷰어의 Slack ID 조회
-        const reviewerSlackIDsPromises = Object.keys(reviewersStatus).map(async (reviewer) => ({ [reviewer]: await this.#getSlackUserProperty(members, reviewer, 'id') }));
-
-        const reviewersSlackIDsResults = await Promise.all(reviewerSlackIDsPromises);
-        const reviewersSlackIDs = Object.assign({}, ...reviewersSlackIDsResults);
-
-        return {
-          ...pr, reviewersStatus, teamSlug, reviewersSlackIDs,
-        };
+        return { ...pr, reviewersStatus, teamSlug };
       }));
 
       return prsDetails;
