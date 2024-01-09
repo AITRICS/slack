@@ -186,9 +186,8 @@ class EventHandler {
             body: pr.reviewers,
             prTitle: pr.title,
           };
-          console.log(pr.title, pr.reviewersStatus);
-          console.log();
-          // await this.slackMessages.sendSlackMessageToSchedule(commentData, channelId);
+
+          await this.slackMessages.sendSlackMessageToSchedule(commentData, channelId);
         }));
       }));
     } catch (error) {

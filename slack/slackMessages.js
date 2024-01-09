@@ -101,7 +101,7 @@ class SlackMessages {
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*<${commentData.prUrl}|${commentData.prTitle}>*\n:eyes: *${commentData.commentAuthorSlackRealName}* 님이 Review를 요청했습니다!! <@${commentData.mentionedSlackId}>:\n`,
+      `*<${commentData.prUrl}|${commentData.prTitle}>*에서 리뷰를 기다리고 있습니다. ${commentData.body}\n`,
       attachments,
     );
 
