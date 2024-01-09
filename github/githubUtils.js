@@ -1,27 +1,19 @@
 /**
- * Finds the team slug for a given GitHub user from a list of GitHub team slugs.
+ * Fetches the member list of a specific GitHub team.
  * @param {Octokit} octokit - The Octokit instance.
- * @param {string} githubName - The GitHub username to search for.
- * @param {string[]} githubTeamSlugs - An array of GitHub team slugs.
- * @returns {Promise<string|null>} The team slug if the user is found, null otherwise.
+ * @param {string} teamSlug - The slug of the GitHub team.
+ * @returns {Promise<Array>} A promise that resolves to an array of team members.
  * @throws Will throw an error if the GitHub API request fails.
  */
-async function findTeamSlugForGithubUser(octokit, githubName, githubTeamSlugs) {
+async function fetchListMembersInOrg(octokit, teamSlug) {
   try {
-    const memberChecks = githubTeamSlugs.map(async (teamSlug) => {
-      const memberList = await octokit.teams.listMembersInOrg({
-        org: 'aitrics',
-        team_slug: teamSlug,
-      });
-
-      const member = memberList.data.find(({ login }) => login === githubName);
-      return member ? teamSlug : null;
+    const memberList = await octokit.teams.listMembersInOrg({
+      org: 'aitrics',
+      team_slug: teamSlug,
     });
-
-    const results = await Promise.all(memberChecks);
-    return results.find((slug) => slug !== null);
+    return memberList.data;
   } catch (error) {
-    console.error('Error finding team slug for GitHub user:', error);
+    console.error(`Error fetching member list for team slug ${teamSlug}:`, error);
     throw error;
   }
 }
@@ -43,7 +35,7 @@ async function fetchCommentAuthor(octokit, repo, commentId) {
     });
     return response.data.user.login;
   } catch (error) {
-    console.error(error);
+    console.error(`Error fetching author of comment ID ${commentId} in repository '${repo}':`, error);
     throw error;
   }
 }
@@ -135,7 +127,7 @@ async function fetchOpenPullRequests(octokit, repo) {
 module.exports = {
   fetchGithubNickNameToGitHub,
   fetchCommentAuthor,
-  findTeamSlugForGithubUser,
+  fetchListMembersInOrg,
   fetchPullRequestReviews,
   fetchPullRequestDetails,
   fetchOpenPullRequests,
