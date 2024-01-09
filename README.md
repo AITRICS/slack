@@ -1,4 +1,4 @@
-# Slack Git Action
+# Slack Git Action V2
 
 ## About
 이 액션은 다른 Github에서 발생되는 PR, Reviewer, Comment 등의 이벤트를 Slack으로 전송합니다.  
@@ -6,7 +6,11 @@ Slack으로 전송될 때, Reviewer나 PR owner의 경우 Github의 Profile name
 Channel은 해당 Github user가 속해있는 Github member기준으로 나눠서 Slack channel과 Mapping 시켜서 전송하도록 했습니다.  
 Handler code의 `GITHUB_TEAM_SLUGS`, `SLACK_CHANNEL` 을 기준으로 Mapping 시킵니다.  
 
-#### 버전은 v2가 최신입니다.
+## Reference
+- [Github Action](https://docs.github.com/en/actions/creating-actions)
+- [Javascript Github Action](https://github.com/actions/javascript-action)
+- [Slack web api](https://api.slack.com/methods)
+- [Octokit](https://octokit.github.io/rest.js/v20)
 
 ## Develop Environment
 - Node version :  20
