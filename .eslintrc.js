@@ -22,6 +22,6 @@ module.exports = {
     sourceType: 'module',
   },
   rules: {
-    'max-len': ['error', { code: 130 }],
+    'max-len': ['error', { code: 140 }],
   },
 };
