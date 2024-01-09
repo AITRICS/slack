@@ -92,6 +92,21 @@ class SlackMessages {
 
     await this.#sendSlackMessage(message);
   }
+
+  async sendSlackMessageToSchedule(commentData, channelId) {
+    const attachments = [{
+      color: 'good',
+      text: `\n<${commentData.prUrl}|PR 보러가기>.`,
+    }];
+
+    const message = SlackMessages.#createMessage(
+      channelId,
+      `*<${commentData.prUrl}|${commentData.prTitle}>* 에서 리뷰를 기다리고 있습니다. ${commentData.body}\n`,
+      attachments,
+    );
+
+    await this.#sendSlackMessage(message);
+  }
 }
 
 module.exports = SlackMessages;

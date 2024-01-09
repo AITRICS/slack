@@ -1,4 +1,11 @@
-const { getGithubNickNameToGitHub, getCommentAuthor, findTeamSlugForGithubUser } = require('../github/githubUtils');
+const {
+  getGithubNickNameToGitHub,
+  getCommentAuthor,
+  findTeamSlugForGithubUser,
+  getPullRequestReviews,
+  getPullRequestDetails,
+  fetchOpenPullRequests,
+} = require('../github/githubUtils');
 const getSlackUserList = require('../slack/getSlackUserList');
 const SlackMessages = require('../slack/slackMessages');
 
@@ -20,6 +27,77 @@ class EventHandler {
     this.slackMessages = new SlackMessages(web);
     this.octokit = octokit;
     this.web = web;
+  }
+
+  /**
+   * Fetches the reviewers' Slack IDs and their review status for a given pull request.
+   *
+   * @param {Octokit} octokit - The Octokit instance used for GitHub API requests.
+   * @param {Array} members - An array of member objects, used to map GitHub usernames to Slack IDs.
+   * @param {string} repo - The name of the repository.
+   * @param {Object} pr - The pull request object.
+   * @returns {Promise<Object>} A promise that resolves to an object mapping Slack IDs to their review status.
+   */
+  async #getPRReviewersWithStatus(octokit, members, repo, pr) {
+    const prNumber = pr.number;
+    /**
+    * Note: `getPullRequestReviews` is used to fetch submitted reviews. However, it does not include reviewers
+    * who are requested but have not yet submitted a review. Therefore, `getPullRequestDetails` is also used
+    * to fetch all requested reviewers. This ensures we capture the status of all reviewers, both who have
+    * and have not yet reviewed.
+    */
+    const reviewsData = await getPullRequestReviews(octokit, repo, prNumber);
+    const prDetailsData = await getPullRequestDetails(octokit, repo, prNumber);
+
+    // Maps each reviewer to their corresponding Slack ID and review status.
+    const mapReviewersToSlackIdAndState = async (reviewers, defaultState = null) => Promise.all(
+      reviewers.map(async (reviewer) => {
+        const slackId = await this.#getSlackUserProperty(members, reviewer.user?.login || reviewer.login, 'id');
+        // Formats the Slack ID in a mention-friendly format.
+        return { slackId, state: reviewer.state || defaultState };
+      }),
+    );
+
+    // Processes both submitted and requested reviewers in parallel.
+    const [submittedReviewers, requestedReviewers] = await Promise.all([
+      mapReviewersToSlackIdAndState(reviewsData, 'COMMENTED'),
+      mapReviewersToSlackIdAndState(prDetailsData.requested_reviewers, 'AWAITING'),
+    ]);
+
+    // Combines the status of all reviewers into a single object.
+    const reviewersStatus = {};
+    [...submittedReviewers, ...requestedReviewers].forEach(({ slackId, state }) => {
+      reviewersStatus[slackId] = state;
+    });
+
+    return reviewersStatus;
+  }
+
+  /**
+   * Fetches and compiles details of all non-draft pull requests in a specific GitHub repository,
+   * including reviewers' information and the team associated with each pull request.
+   *
+   * @param {Octokit} octokit - The Octokit instance used for GitHub API requests.
+   * @param {Array} members - An array of member objects, used to map GitHub usernames to Slack IDs.
+   * @param {string} repo - The name of the GitHub repository.
+   * @returns {Promise<Object>} A promise that resolves to objects, each representing
+   * a non-draft pull request with additional details such as reviewers' status and team slug.
+   */
+  async #getPendingReviewPRs(octokit, members, repo) {
+    const openPRs = await fetchOpenPullRequests(octokit, repo);
+    const filteredNonDraftPRs = openPRs.filter((pr) => !pr.draft);
+
+    return Promise.all(filteredNonDraftPRs.map(async (pr) => {
+      const reviewersAndStatus = await this.#getPRReviewersWithStatus(octokit, members, repo, pr);
+      const teamSlug = await findTeamSlugForGithubUser(octokit, pr.user.login, GITHUB_TEAM_SLUGS);
+
+      // Format the reviewer's status and mansion as a string.
+      const formattedReviewersStatus = Object.entries(reviewersAndStatus)
+        .map(([reviewer, status]) => `<@${reviewer}> (${status})`)
+        .join(', ');
+
+      return { ...pr, reviewersString: formattedReviewersStatus, teamSlug };
+    }));
   }
 
   /**
@@ -46,11 +124,11 @@ class EventHandler {
    * @throws Will throw an error if the Slack API request fails.
    */
   static #findSlackUserPropertyByGitName(members, searchName, property) {
-    const lowerCaseSearchName = searchName.toLowerCase();
+    const cleanedSearchName = searchName.replace(/[^a-zA-Z]/g, '').toLowerCase();
 
     const user = members.find(({ real_name: realName, profile }) => {
       const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
-      return nameToCheck.some((name) => name?.includes(lowerCaseSearchName));
+      return nameToCheck.some((name) => name?.includes(cleanedSearchName));
     });
 
     if (user) {
@@ -88,10 +166,57 @@ class EventHandler {
   }
 
   /**
+   * Organizes pull requests by their respective teams.
+   *
+   * @param {Object} prsDetails - A pull request detail objects.
+   * @returns {Object} An object with team slugs as keys and arrays of PRs as values.
+   */
+  static #organizePRsByTeam(prsDetails) {
+    return GITHUB_TEAM_SLUGS.reduce((accumulator, teamSlug) => {
+      // Filter PRs for each team based on the team slug
+      const prsForTeam = prsDetails.filter((pr) => pr.teamSlug === teamSlug);
+
+      return {
+        ...accumulator,
+        [teamSlug]: prsForTeam,
+      };
+    }, {});
+  }
+
+  /**
    * EventHandler class processes different GitHub event types and sends corresponding notifications to Slack.
-   * It handles three main types of events: comment, approve, and review request.
+   * It handles three main types of events: comment, approve, schedule and review request.
    * @param {object} payload - The payload of the GitHub comment event.
    */
+  async handleSchedule(payload) {
+    // Extracting repository information and fetching Slack user list.
+    const repo = payload.repository.name;
+    const members = await getSlackUserList(this.web);
+    const prsDetails = await this.#getPendingReviewPRs(this.octokit, members, repo);
+    const teamPRs = EventHandler.#organizePRsByTeam(prsDetails);
+
+    // Using array method to handle PR notifications.
+    const notificationPromises = Object.entries(teamPRs).flatMap(([teamSlug, prs]) => {
+      if (prs.length === 0) return [];
+
+      const channelId = SLACK_CHANNEL[teamSlug] || SLACK_CHANNEL.gitAny;
+      return prs.map((pr) => this.#notifyPR(pr, channelId));
+    });
+
+    await Promise.all(notificationPromises);
+  }
+
+  async #notifyPR(pr, channelId) {
+    const commentData = {
+      mentionedGitName: pr.author,
+      prUrl: pr.url,
+      body: pr.reviewersString,
+      prTitle: pr.title,
+    };
+
+    await this.slackMessages.sendSlackMessageToSchedule(commentData, channelId);
+  }
+
   async handleComment(payload) {
     const commentData = {
       commentUrl: payload.comment?.html_url,
