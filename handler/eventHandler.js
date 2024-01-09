@@ -64,12 +64,12 @@ class EventHandler {
         state: 'open',
       });
 
-      // draft 상태가 아닌 PR만 필터링
       const nonDraftPRs = response.data.filter((pr) => !pr.draft);
 
       const prsDetails = await Promise.all(nonDraftPRs.map(async (pr) => {
         const reviewersStatus = await this.getPRReviewersWithStatus(octokit, owner, repo, pr);
-        return { ...pr, reviewersStatus };
+        const teamSlug = await findTeamSlugForGithubUser(octokit, pr.user.login, GITHUB_TEAM_SLUGS);
+        return { ...pr, reviewersStatus, teamSlug };
       }));
 
       return prsDetails;
@@ -152,13 +152,18 @@ class EventHandler {
   async handleSchedule(payload) {
     const repo = payload.repository.name;
 
-    await this.getPendingReviewPRs(this.octokit, 'aitrics', repo).then((prsDetails) => {
-      prsDetails.forEach((pr) => {
-        const reviewers = Object.entries(pr.reviewersStatus)
-          .map(([reviewer, status]) => `${reviewer} (${status})`)
-          .join(', ');
+    await this.getPendingReviewPRs(this.octokit, 'aitrics', 'vc-monorepo').then((prsDetails) => {
+      const teamPRs = GITHUB_TEAM_SLUGS.reduce((acc, teamSlug) => {
+        acc[teamSlug] = prsDetails.filter((pr) => pr.teamSlug === teamSlug);
+        return acc;
+      }, {});
 
-        console.log(`${pr.title} - Reviewers: ${reviewers}`);
+      Object.entries(teamPRs).forEach(([teamSlug, prs]) => {
+        console.log(`${teamSlug} PRs:`);
+        prs.forEach((pr) => {
+          console.log(`${pr.title} - Reviewers: ${Object.entries(pr.reviewersStatus).map(([reviewer, status]) => `${reviewer} (${status})`).join(', ')}`);
+        });
+        console.log('\n');
       });
     }).catch((error) => {
       console.error('Error:', error);
