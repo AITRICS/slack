@@ -104,8 +104,8 @@ class SlackMessages {
       `*<${commentData.prUrl}|${commentData.prTitle}>* 에서 리뷰를 기다리고 있습니다. ${commentData.body}\n`,
       attachments,
     );
-    // console.log(message);
-    await this.#sendSlackMessage(message);
+    console.log(message);
+    // await this.#sendSlackMessage(message);
   }
 }
 
