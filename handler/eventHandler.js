@@ -114,11 +114,11 @@ class EventHandler {
    * @throws Will throw an error if the Slack API request fails.
    */
   static #findSlackUserPropertyByGitName(members, searchName, property) {
-    const lowerCaseSearchName = searchName.toLowerCase();
+    const cleanedSearchName = searchName.replace(/[^a-zA-Z]/g, '').toLowerCase();
 
     const user = members.find(({ real_name: realName, profile }) => {
       const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
-      return nameToCheck.some((name) => name?.includes(lowerCaseSearchName));
+      return nameToCheck.some((name) => name?.includes(cleanedSearchName));
     });
 
     if (user) {
@@ -171,6 +171,11 @@ class EventHandler {
       }, {});
 
       Object.entries(teamPRs).forEach(([teamSlug, prs]) => {
+        // 여기서 PRs 배열이 비어있으면 건너뜁니다.
+        if (prs.length === 0) {
+          return;
+        }
+
         console.log(`${teamSlug} PRs:`);
         prs.forEach((pr) => {
           console.log(`${pr.title} - Reviewers: ${Object.entries(pr.reviewersStatus).map(([reviewer, status]) => `${reviewer} (${status})`).join(', ')}`);
