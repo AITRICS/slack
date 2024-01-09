@@ -22,6 +22,7 @@ async function run() {
   // Github.context provides the payload of the GitHub event that triggered the action.
   // The structure of the payload object depends on the type of event that triggered the workflow.
   // For instance, for a pull request event, it will contain details about the pull request.
+  // FYI: https://docs.github.com/ko/actions/learn-github-actions/contexts
   const { payload } = Github.context;
 
   if (!payload) {
