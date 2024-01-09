@@ -56,7 +56,7 @@ class EventHandler {
     return submittedReviewers;
   }
 
-  async getPendingReviewPRs(octokit, owner, repo) {
+  async getPendingReviewPRs(octokit, members, owner, repo) {
     try {
       const response = await octokit.rest.pulls.list({
         owner,
@@ -69,7 +69,16 @@ class EventHandler {
       const prsDetails = await Promise.all(nonDraftPRs.map(async (pr) => {
         const reviewersStatus = await this.getPRReviewersWithStatus(octokit, owner, repo, pr);
         const teamSlug = await findTeamSlugForGithubUser(octokit, pr.user.login, GITHUB_TEAM_SLUGS);
-        return { ...pr, reviewersStatus, teamSlug };
+
+        // 각 리뷰어의 Slack ID 조회
+        const reviewerSlackIDsPromises = Object.keys(reviewersStatus).map(async (reviewer) => ({ [reviewer]: await this.#getSlackUserProperty(members, reviewer, 'id') }));
+
+        const reviewersSlackIDsResults = await Promise.all(reviewerSlackIDsPromises);
+        const reviewersSlackIDs = Object.assign({}, ...reviewersSlackIDsResults);
+
+        return {
+          ...pr, reviewersStatus, teamSlug, reviewersSlackIDs,
+        };
       }));
 
       return prsDetails;
