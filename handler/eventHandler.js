@@ -221,7 +221,7 @@ class EventHandler {
   async #notifyPR(pr, channelId) {
     const commentData = {
       mentionedGitName: pr.author,
-      prUrl: pr.url,
+      prUrl: pr.html_url,
       body: pr.reviewersString,
       prTitle: pr.title,
     };
