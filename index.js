@@ -54,6 +54,7 @@ async function run() {
     process.exit(1);
   }
 
+  console.log(payload);
   console.log('Message sent to Slack!');
 }
 
