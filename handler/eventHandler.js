@@ -139,21 +139,20 @@ class EventHandler {
   static #findSlackUserPropertyByGitName(members, searchName, property) {
     const cleanedSearchName = searchName.replace(/[^a-zA-Z]/g, '').toLowerCase();
 
-    const user = members.find(({ real_name: realName, profile }) => {
+    const user = members.find(({ real_name: realName, profile, deleted }) => {
+      if (deleted) return false;
       const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
       return nameToCheck.some((name) => name?.includes(cleanedSearchName));
     });
 
-    if (user) {
-      if (property === 'id') {
-        return user.id;
-      }
-      if (property === 'realName') {
-        return user.profile.display_name;
-      }
-    }
+    if (!user) return searchName;
 
-    return searchName;
+    const slackUserProperties = {
+      id: () => user.id,
+      realName: () => user.profile.display_name,
+    };
+
+    return slackUserProperties[property] ? slackUserProperties[property]() : searchName;
   }
 
   /**
