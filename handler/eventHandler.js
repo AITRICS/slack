@@ -311,8 +311,9 @@ class EventHandler {
       ref,
     } = context;
     const repoName = payload.repository.name;
+    const repoFullName = payload.repository.full_name;
+    const repoUrl = payload.repository.html_url;
     const gitActionRunData = await fetchGitActionRunData(this.octokit, repoName, runId);
-    console.log(gitActionRunData);
     const durationMinutes = EventHandler.#getDurationInMinutes(gitActionRunData.created_at, gitActionRunData.updated_at);
     const minutes = Math.floor(durationMinutes);
     const seconds = Math.round((durationMinutes - minutes) * 60);
@@ -323,8 +324,12 @@ class EventHandler {
       ec2Name,
       imageTag,
       repoName,
+      repoFullName,
+      repoUrl,
       ref,
-      commit: sha.slice(0, 7),
+      sha,
+      commitUrl: `<https://github.com/${repoFullName}/commit/${sha}`,
+      workflow: gitActionRunData.workflow,
       totalRunTime: `${minutes}분 ${seconds}초`,
       triggerUser: mentionedSlackId,
       actionUrl: gitActionRunData.html_url,

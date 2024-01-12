@@ -23,6 +23,10 @@ class SlackMessages {
     };
   }
 
+  static #createField(title, value, isShort) {
+    return { title, value, short: isShort };
+  }
+
   /**
    * Sends a formatted Slack message.
    * @param {object} message - The Slack message object to send.
@@ -109,40 +113,21 @@ class SlackMessages {
   }
 
   async sendSlackMessageToDeploy(notificationData, channelId) {
+    const attachmentFields = [
+      SlackMessages.#createField(':white_check_mark:Succeeded GitHub Actions', '', false),
+      SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
+      SlackMessages.#createField('Commit', `${notificationData.commitUrl}|${notificationData.sha.slice(0, 7)}`, true),
+      SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
+      SlackMessages.#createField('Time', notificationData.totalRunTime, true),
+      SlackMessages.#createField('Ref', notificationData.ref, true),
+      SlackMessages.#createField('Workflow', `${notificationData.actionUrl}|${notificationData.workflow}`, true),
+      SlackMessages.#createField('Image Tag', notificationData.imageTag, true),
+      SlackMessages.#createField('Deploy Server', `https://${notificationData.ec2Name}.aitrics-vc.com|${notificationData.ec2Name}`, true),
+    ];
+
     const attachments = [{
-      color: 'good', // 메시지 색상
-      fields: [
-        {
-          title: 'Succeeded GitHub Actions',
-          value: `:white_check_mark: ${notificationData.imageTag}`,
-          short: false,
-        },
-        {
-          title: 'Repository',
-          value: `${notificationData.repoName}`,
-          short: true,
-        },
-        {
-          title: 'Commit',
-          value: `${notificationData.commit}`,
-          short: true,
-        },
-        {
-          title: 'Author',
-          value: `${notificationData.triggerUser}`,
-          short: true,
-        },
-        {
-          title: 'Time',
-          value: `${notificationData.totalRunTime}`,
-          short: true,
-        },
-        {
-          title: 'Ref',
-          value: `${notificationData.ref}`,
-          short: true,
-        },
-      ],
+      color: 'good',
+      fields: attachmentFields,
     }];
 
     const message = SlackMessages.#createMessage(
