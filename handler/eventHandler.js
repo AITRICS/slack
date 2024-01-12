@@ -311,7 +311,7 @@ class EventHandler {
       ref,
     } = context;
     const repoName = payload.repository.name;
-    const gitActionRunData = fetchGitActionRunData(this.octokit, repoName, runId);
+    const gitActionRunData = await fetchGitActionRunData(this.octokit, repoName, runId);
     console.log(gitActionRunData);
     const durationMinutes = EventHandler.#getDurationInMinutes(gitActionRunData.created_at, gitActionRunData.updated_at);
     const minutes = Math.floor(durationMinutes);
