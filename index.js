@@ -45,6 +45,11 @@ async function run() {
       case 'changes_requested':
         await handler.handleReviewRequested(payload);
         break;
+      case 'deploy': {
+        const ec2Name = Core.getInput('EC2_NAME');
+        await handler.handleDeploy(payload, ec2Name);
+        break;
+      }
       default:
         console.error('Unknown action type:', ACTION_TYPE);
         process.exit(1);

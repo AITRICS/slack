@@ -13,4 +13,7 @@ inputs:
   ACTION_TYPE:
     description: "github token"
     required: true
+  EC2_NAME:
+    description: "EC2 name"
+    required: false
 

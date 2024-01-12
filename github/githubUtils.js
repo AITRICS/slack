@@ -124,6 +124,20 @@ async function fetchOpenPullRequests(octokit, repo) {
   }
 }
 
+async function fetchGitActionRunData(octokit, repo, runId) {
+  try {
+    const response = await octokit.actions.getWorkflowRun({
+      owner: 'aitrics',
+      repo,
+      run_id: runId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching action run status for run ID ${runId}:`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   fetchGithubNickNameToGitHub,
   fetchCommentAuthor,
@@ -131,4 +145,5 @@ module.exports = {
   fetchPullRequestReviews,
   fetchPullRequestDetails,
   fetchOpenPullRequests,
+  fetchGitActionRunData,
 };
