@@ -316,7 +316,7 @@ class EventHandler {
     const minutes = Math.floor(durationMinutes);
     const seconds = Math.round((durationMinutes - minutes) * 60);
     const members = await fetchSlackUserList(this.web);
-    const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.name, 'id');
+    const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.login, 'id');
 
     const notificationData = {
       ec2Name,
