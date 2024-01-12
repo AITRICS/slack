@@ -107,6 +107,51 @@ class SlackMessages {
 
     await this.#sendSlackMessage(message);
   }
+
+  async sendSlackMessageToDeploy(notificationData, channelId) {
+    const attachments = [{
+      color: 'good', // 메시지 색상
+      fields: [
+        {
+          title: 'Succeeded GitHub Actions',
+          value: `:white_check_mark: ${notificationData.workflowName}`,
+          short: false,
+        },
+        {
+          title: 'Repository',
+          value: `${notificationData.repoName}`,
+          short: true,
+        },
+        {
+          title: 'Commit',
+          value: `${notificationData.commit}`,
+          short: true,
+        },
+        {
+          title: 'Author',
+          value: `${notificationData.triggerUser}`,
+          short: true,
+        },
+        {
+          title: 'Time',
+          value: `${notificationData.totalRunTime}`,
+          short: true,
+        },
+        {
+          title: 'Ref',
+          value: `${notificationData.ref}`,
+          short: true,
+        },
+      ],
+    }];
+
+    const message = SlackMessages.#createMessage(
+      channelId,
+      '',
+      attachments,
+    );
+    await this.#sendSlackMessage(message);
+  }
 }
 
 module.exports = SlackMessages;

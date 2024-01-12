@@ -16,4 +16,6 @@ inputs:
   EC2_NAME:
     description: "EC2 name"
     required: false
-
+  IMAGE_TAG:
+    description: "Image tag"
+    required: false

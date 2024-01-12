@@ -1,3 +1,4 @@
+const Github = require('@actions/github');
 const {
   fetchGithubNickNameToGitHub,
   fetchCommentAuthor,
@@ -5,6 +6,7 @@ const {
   fetchPullRequestReviews,
   fetchPullRequestDetails,
   fetchOpenPullRequests,
+  fetchGitActionRunData,
 } = require('../github/githubUtils');
 const fetchSlackUserList = require('../slack/fetchSlackUserList');
 const SlackMessages = require('../slack/slackMessages');
@@ -15,6 +17,7 @@ const SLACK_CHANNEL = {
   'Platform-frontend': 'C06B5J3KD8F',
   'Platform-backend': 'C06C8TLTURE',
   gitAny: 'C06CMAY8066',
+  deploy: 'C06CMU2S6JY',
 };
 
 class EventHandler {
@@ -195,6 +198,13 @@ class EventHandler {
     }, {});
   }
 
+  static #getDurationInMinutes(start, end) {
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+
+    return (endTime - startTime) / 60000;
+  }
+
   /**
    * EventHandler class processes different GitHub event types and sends corresponding notifications to Slack.
    * It handles three main types of events: comment, approve, schedule and review request.
@@ -293,8 +303,34 @@ class EventHandler {
     await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
   }
 
-  async handleDeploy(payload, ec2Name) {
-    console.log('hihi');
+  async handleDeploy(context, ec2Name, imageTag) {
+    const {
+      runId,
+      sha,
+      payload,
+      ref,
+    } = context;
+    const repoName = payload.repository.name;
+    const gitActionRunData = fetchGitActionRunData(this.octokit, repoName, runId);
+    const durationMinutes = EventHandler.#getDurationInMinutes(gitActionRunData.created_at, gitActionRunData.updated_at);
+    const minutes = Math.floor(durationMinutes);
+    const seconds = Math.round((durationMinutes - minutes) * 60);
+    const members = await fetchSlackUserList(this.web);
+    const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.name, 'id');
+
+    const notificationData = {
+      ec2Name,
+      imageTag,
+      repoName,
+      ref,
+      commit: sha.slice(0, 7),
+      totalRunTime: `${minutes}분 ${seconds}초`,
+      triggerUser: mentionedSlackId,
+      actionUrl: gitActionRunData.html_url,
+      status: gitActionRunData.conclusion,
+    };
+
+    await this.slackMessages.sendSlackMessageToDeploy(notificationData, SLACK_CHANNEL.deploy);
   }
 }
 
