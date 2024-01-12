@@ -292,6 +292,10 @@ class EventHandler {
 
     await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
   }
+
+  async handleDeploy(payload, ec2Name) {
+    console.log('hihi');
+  }
 }
 
 module.exports = EventHandler;
