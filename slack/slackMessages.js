@@ -114,7 +114,7 @@ class SlackMessages {
       fields: [
         {
           title: 'Succeeded GitHub Actions',
-          value: `:white_check_mark: ${notificationData.workflowName}`,
+          value: `:white_check_mark: ${notificationData.imageTag}`,
           short: false,
         },
         {
