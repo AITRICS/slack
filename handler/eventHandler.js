@@ -330,7 +330,7 @@ class EventHandler {
       status: gitActionRunData.conclusion,
     };
 
-    await this.slackMessages.sendSlackMessageToDeploy(notificationData, SLACK_CHANNEL.deploy);
+    await this.slackMessages.sendSlackMessageToDeploy(notificationData, 'C068EMH12TX');
   }
 }
 
