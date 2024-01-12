@@ -116,13 +116,13 @@ class SlackMessages {
     const attachmentFields = [
       SlackMessages.#createField(':white_check_mark:Succeeded GitHub Actions', '', false),
       SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
-      SlackMessages.#createField('Commit', `${notificationData.commitUrl}|${notificationData.sha.slice(0, 7)}`, true),
+      SlackMessages.#createField('Commit', `<${notificationData.commitUrl}|${notificationData.sha.slice(0, 7)}>`, true),
       SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
       SlackMessages.#createField('Time', notificationData.totalRunTime, true),
       SlackMessages.#createField('Ref', notificationData.ref, true),
-      SlackMessages.#createField('Workflow', `${notificationData.actionUrl}|${notificationData.workflow}`, true),
+      SlackMessages.#createField('Workflow', `<${notificationData.actionUrl}|${notificationData.workflow}>`, true),
       SlackMessages.#createField('Image Tag', notificationData.imageTag, true),
-      SlackMessages.#createField('Deploy Server', `https://${notificationData.ec2Name}.aitrics-vc.com|${notificationData.ec2Name}`, true),
+      SlackMessages.#createField('Deploy Server', `<https://${notificationData.ec2Name}.aitrics-vc.com|${notificationData.ec2Name}>`, true),
     ];
 
     const attachments = [{
