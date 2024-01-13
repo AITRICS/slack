@@ -1,4 +1,3 @@
-const Github = require('@actions/github');
 const {
   fetchGithubNickNameToGitHub,
   fetchCommentAuthor,
@@ -198,6 +197,78 @@ class EventHandler {
     }, {});
   }
 
+  /**
+   * Extracts and returns repository data.
+   * @param {Object} repository - The repository object.
+   * @param {string} repository.name - The name of the repository.
+   * @param {string} repository.full_name - The full name of the repository.
+   * @param {string} repository.html_url - The HTML URL of the repository.
+   * @returns {Object} Extracted repository data.
+   */
+  static #extractRepoData(repository) {
+    return {
+      name: repository.name,
+      fullName: repository.full_name,
+      url: repository.html_url,
+    };
+  }
+
+  /**
+   * Prepares and returns data for a deployment notification.
+   * @param {Object} deployData - The deployment data.
+   * @param {string} deployData.ec2Name - EC2 instance name.
+   * @param {string} deployData.imageTag - Image tag.
+   * @param {Object} deployData.repoData - Repository data.
+   * @param {string} deployData.ref - The git reference.
+   * @param {string} deployData.sha - The git SHA.
+   * @param {string} deployData.slackStatus - Slack status, either 'good' for successful job status or 'danger' for failed job status.
+   * @param {string} deployData.slackDeployResult - Slack deploy result, formatted as an emoji and text.
+   * @param {number} deployData.totalDurationMinutes - Total duration in minutes.
+   * @param {string} deployData.triggerUser - User who triggered the action.
+   * @param {Object} deployData.gitActionRunData - Git action run data.
+   * @returns {Object} Prepared notification data.
+   */
+  static #prepareNotificationData(deployData) {
+    const {
+      ec2Name,
+      imageTag,
+      repoData,
+      ref,
+      sha,
+      slackStatus,
+      slackDeployResult,
+      totalDurationMinutes,
+      triggerUser,
+      gitActionRunData,
+    } = deployData;
+
+    const minutes = Math.floor(totalDurationMinutes);
+    const seconds = Math.round((totalDurationMinutes - minutes) * 60);
+
+    return {
+      ec2Name,
+      imageTag,
+      ref,
+      sha,
+      slackStatus,
+      slackDeployResult,
+      triggerUser,
+      repoName: repoData.name,
+      repoFullName: repoData.fullName,
+      repoUrl: repoData.url,
+      commitUrl: `https://github.com/${repoData.fullName}/commit/${sha}`,
+      workflowName: gitActionRunData.name,
+      totalRunTime: `${minutes}분 ${seconds}초`,
+      actionUrl: gitActionRunData.html_url,
+    };
+  }
+
+  /**
+   * Calculates the duration in minutes between two dates.
+   * @param {Date|string} start - The start time as a Date object or an ISO 8601 string.
+   * @param {Date|string} end - The end time as a Date object or an ISO 8601 string.
+   * @returns {number} The duration in minutes between the two times.
+   */
   static #calculateDurationInMinutes(start, end) {
     const startTime = new Date(start);
     const endTime = new Date(end);
@@ -236,51 +307,6 @@ class EventHandler {
     };
 
     await this.slackMessages.sendSlackMessageToSchedule(commentData, channelId);
-  }
-
-  static #extractRepoData(repository) {
-    return {
-      name: repository.name,
-      fullName: repository.full_name,
-      url: repository.html_url,
-    };
-  }
-
-  static #prepareNotificationData(deployData) {
-    const {
-      ec2Name,
-      imageTag,
-      repoData,
-      ref,
-      sha,
-      slackStatus,
-      slackDeployResult,
-      totalDurationMinutes,
-      triggerUser,
-      gitActionRunData,
-      jobStatus,
-    } = deployData;
-
-    const minutes = Math.floor(totalDurationMinutes);
-    const seconds = Math.round((totalDurationMinutes - minutes) * 60);
-
-    return {
-      ec2Name,
-      imageTag,
-      ref,
-      sha,
-      slackStatus,
-      slackDeployResult,
-      triggerUser,
-      jobStatus,
-      repoName: repoData.name,
-      repoFullName: repoData.fullName,
-      repoUrl: repoData.url,
-      commitUrl: `https://github.com/${repoData.fullName}/commit/${sha}`,
-      workflowName: gitActionRunData.name,
-      totalRunTime: `${minutes}분 ${seconds}초`,
-      actionUrl: gitActionRunData.html_url,
-    };
   }
 
   async handleComment(payload) {
@@ -367,7 +393,6 @@ class EventHandler {
       slackDeployResult,
       totalDurationMinutes,
       triggerUser: mentionedSlackId,
-      jobStatus,
       gitActionRunData,
     });
 

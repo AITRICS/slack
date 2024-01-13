@@ -114,7 +114,7 @@ class SlackMessages {
 
   async sendSlackMessageToDeploy(notificationData, channelId) {
     const attachmentFields = [
-      SlackMessages.#createField(`${notificationData.slackDeployResult} GitHub Actions`, '', false),
+      SlackMessages.#createField('Deploy Info', '', false),
       SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
       SlackMessages.#createField('Deploy Server', `<https://${notificationData.ec2Name}.aitrics-vc.com|${notificationData.ec2Name}>`, true),
       SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
@@ -132,7 +132,7 @@ class SlackMessages {
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*${notificationData.jobStatus}*`,
+      `*${notificationData.slackDeployResult}*GitHub Actions Deploy Notification`,
       attachments,
     );
     await this.#sendSlackMessage(message);
