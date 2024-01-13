@@ -198,7 +198,7 @@ class EventHandler {
     }, {});
   }
 
-  static #getDurationInMinutes(start, end) {
+  static #calculateDurationInMinutes(start, end) {
     const startTime = new Date(start);
     const endTime = new Date(end);
 
@@ -236,6 +236,51 @@ class EventHandler {
     };
 
     await this.slackMessages.sendSlackMessageToSchedule(commentData, channelId);
+  }
+
+  static #extractRepoData(repository) {
+    return {
+      name: repository.name,
+      fullName: repository.full_name,
+      url: repository.html_url,
+    };
+  }
+
+  static #prepareNotificationData(deployData) {
+    const {
+      ec2Name,
+      imageTag,
+      repoData,
+      ref,
+      sha,
+      slackStatus,
+      slackDeployResult,
+      totalDurationMinutes,
+      triggerUser,
+      gitActionRunData,
+      jobStatus,
+    } = deployData;
+
+    const minutes = Math.floor(totalDurationMinutes);
+    const seconds = Math.round((totalDurationMinutes - minutes) * 60);
+
+    return {
+      ec2Name,
+      imageTag,
+      ref,
+      sha,
+      slackStatus,
+      slackDeployResult,
+      triggerUser,
+      jobStatus,
+      repoName: repoData.name,
+      repoFullName: repoData.fullName,
+      repoUrl: repoData.url,
+      commitUrl: `https://github.com/${repoData.fullName}/commit/${sha}`,
+      workflowName: gitActionRunData.name,
+      totalRunTime: `${minutes}분 ${seconds}초`,
+      actionUrl: gitActionRunData.html_url,
+    };
   }
 
   async handleComment(payload) {
@@ -304,42 +349,27 @@ class EventHandler {
   }
 
   async handleDeploy(context, ec2Name, imageTag, jobStatus) {
-    const {
-      runId,
-      sha,
-      payload,
-      ref,
-    } = context;
-    const repoName = payload.repository.name;
-    const repoFullName = payload.repository.full_name;
-    const repoUrl = payload.repository.html_url;
-    const gitActionRunData = await fetchGitActionRunData(this.octokit, repoName, runId);
-    const totalDurationMinutes = EventHandler.#getDurationInMinutes(gitActionRunData.run_started_at, new Date());
+    const repoData = EventHandler.#extractRepoData(context.payload.repository);
+    const gitActionRunData = await fetchGitActionRunData(repoData.name, context.runId);
     const slackStatus = jobStatus === 'success' ? 'good' : 'danger';
-    const slackStatusEmoji = jobStatus === 'success' ? ':white_check_mark:' : ':x:';
-    const minutes = Math.floor(totalDurationMinutes);
-    const seconds = Math.round((totalDurationMinutes - minutes) * 60);
+    const slackDeployResult = jobStatus === 'success' ? ':white_check_mark:Succeeded' : ':x:Failed';
+    const totalDurationMinutes = EventHandler.#calculateDurationInMinutes(gitActionRunData.run_started_at, new Date());
     const members = await fetchSlackUserList(this.web);
     const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.login, 'id');
 
-    console.log(gitActionRunData);
-    const notificationData = {
+    const notificationData = this.#prepareNotificationData({
       ec2Name,
       imageTag,
-      repoName,
-      repoFullName,
-      repoUrl,
-      ref,
-      sha,
+      repoData,
+      ref: context.ref,
+      sha: context.sha,
       slackStatus,
-      slackStatusEmoji,
-      commitUrl: `https://github.com/${repoFullName}/commit/${sha}`,
-      workflowName: gitActionRunData.name,
-      totalRunTime: `${minutes}분 ${seconds}초`,
+      slackDeployResult,
+      totalDurationMinutes,
       triggerUser: mentionedSlackId,
-      actionUrl: gitActionRunData.html_url,
-      status: gitActionRunData.conclusion,
-    };
+      jobStatus,
+      gitActionRunData,
+    });
 
     await this.slackMessages.sendSlackMessageToDeploy(notificationData, 'C068EMH12TX');
   }
