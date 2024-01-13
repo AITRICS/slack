@@ -396,7 +396,7 @@ class EventHandler {
       gitActionRunData,
     });
 
-    await this.slackMessages.sendSlackMessageToDeploy(notificationData, 'C068EMH12TX');
+    await this.slackMessages.sendSlackMessageToDeploy(notificationData, SLACK_CHANNEL.deploy);
   }
 }
 
