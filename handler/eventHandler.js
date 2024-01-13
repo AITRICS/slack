@@ -349,6 +349,7 @@ class EventHandler {
   }
 
   async handleDeploy(context, ec2Name, imageTag, jobStatus) {
+    console.log(context);
     const repoData = EventHandler.#extractRepoData(context.payload.repository);
     const gitActionRunData = await fetchGitActionRunData(repoData.name, context.runId);
     const slackStatus = jobStatus === 'success' ? 'good' : 'danger';
