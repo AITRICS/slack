@@ -23,6 +23,10 @@ class SlackMessages {
     };
   }
 
+  static #createField(title, value, isShort) {
+    return { title, value, short: isShort };
+  }
+
   /**
    * Sends a formatted Slack message.
    * @param {object} message - The Slack message object to send.
@@ -105,6 +109,32 @@ class SlackMessages {
       attachments,
     );
 
+    await this.#sendSlackMessage(message);
+  }
+
+  async sendSlackMessageToDeploy(notificationData, channelId) {
+    const attachmentFields = [
+      SlackMessages.#createField('Deploy Info', '', false),
+      SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
+      SlackMessages.#createField('Deploy Server', `<https://${notificationData.ec2Name}.aitrics-vc.com|${notificationData.ec2Name}>`, true),
+      SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
+      SlackMessages.#createField('Commit', `<${notificationData.commitUrl}|${notificationData.sha.slice(0, 7)}>`, true),
+      SlackMessages.#createField('Image Tag', notificationData.imageTag, true),
+      SlackMessages.#createField('Time', notificationData.totalRunTime, true),
+      SlackMessages.#createField('Workflow', `<${notificationData.actionUrl}|${notificationData.workflowName}>`, true),
+      SlackMessages.#createField('Ref', notificationData.ref, true),
+    ];
+
+    const attachments = [{
+      color: notificationData.slackStatus,
+      fields: attachmentFields,
+    }];
+
+    const message = SlackMessages.#createMessage(
+      channelId,
+      `*${notificationData.slackDeployResult}*GitHub Actions Deploy Notification`,
+      attachments,
+    );
     await this.#sendSlackMessage(message);
   }
 }

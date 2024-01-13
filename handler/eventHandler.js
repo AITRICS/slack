@@ -5,6 +5,7 @@ const {
   fetchPullRequestReviews,
   fetchPullRequestDetails,
   fetchOpenPullRequests,
+  fetchGitActionRunData,
 } = require('../github/githubUtils');
 const fetchSlackUserList = require('../slack/fetchSlackUserList');
 const SlackMessages = require('../slack/slackMessages');
@@ -15,6 +16,7 @@ const SLACK_CHANNEL = {
   'Platform-frontend': 'C06B5J3KD8F',
   'Platform-backend': 'C06C8TLTURE',
   gitAny: 'C06CMAY8066',
+  deploy: 'C06CMU2S6JY',
 };
 
 class EventHandler {
@@ -196,6 +198,85 @@ class EventHandler {
   }
 
   /**
+   * Extracts and returns repository data.
+   * @param {Object} repository - The repository object.
+   * @param {string} repository.name - The name of the repository.
+   * @param {string} repository.full_name - The full name of the repository.
+   * @param {string} repository.html_url - The HTML URL of the repository.
+   * @returns {Object} Extracted repository data.
+   */
+  static #extractRepoData(repository) {
+    return {
+      name: repository.name,
+      fullName: repository.full_name,
+      url: repository.html_url,
+    };
+  }
+
+  /**
+   * Prepares and returns data for a deployment notification.
+   * @param {Object} deployData - The deployment data.
+   * @param {string} deployData.ec2Name - EC2 instance name.
+   * @param {string} deployData.imageTag - Image tag.
+   * @param {Object} deployData.repoData - Repository data.
+   * @param {string} deployData.ref - The git reference.
+   * @param {string} deployData.sha - The git SHA.
+   * @param {string} deployData.slackStatus - Slack status, either 'good' for successful job status or 'danger' for failed job status.
+   * @param {string} deployData.slackDeployResult - Slack deploy result, formatted as an emoji and text.
+   * @param {number} deployData.totalDurationMinutes - Total duration in minutes.
+   * @param {string} deployData.triggerUser - User who triggered the action.
+   * @param {Object} deployData.gitActionRunData - Git action run data.
+   * @returns {Object} Prepared notification data.
+   */
+  static #prepareNotificationData(deployData) {
+    const {
+      ec2Name,
+      imageTag,
+      repoData,
+      ref,
+      sha,
+      slackStatus,
+      slackDeployResult,
+      totalDurationMinutes,
+      triggerUser,
+      gitActionRunData,
+    } = deployData;
+
+    const minutes = Math.floor(totalDurationMinutes);
+    const seconds = Math.round((totalDurationMinutes - minutes) * 60);
+
+    return {
+      ec2Name,
+      imageTag,
+      ref,
+      sha,
+      slackStatus,
+      slackDeployResult,
+      triggerUser,
+      repoName: repoData.name,
+      repoFullName: repoData.fullName,
+      repoUrl: repoData.url,
+      commitUrl: `https://github.com/${repoData.fullName}/commit/${sha}`,
+      workflowName: gitActionRunData.name,
+      totalRunTime: `${minutes}분 ${seconds}초`,
+      actionUrl: gitActionRunData.html_url,
+    };
+  }
+
+  /**
+   * Calculates the duration in minutes between two dates.
+   * @param {Date|string} start - The start time as a Date object or an ISO 8601 string.
+   * @param {Date|string} end - The end time as a Date object or an ISO 8601 string.
+   * @returns {number} The duration in minutes between the two times.
+   */
+  static #calculateDurationInMinutes(start, end) {
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+
+    return (endTime - startTime) / 60000;
+  }
+
+  /**
    * EventHandler class processes different GitHub event types and sends corresponding notifications to Slack.
    * It handles three main types of events: comment, approve, schedule and review request.
    * @param {object} payload - The payload of the GitHub comment event.
@@ -291,6 +372,31 @@ class EventHandler {
     commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'realName');
 
     await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
+  }
+
+  async handleDeploy(context, ec2Name, imageTag, jobStatus) {
+    const repoData = EventHandler.#extractRepoData(context.payload.repository);
+    const gitActionRunData = await fetchGitActionRunData(this.octokit, repoData.name, context.runId);
+    const members = await fetchSlackUserList(this.web);
+    const totalDurationMinutes = EventHandler.#calculateDurationInMinutes(gitActionRunData.run_started_at, new Date());
+    const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.login, 'id');
+    const slackStatus = jobStatus === 'success' ? 'good' : 'danger';
+    const slackDeployResult = jobStatus === 'success' ? ':white_check_mark:Succeeded' : ':x:Failed';
+
+    const notificationData = EventHandler.#prepareNotificationData({
+      ec2Name,
+      imageTag,
+      repoData,
+      ref: context.ref,
+      sha: context.sha,
+      slackStatus,
+      slackDeployResult,
+      totalDurationMinutes,
+      triggerUser: mentionedSlackId,
+      gitActionRunData,
+    });
+
+    await this.slackMessages.sendSlackMessageToDeploy(notificationData, SLACK_CHANNEL.deploy);
   }
 }
 

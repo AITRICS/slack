@@ -5,12 +5,20 @@ runs:
   main: "index.js"
 inputs:
   SLACK_TOKEN:
-    description: "slack token"
+    description: "Slack token"
     required: true
   GITHUB_TOKEN:
-    description: "github token"
+    description: "Github token"
     required: true
   ACTION_TYPE:
-    description: "github token"
+    description: "Action Type"
     required: true
-
+  EC2_NAME:
+    description: "EC2 name"
+    required: false
+  IMAGE_TAG:
+    description: "Image tag"
+    required: false
+  JOB_STATUS:
+    description: "Job status"
+    required: false

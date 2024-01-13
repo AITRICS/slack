@@ -23,9 +23,9 @@ async function run() {
   // The structure of the payload object depends on the type of event that triggered the workflow.
   // For instance, for a pull request event, it will contain details about the pull request.
   // FYI: https://docs.github.com/ko/actions/learn-github-actions/contexts
-  const { payload } = Github.context;
+  const { context } = Github;
 
-  if (!payload) {
+  if (!context.payload) {
     console.error('Invalid payload');
     process.exit(1);
   }
@@ -33,18 +33,25 @@ async function run() {
   try {
     switch (ACTION_TYPE) {
       case 'schedule':
-        await handler.handleSchedule(payload);
+        await handler.handleSchedule(context.payload);
         break;
       case 'approve':
-        await handler.handleApprove(payload);
+        await handler.handleApprove(context.payload);
         break;
       case 'comment':
-        await handler.handleComment(payload);
+        await handler.handleComment(context.payload);
         break;
       case 'review_requested':
       case 'changes_requested':
-        await handler.handleReviewRequested(payload);
+        await handler.handleReviewRequested(context.payload);
         break;
+      case 'deploy': {
+        const ec2Name = Core.getInput('EC2_NAME');
+        const imageTag = Core.getInput('IMAGE_TAG');
+        const jobStatus = Core.getInput('JOB_STATUS');
+        await handler.handleDeploy(context, ec2Name, imageTag, jobStatus);
+        break;
+      }
       default:
         console.error('Unknown action type:', ACTION_TYPE);
         process.exit(1);
@@ -54,7 +61,6 @@ async function run() {
     process.exit(1);
   }
 
-  console.log(payload);
   console.log('Message sent to Slack!');
 }
 
