@@ -315,6 +315,9 @@ class EventHandler {
     const repoUrl = payload.repository.html_url;
     const gitActionRunData = await fetchGitActionRunData(this.octokit, repoName, runId);
     const totalDurationMinutes = EventHandler.#getDurationInMinutes(gitActionRunData.run_started_at, new Date());
+    const { conclusion } = gitActionRunData;
+    const slackStatus = conclusion === 'success' ? 'good' : 'danger';
+    const slackStatusEmoji = conclusion === 'success' ? ':white_check_mark:' : ':x:';
     const minutes = Math.floor(totalDurationMinutes);
     const seconds = Math.round((totalDurationMinutes - minutes) * 60);
     const members = await fetchSlackUserList(this.web);
@@ -328,6 +331,8 @@ class EventHandler {
       repoUrl,
       ref,
       sha,
+      slackStatus,
+      slackStatusEmoji,
       commitUrl: `https://github.com/${repoFullName}/commit/${sha}`,
       workflowName: gitActionRunData.name,
       totalRunTime: `${minutes}분 ${seconds}초`,
