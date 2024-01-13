@@ -1,4 +1,4 @@
-# Slack Git Action V2
+# Slack Git Action V3
 
 ## About
 이 액션은 다른 Github에서 발생되는 PR, Reviewer, Comment 등의 이벤트를 Slack으로 전송합니다.  
@@ -36,6 +36,12 @@ Handler code의 `GITHUB_TEAM_SLUGS`, `SLACK_CHANNEL` 을 기준으로 Mapping �
 - Reviewer가 추가되면 해당 Reviewer에게 Slack으로 전송됩니다.
 - 마찬가지로 맨션되도록 되어있습니다.
 - Reviewer가 PR을 보고 changes requested를 하면 해당 PR의 owner에게 Slack으로 전송됩니다.
+
+### deploy
+- 해당 기능은 `workflow_call` 로 트리거 할 수 있습니다.
+- Gitaction을 통한 Deploy가 완료되면 Slack으로 전송됩니다.
+- 채널은 `#1_rnd-git-deploy` 로 고정되어 있습니다.
+- 성공/실패 여부, 얼마나 걸렸는지, 어느 EC2에 배포되었는지 등이 메시지로 전달됩니다.
 
 ## Inputs
 >```
@@ -123,6 +129,31 @@ ACTION_TYPE에는 Function에서 설명한 기능들이 들어가야 합니다.
           SLACK_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.BOT_SECRET_KEY }}
           ACTION_TYPE: 'changes_requested'
+```
+
+### Deploy
+```
+on:
+  workflow_call:
+    inputs:
+      ec2_name:
+        type: string
+      image_tag:
+        type: string
+
+  deploy:
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aitrics/slack@v2
+        with:
+          SLACK_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BOT_SECRET_KEY }}
+          ACTION_TYPE: 'deploy'
+          EC2_NAME: ${{ inputs.ec2_name }}
+          IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+          JOB_STATUS: ${{ needs.echo-job.result || 'failure' }}
 ```
 
 ### Improvements
