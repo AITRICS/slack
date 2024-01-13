@@ -120,7 +120,7 @@ class SlackMessages {
       SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
       SlackMessages.#createField('Time', notificationData.totalRunTime, true),
       SlackMessages.#createField('Ref', notificationData.ref, true),
-      SlackMessages.#createField('Workflow', `<${notificationData.actionUrl}|${notificationData.workflow}>`, true),
+      SlackMessages.#createField('Workflow', `<${notificationData.actionUrl}|${notificationData.workflowName}>`, true),
       SlackMessages.#createField('Image Tag', notificationData.imageTag, true),
       SlackMessages.#createField('Deploy Server', `<https://${notificationData.ec2Name}.aitrics-vc.com|${notificationData.ec2Name}>`, true),
     ];
