@@ -351,7 +351,7 @@ class EventHandler {
   async handleDeploy(context, ec2Name, imageTag, jobStatus) {
     console.log(context);
     const repoData = EventHandler.#extractRepoData(context.payload.repository);
-    const gitActionRunData = await fetchGitActionRunData(repoData.name, context.runId);
+    const gitActionRunData = await fetchGitActionRunData(this.octokit, repoData.name, context.runId);
     const slackStatus = jobStatus === 'success' ? 'good' : 'danger';
     const slackDeployResult = jobStatus === 'success' ? ':white_check_mark:Succeeded' : ':x:Failed';
     const totalDurationMinutes = EventHandler.#calculateDurationInMinutes(gitActionRunData.run_started_at, new Date());
