@@ -349,16 +349,15 @@ class EventHandler {
   }
 
   async handleDeploy(context, ec2Name, imageTag, jobStatus) {
-    console.log(context);
     const repoData = EventHandler.#extractRepoData(context.payload.repository);
     const gitActionRunData = await fetchGitActionRunData(this.octokit, repoData.name, context.runId);
+    const members = await fetchSlackUserList(this.web);
+    const totalDurationMinutes = EventHandler.#calculateDurationInMinutes(gitActionRunData.run_started_at, new Date());
+    const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.login, 'id');
     const slackStatus = jobStatus === 'success' ? 'good' : 'danger';
     const slackDeployResult = jobStatus === 'success' ? ':white_check_mark:Succeeded' : ':x:Failed';
-    const totalDurationMinutes = EventHandler.#calculateDurationInMinutes(gitActionRunData.run_started_at, new Date());
-    const members = await fetchSlackUserList(this.web);
-    const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.login, 'id');
 
-    const notificationData = this.#prepareNotificationData({
+    const notificationData = EventHandler.#prepareNotificationData({
       ec2Name,
       imageTag,
       repoData,
