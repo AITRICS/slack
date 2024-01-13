@@ -143,7 +143,7 @@ on:
 
   deploy:
     runs-on: ubuntu-latest
-    if: always() && github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: aitrics/slack@v2
