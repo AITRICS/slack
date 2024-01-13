@@ -48,7 +48,8 @@ async function run() {
       case 'deploy': {
         const ec2Name = Core.getInput('EC2_NAME');
         const imageTag = Core.getInput('IMAGE_TAG');
-        await handler.handleDeploy(context, ec2Name, imageTag);
+        const jobStatus = Core.getInput('JOB_STATUS');
+        await handler.handleDeploy(context, ec2Name, imageTag, jobStatus);
         break;
       }
       default:

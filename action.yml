@@ -19,3 +19,6 @@ inputs:
   IMAGE_TAG:
     description: "Image tag"
     required: false
+  JOB_STATUS:
+    description: "Job status"
+    required: false

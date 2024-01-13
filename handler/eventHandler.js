@@ -303,7 +303,7 @@ class EventHandler {
     await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
   }
 
-  async handleDeploy(context, ec2Name, imageTag) {
+  async handleDeploy(context, ec2Name, imageTag, jobStatus) {
     const {
       runId,
       sha,
@@ -315,9 +315,8 @@ class EventHandler {
     const repoUrl = payload.repository.html_url;
     const gitActionRunData = await fetchGitActionRunData(this.octokit, repoName, runId);
     const totalDurationMinutes = EventHandler.#getDurationInMinutes(gitActionRunData.run_started_at, new Date());
-    const { conclusion } = gitActionRunData;
-    const slackStatus = conclusion === 'success' ? 'good' : 'danger';
-    const slackStatusEmoji = conclusion === 'success' ? ':white_check_mark:' : ':x:';
+    const slackStatus = jobStatus === 'success' ? 'good' : 'danger';
+    const slackStatusEmoji = jobStatus === 'success' ? ':white_check_mark:' : ':x:';
     const minutes = Math.floor(totalDurationMinutes);
     const seconds = Math.round((totalDurationMinutes - minutes) * 60);
     const members = await fetchSlackUserList(this.web);
