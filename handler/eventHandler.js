@@ -323,6 +323,7 @@ class EventHandler {
     const members = await fetchSlackUserList(this.web);
     const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.login, 'id');
 
+    console.log(conclusion);
     const notificationData = {
       ec2Name,
       imageTag,

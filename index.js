@@ -60,7 +60,6 @@ async function run() {
     process.exit(1);
   }
 
-  console.log(Github.context);
   console.log('Message sent to Slack!');
 }
 
