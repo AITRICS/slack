@@ -81,7 +81,7 @@ class EventHandler {
    * @param {Array} nonDraftPRs - Array of non-draft PR objects.
    * @param {Array} slackMembers - Object containing Slack member information.
    * @param {string} repoName - Repository name.
-   * @returns {Promise<Array>} A promise that resolves to an array of PRs with added review and team data.
+   * @returns {Promise<Object>} A promise that resolves to an object of PRs with added review and team data.
    */
   async #addReviewAndTeamDataToPRs(nonDraftPRs, slackMembers, repoName) {
     return Promise.all(nonDraftPRs.map(async (pr) => {
@@ -125,7 +125,6 @@ class EventHandler {
    * @param {string} searchName - The GitHub username to search for in Slack user profiles.
    * @param {string} property - The property to retrieve from the Slack user ('id' or 'realName').
    * @returns {string} The requested property of the found Slack user or the searchName if no user is found.
-   * @throws Will throw an error if the Slack API request fails.
    */
   static #findSlackUserPropertyByGitName(slackMembers, searchName, property) {
     const cleanedSearchName = searchName.replace(/[^a-zA-Z]/g, '').toLowerCase();
