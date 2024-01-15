@@ -153,16 +153,12 @@ on:
           ACTION_TYPE: 'deploy'
           EC2_NAME: ${{ inputs.ec2_name }}
           IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
-          JOB_STATUS: ${{ needs.echo-job.result || 'failure' }}
+          JOB_STATUS: ${{ needs.echo-job.result || 'failure' }} //Job 상태를 확인할 수 있는 것이 필요.
 ```
 
 ### Improvements
 1. 현재 `GITHUB_TEAM_SLUGS`, `SLACK_CHANNEL`는 하드코딩 되어 있습니다.  
    지금은 Dev team에서만 사용하지만, 사용 범위가 점차 확장된다면 Input으로 받는 걸 고려 해야 합니다.
-2. githubUtils.js 같은 경우 함수가 여러게 있습니다.  
-   이 함수들을 Class로 묶을지의 여부는 고려할 만한 사항입니다.
-3. Dev team에서 만든 CI/CD Git action의 Noti를 추가 개발해야 합니다.  
-   성공/실패 여부, 얼마나 걸렸는지, 어느 EC2에 배포되었는지 등이 필요합니다.
 
 ### P.S
 새로운 기능 개발, 개선, 버그 수정 등은 언제든지 환영입니다.  
