@@ -45,67 +45,67 @@ class SlackMessages {
    * Sends a Slack message related to a GitHub event.
    * This method is used for various GitHub events such as comments, approvals, and review requests.
    * Depending on the event type, the message content and format vary.
-   * @param {object} commentData - Data about the GitHub event.
+   * @param {object} notificationData - Data about the GitHub event.
    * @param {string} channelId - The ID of the Slack channel to send the message to.
    */
-  async sendSlackMessageToComment(commentData, channelId) {
-    const contentText = commentData.commentContent
-      ? `\`\`\`${commentData.commentContent}\`\`\`\n`
+  async sendSlackMessageToComment(notificationData, channelId) {
+    const contentText = notificationData.commentContent
+      ? `\`\`\`${notificationData.commentContent}\`\`\`\n`
       : '';
 
     const attachments = [{
       color: 'good',
-      text: `${contentText}\n*코맨트 내용 :*\n${commentData.commentBody}\n\n<${commentData.commentUrl}|코멘트 보러가기>\n\n`,
+      text: `${contentText}\n*코맨트 내용 :*\n${notificationData.commentBody}\n\n<${notificationData.commentUrl}|코멘트 보러가기>\n\n`,
     }];
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*<${commentData.prUrl}|${commentData.prTitle}>*\n:pencil: *${commentData.commentAuthorSlackRealName}* 님이 코멘트를 남겼어요!! <@${commentData.mentionedSlackId}>:\n`,
+      `*<${notificationData.prUrl}|${notificationData.prTitle}>*\n:pencil: *${notificationData.commentAuthorSlackRealName}* 님이 코멘트를 남겼어요!! <@${notificationData.mentionedSlackId}>:\n`,
       attachments,
     );
 
     await this.#sendSlackMessage(message);
   }
 
-  async sendSlackMessageToApprove(commentData, channelId) {
+  async sendSlackMessageToApprove(notificationData, channelId) {
     const attachments = [{
       color: 'good',
-      text: `${commentData.commentBody}\n\n<${commentData.commentUrl}|코멘트 보러가기>.`,
+      text: `${notificationData.commentBody}\n\n<${notificationData.commentUrl}|코멘트 보러가기>.`,
     }];
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*<${commentData.prUrl}|${commentData.prTitle}>*\n:white_check_mark: *${commentData.commentAuthorSlackRealName}* 님이 Approve를 했습니다!! <@${commentData.mentionedSlackId}>:\n`,
+      `*<${notificationData.prUrl}|${notificationData.prTitle}>*\n:white_check_mark: *${notificationData.commentAuthorSlackRealName}* 님이 Approve를 했습니다!! <@${notificationData.mentionedSlackId}>:\n`,
       attachments,
     );
 
     await this.#sendSlackMessage(message);
   }
 
-  async sendSlackMessageToReviewRequested(commentData, channelId) {
+  async sendSlackMessageToReviewRequested(notificationData, channelId) {
     const attachments = [{
       color: 'good',
-      text: `\n<${commentData.prUrl}|PR 보러가기>.`,
+      text: `\n<${notificationData.prUrl}|PR 보러가기>.`,
     }];
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*<${commentData.prUrl}|${commentData.prTitle}>*\n:eyes: *${commentData.commentAuthorSlackRealName}* 님이 Review를 요청했습니다!! <@${commentData.mentionedSlackId}>:\n`,
+      `*<${notificationData.prUrl}|${notificationData.prTitle}>*\n:eyes: *${notificationData.commentAuthorSlackRealName}* 님이 Review를 요청했습니다!! <@${notificationData.mentionedSlackId}>:\n`,
       attachments,
     );
 
     await this.#sendSlackMessage(message);
   }
 
-  async sendSlackMessageToSchedule(commentData, channelId) {
+  async sendSlackMessageToSchedule(notificationData, channelId) {
     const attachments = [{
       color: 'good',
-      text: `\n<${commentData.prUrl}|PR 보러가기>.`,
+      text: `\n<${notificationData.prUrl}|PR 보러가기>.`,
     }];
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*<${commentData.prUrl}|${commentData.prTitle}>* 에서 리뷰를 기다리고 있습니다. ${commentData.body}\n`,
+      `*<${notificationData.prUrl}|${notificationData.prTitle}>* 에서 리뷰를 기다리고 있습니다. ${notificationData.body}\n`,
       attachments,
     );
 
@@ -116,11 +116,11 @@ class SlackMessages {
     const attachmentFields = [
       SlackMessages.#createField('Deploy Info', '', false),
       SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
-      SlackMessages.#createField('Deploy Server', `<https://${notificationData.ec2Name}.aitrics-vc.com|${notificationData.ec2Name}>`, true),
+      SlackMessages.#createField('Deploy Server', `https://${notificationData.ec2Name}.aitrics-vc.com`, true),
       SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
       SlackMessages.#createField('Commit', `<${notificationData.commitUrl}|${notificationData.sha.slice(0, 7)}>`, true),
       SlackMessages.#createField('Image Tag', notificationData.imageTag, true),
-      SlackMessages.#createField('Time', notificationData.totalRunTime, true),
+      SlackMessages.#createField('Run Time', notificationData.totalRunTime, true),
       SlackMessages.#createField('Workflow', `<${notificationData.actionUrl}|${notificationData.workflowName}>`, true),
       SlackMessages.#createField('Ref', notificationData.ref, true),
     ];
@@ -132,7 +132,7 @@ class SlackMessages {
 
     const message = SlackMessages.#createMessage(
       channelId,
-      `*${notificationData.slackDeployResult}*GitHub Actions Deploy Notification`,
+      `${notificationData.slackDeployResult} *GitHub Actions Deploy Notification*`,
       attachments,
     );
     await this.#sendSlackMessage(message);

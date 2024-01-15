@@ -1,14 +1,6 @@
-const {
-  fetchGithubNickNameToGitHub,
-  fetchCommentAuthor,
-  fetchListMembersInOrg,
-  fetchPullRequestReviews,
-  fetchPullRequestDetails,
-  fetchOpenPullRequests,
-  fetchGitActionRunData,
-} = require('../github/githubUtils');
-const fetchSlackUserList = require('../slack/fetchSlackUserList');
+const GitHubApiHelper = require('../github/gitHubApiHelper');
 const SlackMessages = require('../slack/slackMessages');
+const fetchSlackUserList = require('../slack/fetchSlackUserList');
 
 const GITHUB_TEAM_SLUGS = ['SE', 'Platform-frontend', 'Platform-backend'];
 const SLACK_CHANNEL = {
@@ -26,49 +18,45 @@ class EventHandler {
    * @param {WebClient} web - The Slack WebClient instance.
    */
   constructor(octokit, web) {
+    this.gitHubApiHelper = new GitHubApiHelper(octokit);
     this.slackMessages = new SlackMessages(web);
-    this.octokit = octokit;
     this.web = web;
   }
 
   /**
    * Fetches the reviewers' Slack IDs and their review status for a given pull request.
    *
-   * @param {Array} members - An array of member objects, used to map GitHub usernames to Slack IDs.
-   * @param {string} repo - The name of the repository.
-   * @param {Object} pr - The pull request object.
+   * @param {Array} slackMembers - An array of member objects, used to map GitHub usernames to Slack IDs.
+   * @param {string} repoName - The name of the repository.
+   * @param {string|int} prNumber - The pull request object.
    * @returns {Promise<Object>} A promise that resolves to an object mapping Slack IDs to their review status.
    */
-  async #getPRReviewersWithStatus(members, repo, pr) {
-    const prNumber = pr.number;
+  async #getPRReviewersWithStatus(slackMembers, repoName, prNumber) {
     /**
-    * Note: `fetchPullRequestReviews` is used to fetch submitted reviews. However, it does not include reviewers
-    * who are requested but have not yet submitted a review. Therefore, `fetchPullRequestDetails` is also used
-    * to fetch all requested reviewers. This ensures we capture the status of all reviewers, both who have
-    * and have not yet reviewed.
-    */
-    const reviewsData = await fetchPullRequestReviews(this.octokit, repo, prNumber);
-    const prDetailsData = await fetchPullRequestDetails(this.octokit, repo, prNumber);
+     * Note: `fetchPullRequestReviews` is used to fetch submitted reviews. However, it does not include reviewers
+     * who are requested but have not yet submitted a review. Therefore, `fetchPullRequestDetails` is also used
+     * to fetch all requested reviewers. This ensures we capture the status of all reviewers, both who have
+     * and have not yet reviewed.
+     */
+    const [reviewsData, prDetailsData] = await Promise.all([
+      this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
+      this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber),
+    ]);
 
-    const mapReviewersToSlackIdAndState = async (reviewers, defaultState = null) => Promise.all(
-      reviewers.map(async (reviewer) => {
-        const slackId = await this.#getSlackUserProperty(members, reviewer.user?.login || reviewer.login, 'id');
-        return { slackId, state: reviewer.state || defaultState };
-      }),
-    );
+    const mapReviewersToSlackIdAndState = (reviewers, defaultState = null) => Promise.all(reviewers.map(
+      (reviewer) => this.#getSlackUserProperty(slackMembers, reviewer.user?.login || reviewer.login, 'id')
+        .then((slackId) => ({ slackId, state: reviewer.state || defaultState })),
+    ));
 
     const [submittedReviewers, requestedReviewers] = await Promise.all([
       mapReviewersToSlackIdAndState(reviewsData, 'COMMENTED'),
       mapReviewersToSlackIdAndState(prDetailsData.requested_reviewers, 'AWAITING'),
     ]);
 
-    // Combines the status of all reviewers into a single object.
-    const reviewersStatus = {};
-    [...submittedReviewers, ...requestedReviewers].forEach(({ slackId, state }) => {
-      reviewersStatus[slackId] = state;
-    });
-
-    return reviewersStatus;
+    return [...submittedReviewers, ...requestedReviewers].reduce((reviewersStatus, { slackId, state }) => ({
+      ...reviewersStatus,
+      [slackId]: state,
+    }), {});
   }
 
   /**
@@ -76,43 +64,44 @@ class EventHandler {
    * @param {string} githubName - The GitHub username to search for.
    * @param {string[]} githubTeamSlugs - An array of GitHub team slugs.
    * @returns {Promise<string|null>} The team slug if the user is found, null otherwise.
-   * @throws Will throw an error if the GitHub API request fails.
    */
   async #findTeamSlugForGithubUser(githubName, githubTeamSlugs) {
-    const memberChecks = githubTeamSlugs.map(async (teamSlug) => {
-      const members = await fetchListMembersInOrg(this.octokit, teamSlug);
-      const member = members.find(({ login }) => login === githubName);
-      return member ? teamSlug : null;
+    const githubMemberChecks = githubTeamSlugs.map(async (teamSlug) => {
+      const githubMembers = await this.gitHubApiHelper.fetchListMembersInOrg(teamSlug);
+      const githubMember = githubMembers.find(({ login }) => login === githubName);
+      return githubMember ? teamSlug : null;
     });
 
-    const results = await Promise.all(memberChecks);
+    const results = await Promise.all(githubMemberChecks);
     return results.find((slug) => slug !== null);
   }
 
   /**
-   * Fetches and compiles details of all non-draft pull requests in a specific GitHub repository,
-   * including reviewers' information and the team associated with each pull request.
-   *
-   * @param {Array} members - An array of member objects, used to map GitHub usernames to Slack IDs.
-   * @param {string} repo - The name of the GitHub repository.
-   * @returns {Promise<Object>} A promise that resolves to objects, each representing
-   * a non-draft pull request with additional details such as reviewers' status and team slug.
+   * Adds review and team data to each PR in the list.
+   * @param {Array} nonDraftPRs - Array of non-draft PR objects.
+   * @param {Array} slackMembers - Object containing Slack member information.
+   * @param {string} repoName - Repository name.
+   * @returns {Promise<Array>} A promise that resolves to an array of PRs with added review and team data.
    */
-  async #getPendingReviewPRs(members, repo) {
-    const openPRs = await fetchOpenPullRequests(this.octokit, repo);
-    const filteredNonDraftPRs = openPRs.filter((pr) => !pr.draft);
-
-    return Promise.all(filteredNonDraftPRs.map(async (pr) => {
-      const reviewersAndStatus = await this.#getPRReviewersWithStatus(members, repo, pr);
+  async #addReviewAndTeamDataToPRs(nonDraftPRs, slackMembers, repoName) {
+    return Promise.all(nonDraftPRs.map(async (pr) => {
+      const reviewersAndStatus = await this.#getPRReviewersWithStatus(slackMembers, repoName, pr.number);
+      const formattedReviewersStatus = EventHandler.#createFormattedReviewerStatusString(reviewersAndStatus);
       const teamSlug = await this.#findTeamSlugForGithubUser(pr.user.login, GITHUB_TEAM_SLUGS);
-
-      // Format the reviewer's status and mansion as a string.
-      const formattedReviewersStatus = Object.entries(reviewersAndStatus)
-        .map(([reviewer, status]) => `<@${reviewer}> (${status})`)
-        .join(', ');
 
       return { ...pr, reviewersString: formattedReviewersStatus, teamSlug };
     }));
+  }
+
+  /**
+   * Creates a formatted string representing the status of each reviewer.
+   * @param {Object} reviewersAndStatus - Object mapping reviewers to their status.
+   * @returns {string} A string representing the status of each reviewer.
+   */
+  static #createFormattedReviewerStatusString(reviewersAndStatus) {
+    return Object.entries(reviewersAndStatus)
+      .map(([reviewer, status]) => `<@${reviewer}> (${status})`)
+      .join(', ');
   }
 
   /**
@@ -132,16 +121,16 @@ class EventHandler {
 
   /**
    * Finds a specific property of a Slack user by matching their real name or display name with the given GitHub username.
-   * @param {Array} members - The list of Slack users.
+   * @param {Array} slackMembers - The list of Slack users.
    * @param {string} searchName - The GitHub username to search for in Slack user profiles.
    * @param {string} property - The property to retrieve from the Slack user ('id' or 'realName').
    * @returns {string} The requested property of the found Slack user or the searchName if no user is found.
    * @throws Will throw an error if the Slack API request fails.
    */
-  static #findSlackUserPropertyByGitName(members, searchName, property) {
+  static #findSlackUserPropertyByGitName(slackMembers, searchName, property) {
     const cleanedSearchName = searchName.replace(/[^a-zA-Z]/g, '').toLowerCase();
 
-    const user = members.find(({ real_name: realName, profile, deleted }) => {
+    const user = slackMembers.find(({ real_name: realName, profile, deleted }) => {
       if (deleted) return false;
       const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
       return nameToCheck.some((name) => name?.includes(cleanedSearchName));
@@ -159,12 +148,12 @@ class EventHandler {
 
   /**
    * Retrieves a Slack user property based on a GitHub username.
-   * @param {Array} members - The list of Slack users.
+   * @param {Array} slackMembers - The list of Slack users.
    * @param {string} searchName - The GitHub username.
    * @param {string} property - The Slack user property to retrieve ('id' or 'realName').
    * @returns {Promise<string>} The Slack user property value.
    */
-  async #getSlackUserProperty(members, searchName, property) {
+  async #getSlackUserProperty(slackMembers, searchName, property) {
     if (!searchName) {
       console.error('(#getSlackUserProperty) Invalid searchName: must be a non-empty string.');
       return null;
@@ -175,24 +164,22 @@ class EventHandler {
       return null;
     }
 
-    const githubNickName = await fetchGithubNickNameToGitHub(this.octokit, searchName);
-    return EventHandler.#findSlackUserPropertyByGitName(members, githubNickName, property);
+    const githubNickName = await this.gitHubApiHelper.fetchGithubNickNameToGitHub(searchName);
+    return EventHandler.#findSlackUserPropertyByGitName(slackMembers, githubNickName, property);
   }
 
   /**
    * Organizes pull requests by their respective teams.
    *
-   * @param {Object} prsDetails - A pull request detail objects.
+   * @param {Object} pullRequestDetails - A pull request detail objects.
    * @returns {Object} An object with team slugs as keys and arrays of PRs as values.
    */
-  static #organizePRsByTeam(prsDetails) {
-    return GITHUB_TEAM_SLUGS.reduce((accumulator, teamSlug) => {
-      // Filter PRs for each team based on the team slug
-      const prsForTeam = prsDetails.filter((pr) => pr.teamSlug === teamSlug);
-
+  static #groupPullRequestsByTeam(pullRequestDetails) {
+    return GITHUB_TEAM_SLUGS.reduce((groupedPRs, currentTeamSlug) => {
+      const prsForCurrentTeam = pullRequestDetails.filter((prDetail) => prDetail.teamSlug === currentTeamSlug);
       return {
-        ...accumulator,
-        [teamSlug]: prsForTeam,
+        ...groupedPRs,
+        [currentTeamSlug]: prsForCurrentTeam,
       };
     }, {});
   }
@@ -282,35 +269,36 @@ class EventHandler {
    * @param {object} payload - The payload of the GitHub comment event.
    */
   async handleSchedule(payload) {
-    const repo = payload.repository.name;
-    const members = await fetchSlackUserList(this.web);
-    const prsDetails = await this.#getPendingReviewPRs(members, repo);
-    const teamPRs = EventHandler.#organizePRsByTeam(prsDetails);
+    const repoName = payload.repository.name;
+    const slackMembers = await fetchSlackUserList(this.web);
+    const nonDraftPRs = (await this.gitHubApiHelper.fetchOpenPullRequests(repoName)).filter((pr) => !pr.draft);
+    const pullRequestDetails = await this.#addReviewAndTeamDataToPRs(nonDraftPRs, slackMembers, repoName);
+    const teamPRs = EventHandler.#groupPullRequestsByTeam(pullRequestDetails);
 
     // This approach because we have multiple PR notices to send.
     const notificationPromises = Object.entries(teamPRs).flatMap(([teamSlug, prs]) => {
       if (prs.length === 0) return [];
 
       const channelId = SLACK_CHANNEL[teamSlug] || SLACK_CHANNEL.gitAny;
-      return prs.map((pr) => this.#notifyPR(pr, channelId));
+      return prs.map((pr) => this.#sendPRNotificationToSlack(pr, channelId));
     });
 
     await Promise.all(notificationPromises);
   }
 
-  async #notifyPR(pr, channelId) {
-    const commentData = {
+  async #sendPRNotificationToSlack(pr, channelId) {
+    const notificationData = {
       mentionedGitName: pr.author,
       prUrl: pr.html_url,
       body: pr.reviewersString,
       prTitle: pr.title,
     };
 
-    await this.slackMessages.sendSlackMessageToSchedule(commentData, channelId);
+    await this.slackMessages.sendSlackMessageToSchedule(notificationData, channelId);
   }
 
   async handleComment(payload) {
-    const commentData = {
+    const notificationData = {
       commentUrl: payload.comment?.html_url,
       mentionedGitName: payload.issue?.user.login ?? payload.pull_request?.user.login,
       prUrl: payload.pull_request?.html_url ?? payload.issue?.html_url,
@@ -323,25 +311,33 @@ class EventHandler {
     // Check if the comment is a reply to another comment.
     if (payload.comment.in_reply_to_id) {
       // Get the author of the original comment this one is replying to.
-      const previousCommentAuthor = await fetchCommentAuthor(this.octokit, payload.repository.name, payload.comment.in_reply_to_id);
+      const previousCommentAuthor = await this.gitHubApiHelper.fetchCommentAuthor(payload.repository.name, payload.comment.in_reply_to_id);
 
       // If the author of the previous comment is different from the author of the current comment,
       // update the mentionedGitName to the previous comment's author.
-      if (previousCommentAuthor !== commentData.commentAuthorGitName) {
-        commentData.mentionedGitName = previousCommentAuthor;
+      if (previousCommentAuthor !== notificationData.commentAuthorGitName) {
+        notificationData.mentionedGitName = previousCommentAuthor;
       }
     }
 
-    const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    const members = await fetchSlackUserList(this.web);
-    commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'id');
-    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.commentAuthorGitName, 'realName');
+    const channelId = await this.#selectSlackChannel(notificationData.mentionedGitName);
+    const slackMembers = await fetchSlackUserList(this.web);
+    notificationData.mentionedSlackId = await this.#getSlackUserProperty(
+      slackMembers,
+      notificationData.mentionedGitName,
+      'id',
+    );
+    notificationData.commentAuthorSlackRealName = await this.#getSlackUserProperty(
+      slackMembers,
+      notificationData.commentAuthorGitName,
+      'realName',
+    );
 
-    await this.slackMessages.sendSlackMessageToComment(commentData, channelId);
+    await this.slackMessages.sendSlackMessageToComment(notificationData, channelId);
   }
 
   async handleApprove(payload) {
-    const commentData = {
+    const notificationData = {
       commentUrl: payload.review?.html_url,
       mentionedGitName: payload.pull_request?.user.login,
       prUrl: payload.pull_request?.html_url,
@@ -350,38 +346,52 @@ class EventHandler {
       prTitle: payload.pull_request?.title,
     };
 
-    const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    const members = await fetchSlackUserList(this.web);
-    commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'id');
-    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.commentAuthorGitName, 'realName');
+    const channelId = await this.#selectSlackChannel(notificationData.mentionedGitName);
+    const slackMembers = await fetchSlackUserList(this.web);
+    notificationData.mentionedSlackId = await this.#getSlackUserProperty(
+      slackMembers,
+      notificationData.mentionedGitName,
+      'id',
+    );
+    notificationData.commentAuthorSlackRealName = await this.#getSlackUserProperty(
+      slackMembers,
+      notificationData.commentAuthorGitName,
+      'realName',
+    );
 
-    await this.slackMessages.sendSlackMessageToApprove(commentData, channelId);
+    await this.slackMessages.sendSlackMessageToApprove(notificationData, channelId);
   }
 
   async handleReviewRequested(payload) {
-    const commentData = {
+    const notificationData = {
       mentionedGitName: payload.pull_request?.user.login,
       prUrl: payload.pull_request?.html_url,
       reviewerGitName: payload.requested_reviewer?.login ?? payload.review?.user.login,
       prTitle: payload.pull_request?.title,
     };
 
-    const channelId = await this.#selectSlackChannel(commentData.mentionedGitName);
-    const members = await fetchSlackUserList(this.web);
-    commentData.mentionedSlackId = await this.#getSlackUserProperty(members, commentData.reviewerGitName, 'id');
-    commentData.commentAuthorSlackRealName = await this.#getSlackUserProperty(members, commentData.mentionedGitName, 'realName');
+    const channelId = await this.#selectSlackChannel(notificationData.mentionedGitName);
+    const slackMembers = await fetchSlackUserList(this.web);
+    notificationData.mentionedSlackId = await this.#getSlackUserProperty(
+      slackMembers,
+      notificationData.reviewerGitName,
+      'id',
+    );
+    notificationData.commentAuthorSlackRealName = await this.#getSlackUserProperty(
+      slackMembers,
+      notificationData.mentionedGitName,
+      'realName',
+    );
 
-    await this.slackMessages.sendSlackMessageToReviewRequested(commentData, channelId);
+    await this.slackMessages.sendSlackMessageToReviewRequested(notificationData, channelId);
   }
 
   async handleDeploy(context, ec2Name, imageTag, jobStatus) {
     const repoData = EventHandler.#extractRepoData(context.payload.repository);
-    const gitActionRunData = await fetchGitActionRunData(this.octokit, repoData.name, context.runId);
-    const members = await fetchSlackUserList(this.web);
+    const gitActionRunData = await this.gitHubApiHelper.fetchGitActionRunData(repoData.name, context.runId);
+    const slackMembers = await fetchSlackUserList(this.web);
     const totalDurationMinutes = EventHandler.#calculateDurationInMinutes(gitActionRunData.run_started_at, new Date());
-    const mentionedSlackId = await this.#getSlackUserProperty(members, gitActionRunData.actor.login, 'id');
-    const slackStatus = jobStatus === 'success' ? 'good' : 'danger';
-    const slackDeployResult = jobStatus === 'success' ? ':white_check_mark:Succeeded' : ':x:Failed';
+    const mentionedSlackId = await this.#getSlackUserProperty(slackMembers, gitActionRunData.actor.login, 'id');
 
     const notificationData = EventHandler.#prepareNotificationData({
       ec2Name,
@@ -389,8 +399,8 @@ class EventHandler {
       repoData,
       ref: context.ref,
       sha: context.sha,
-      slackStatus,
-      slackDeployResult,
+      slackStatus: jobStatus === 'success' ? 'good' : 'danger',
+      slackDeployResult: jobStatus === 'success' ? ':white_check_mark:*Succeeded*' : ':x:*Failed*',
       totalDurationMinutes,
       triggerUser: mentionedSlackId,
       gitActionRunData,
