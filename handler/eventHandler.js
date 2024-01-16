@@ -369,7 +369,7 @@ class EventHandler {
       prTitle: payload.pull_request?.title,
     };
 
-    const channelId = await this.#selectSlackChannel(notificationData.mentionedGitName);
+    const channelId = await this.#selectSlackChannel(notificationData.reviewerGitName);
     const slackMembers = await fetchSlackUserList(this.web);
     notificationData.mentionedSlackId = await this.#getSlackUserProperty(
       slackMembers,
