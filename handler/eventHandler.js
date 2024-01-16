@@ -127,7 +127,10 @@ class EventHandler {
    * @returns {string} The requested property of the found Slack user or the searchName if no user is found.
    */
   static #findSlackUserPropertyByGitName(slackMembers, searchName, property) {
-    const cleanedSearchName = searchName.replace(/[^a-zA-Z]/g, '').toLowerCase();
+    const cleanedSearchName = searchName
+      .replace(/aitrics-/g, '') // Remove the word 'aitrics-' from the search name
+      .replace(/[^a-zA-Z]/g, '') // Remove any non-alphabetic characters
+      .toLowerCase(); // 소문자로 변환
 
     const user = slackMembers.find(({ real_name: realName, profile, deleted }) => {
       if (deleted) return false;
