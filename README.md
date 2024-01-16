@@ -6,6 +6,9 @@ Slack으로 전송될 때, Reviewer나 PR owner의 경우 Github의 Profile name
 Channel은 해당 Github user가 속해있는 Github member기준으로 나눠서 Slack channel과 Mapping 시켜서 전송하도록 했습니다.  
 Handler code의 `GITHUB_TEAM_SLUGS`, `SLACK_CHANNEL` 을 기준으로 Mapping 시킵니다.
 
+사용하실 때 aitrics-bot을 적용할 repo에 맴버로 등록해줘야 합니다.
+Github token을 aitrics-bot을 사용하고 있기 때문입니다.
+
 ## Reference
 - [Github Action](https://docs.github.com/en/actions/creating-actions)
 - [Javascript Github Action](https://github.com/actions/javascript-action)
