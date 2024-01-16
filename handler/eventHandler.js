@@ -344,7 +344,7 @@ class EventHandler {
       mentionedGitName: payload.pull_request?.user.login,
       prUrl: payload.pull_request?.html_url,
       commentAuthorGitName: payload.review?.user.login,
-      commentBody: payload.review?.body,
+      commentBody: payload.review?.body || '',
       prTitle: payload.pull_request?.title,
     };
 
