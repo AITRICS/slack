@@ -103,7 +103,7 @@ class GitHubApiHelper {
       return prDetails.data;
     } catch (error) {
       console.error(`Error fetching PR details for PR number ${prNumber}:`, error);
-      throw error; // 혹은 에러에 따라 적절한 처리를 할 수 있습니다.
+      throw error;
     }
   }
 
