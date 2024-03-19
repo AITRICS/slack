@@ -11,6 +11,10 @@ const SLACK_CHANNEL = {
   deploy: 'C06CMU2S6JY',
 };
 
+const SKIP_SLACK_USER = [
+  'john (이주호)',
+];
+
 class EventHandler {
   /**
    * Constructs the EventHandler class.
@@ -135,6 +139,10 @@ class EventHandler {
     const user = slackMembers.find(({ real_name: realName, profile, deleted }) => {
       if (deleted) return false;
       const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
+
+      const isSkipUser = nameToCheck.some((name) => SKIP_SLACK_USER.some((skipName) => name?.includes(skipName)));
+      if (isSkipUser) return false;
+
       return nameToCheck.some((name) => name?.includes(cleanedSearchName));
     });
 
