@@ -131,11 +131,6 @@ class EventHandler {
    * @returns {string} The requested property of the found Slack user or the searchName if no user is found.
    */
   static #findSlackUserPropertyByGitName(slackMembers, searchName, property) {
-    const cleanedSearchName = searchName
-      .toLowerCase()
-      .replace(/aitrics-/g, '') // Remove the word 'aitrics-' from the search name
-      .replace(/[^a-zA-Z]/g, ''); // Remove any non-alphabetic characters
-
     const user = slackMembers.find(({ real_name: realName, profile, deleted }) => {
       if (deleted) return false;
       const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
@@ -143,7 +138,7 @@ class EventHandler {
       const isSkipUser = nameToCheck.some((name) => SKIP_SLACK_USER.some((skipName) => name?.includes(skipName)));
       if (isSkipUser) return false;
 
-      return nameToCheck.some((name) => name?.includes(cleanedSearchName));
+      return nameToCheck.some((name) => name?.includes(searchName));
     });
 
     if (!user) return searchName;
