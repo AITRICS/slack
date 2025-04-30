@@ -116,7 +116,7 @@ class SlackMessages {
     const attachmentFields = [
       SlackMessages.#createField('Deploy Info', '', false),
       SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
-      SlackMessages.#createField('Deploy Server', `https://${notificationData.ec2Name}.aitrics-vc.com`, true),
+      SlackMessages.#createField('Deploy Server', `https://${notificationData.ec2Name}`, true),
       SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
       SlackMessages.#createField('Commit', `<${notificationData.commitUrl}|${notificationData.sha.slice(0, 7)}>`, true),
       SlackMessages.#createField('Image Tag', notificationData.imageTag, true),
