@@ -150,6 +150,7 @@ class SlackMessages {
 
     const attachmentFields = [
       SlackMessages.#createField('Build Info', '', false),
+      jobNamesSection,
       SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
       SlackMessages.#createField('Branch', notificationData.branchName || 'N/A', true),
       SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
@@ -159,11 +160,6 @@ class SlackMessages {
     // Add image tag field if available
     if (notificationData.imageTag) {
       attachmentFields.push(SlackMessages.#createField('Image Tag', notificationData.imageTag, true));
-    }
-
-    // Add job names field if available
-    if (jobNamesSection) {
-      attachmentFields.push(jobNamesSection);
     }
 
     attachmentFields.push(

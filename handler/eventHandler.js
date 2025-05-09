@@ -486,16 +486,15 @@ class EventHandler {
 
     const notificationData = EventHandler.#prepareBuildNotificationData({
       branchName: branchName || context.ref.replace('refs/heads/', ''),
+      jobNames,
       imageTag,
       repoData,
-      ref: context.ref,
       sha: context.sha,
       slackStatus: jobStatus === 'success' ? 'good' : 'danger',
       slackBuildResult: jobStatus === 'success' ? ':white_check_mark:*Succeeded*' : ':x:*Failed*',
       totalDurationMinutes,
       triggerUser: mentionedSlackId,
       gitActionRunData,
-      jobNames,
     });
 
     await this.slackMessages.sendSlackMessageToBuild(notificationData, SLACK_CHANNEL.deploy);
