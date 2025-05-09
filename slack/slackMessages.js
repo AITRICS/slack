@@ -150,7 +150,8 @@ class SlackMessages {
 
     // Adding a task list only if it fails
     if (notificationData.slackStatus === 'danger' && notificationData.jobNames && notificationData.jobNames.length > 0) {
-      attachmentFields.push(SlackMessages.#createField('Failed Jobs', notificationData.jobNames.join('\n'), false));
+      const formattedJobNames = notificationData.jobNames.map((job) => `\`${job}\``).join('\n');
+      attachmentFields.push(SlackMessages.#createField('Failed Jobs', formattedJobNames, false));
     }
 
     attachmentFields.push(
