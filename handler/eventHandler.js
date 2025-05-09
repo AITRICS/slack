@@ -256,6 +256,59 @@ class EventHandler {
   }
 
   /**
+   * Prepares and returns data for a build notification.
+   * @param {Object} buildData - The build data.
+   * @param {string} buildData.branchName - Branch name.
+   * @param {string} buildData.imageTag - Image tag.
+   * @param {Object} buildData.repoData - Repository data.
+   * @param {string} buildData.ref - The git reference.
+   * @param {string} buildData.sha - The git SHA.
+   * @param {string} buildData.slackStatus - Slack status, either 'good' for successful job status or 'danger' for failed job status.
+   * @param {string} buildData.slackBuildResult - Slack build result, formatted as an emoji and text.
+   * @param {number} buildData.totalDurationMinutes - Total duration in minutes.
+   * @param {string} buildData.triggerUser - User who triggered the action.
+   * @param {Object} buildData.gitActionRunData - Git action run data.
+   * @param {string[]} buildData.jobNames - Names of the jobs related to the build.
+   * @returns {Object} Prepared notification data.
+   */
+  static #prepareBuildNotificationData(buildData) {
+    const {
+      branchName,
+      imageTag,
+      repoData,
+      ref,
+      sha,
+      slackStatus,
+      slackBuildResult,
+      totalDurationMinutes,
+      triggerUser,
+      gitActionRunData,
+      jobNames,
+    } = buildData;
+
+    const minutes = Math.floor(totalDurationMinutes);
+    const seconds = Math.round((totalDurationMinutes - minutes) * 60);
+
+    return {
+      branchName,
+      imageTag,
+      ref,
+      sha,
+      slackStatus,
+      slackBuildResult,
+      triggerUser,
+      repoName: repoData.name,
+      repoFullName: repoData.fullName,
+      repoUrl: repoData.url,
+      commitUrl: `https://github.com/${repoData.fullName}/commit/${sha}`,
+      workflowName: gitActionRunData.name,
+      totalRunTime: `${minutes}분 ${seconds}초`,
+      actionUrl: gitActionRunData.html_url,
+      jobNames,
+    };
+  }
+
+  /**
    * Calculates the duration in minutes between two dates.
    * @param {Date|string} start - The start time as a Date object or an ISO 8601 string.
    * @param {Date|string} end - The end time as a Date object or an ISO 8601 string.
@@ -412,6 +465,39 @@ class EventHandler {
     });
 
     await this.slackMessages.sendSlackMessageToDeploy(notificationData, SLACK_CHANNEL.deploy);
+  }
+
+  /**
+   * Handles build notifications triggered by GitHub Actions.
+   * @param {object} context - The GitHub Actions context.
+   * @param {string} branchName - The branch name where the build was triggered.
+   * @param {string} imageTag - The image tag associated with the build.
+   * @param {string} jobName - The name of the job that triggered the notification.
+   * @param {string} jobStatus - The status of the job (success or failure).
+   */
+  async handleBuild(context, branchName, imageTag, jobName, jobStatus) {
+    const repoData = EventHandler.#extractRepoData(context.payload.repository);
+    const gitActionRunData = await this.gitHubApiHelper.fetchGitActionRunData(repoData.name, context.runId);
+    const slackMembers = await fetchSlackUserList(this.web);
+    const totalDurationMinutes = EventHandler.#calculateDurationInMinutes(gitActionRunData.run_started_at, new Date());
+    const mentionedSlackId = await this.#getSlackUserProperty(slackMembers, gitActionRunData.actor.login, 'id');
+
+    const jobNames = jobName ? jobName.split(',').map((name) => name.trim()) : [];
+
+    const notificationData = EventHandler.#prepareBuildNotificationData({
+      branchName: branchName || context.ref.replace('refs/heads/', ''),
+      jobNames,
+      imageTag,
+      repoData,
+      sha: context.sha,
+      slackStatus: jobStatus === 'success' ? 'good' : 'danger',
+      slackBuildResult: jobStatus === 'success' ? ':white_check_mark:*Succeeded*' : ':x:*Failed*',
+      totalDurationMinutes,
+      triggerUser: mentionedSlackId,
+      gitActionRunData,
+    });
+
+    await this.slackMessages.sendSlackMessageToBuild(notificationData, SLACK_CHANNEL.deploy);
   }
 }
 

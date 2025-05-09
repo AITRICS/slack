@@ -137,6 +137,48 @@ class SlackMessages {
     );
     await this.#sendSlackMessage(message);
   }
+
+  /**
+   * Sends a Slack message for build notifications.
+   * @param {object} notificationData - Data about the build event.
+   * @param {string} channelId - The ID of the Slack channel to send the message to.
+   */
+  async sendSlackMessageToBuild(notificationData, channelId) {
+    const jobNamesSection = notificationData.jobNames && notificationData.jobNames.length > 0
+      ? SlackMessages.#createField('Jobs', notificationData.jobNames.join(', '), false)
+      : null;
+
+    const attachmentFields = [
+      SlackMessages.#createField('Build Info', '', false),
+      jobNamesSection,
+      SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
+      SlackMessages.#createField('Branch', notificationData.branchName || 'N/A', true),
+      SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
+      SlackMessages.#createField('Commit', `<${notificationData.commitUrl}|${notificationData.sha.slice(0, 7)}>`, true),
+    ];
+
+    // Add image tag field if available
+    if (notificationData.imageTag) {
+      attachmentFields.push(SlackMessages.#createField('Image Tag', notificationData.imageTag, true));
+    }
+
+    attachmentFields.push(
+      SlackMessages.#createField('Run Time', notificationData.totalRunTime, true),
+      SlackMessages.#createField('Workflow', `<${notificationData.actionUrl}|${notificationData.workflowName}>`, true),
+    );
+
+    const attachments = [{
+      color: notificationData.slackStatus,
+      fields: attachmentFields,
+    }];
+
+    const message = SlackMessages.#createMessage(
+      channelId,
+      `${notificationData.slackBuildResult} *GitHub Actions Build Notification*`,
+      attachments,
+    );
+    await this.#sendSlackMessage(message);
+  }
 }
 
 module.exports = SlackMessages;
