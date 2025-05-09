@@ -22,3 +22,9 @@ inputs:
   JOB_STATUS:
     description: "Job status"
     required: false
+  BRANCH_NAME:
+    description: "Branch name"
+    required: false
+  JOB_NAME:
+    description: "Job name (comma-separated for multiple jobs)"
+    required: false
