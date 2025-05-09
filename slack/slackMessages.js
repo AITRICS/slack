@@ -144,20 +144,22 @@ class SlackMessages {
    * @param {string} channelId - The ID of the Slack channel to send the message to.
    */
   async sendSlackMessageToBuild(notificationData, channelId) {
-    const jobNamesSection = notificationData.jobNames && notificationData.jobNames.length > 0
-      ? SlackMessages.#createField('Jobs', notificationData.jobNames.join(', '), false)
-      : null;
-
     const attachmentFields = [
       SlackMessages.#createField('Build Info', '', false),
-      jobNamesSection,
+    ];
+
+    // Adding a task list only if it fails
+    if (notificationData.slackStatus === 'danger' && notificationData.jobNames && notificationData.jobNames.length > 0) {
+      attachmentFields.push(SlackMessages.#createField('Failed Jobs', notificationData.jobNames.join('\n'), false));
+    }
+
+    attachmentFields.push(
       SlackMessages.#createField('Repository', `<${notificationData.repoUrl}|${notificationData.repoName}>`, true),
       SlackMessages.#createField('Branch', notificationData.branchName || 'N/A', true),
       SlackMessages.#createField('Author', `<@${notificationData.triggerUser}>`, true),
       SlackMessages.#createField('Commit', `<${notificationData.commitUrl}|${notificationData.sha.slice(0, 7)}>`, true),
-    ];
+    );
 
-    // Add image tag field if available
     if (notificationData.imageTag) {
       attachmentFields.push(SlackMessages.#createField('Image Tag', notificationData.imageTag, true));
     }
