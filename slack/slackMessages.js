@@ -165,7 +165,6 @@ class SlackMessages {
     attachmentFields.push(
       SlackMessages.#createField('Run Time', notificationData.totalRunTime, true),
       SlackMessages.#createField('Workflow', `<${notificationData.actionUrl}|${notificationData.workflowName}>`, true),
-      SlackMessages.#createField('Ref', notificationData.ref, true),
     );
 
     const attachments = [{
