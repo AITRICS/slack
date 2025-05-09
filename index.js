@@ -52,6 +52,14 @@ async function run() {
         await handler.handleDeploy(context, ec2Name, imageTag, jobStatus);
         break;
       }
+      case 'build': {
+        const branchName = Core.getInput('BRANCH_NAME');
+        const imageTag = Core.getInput('IMAGE_TAG');
+        const jobName = Core.getInput('JOB_NAME');
+        const jobStatus = Core.getInput('JOB_STATUS');
+        await handler.handleBuild(context, branchName, imageTag, jobName, jobStatus);
+        break;
+      }
       default:
         console.error('Unknown action type:', ACTION_TYPE);
         process.exit(1);
