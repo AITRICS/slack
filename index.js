@@ -52,7 +52,7 @@ async function run() {
         await handler.handleDeploy(context, ec2Name, imageTag, jobStatus);
         break;
       }
-      case 'build': {
+      case 'ci': {
         const branchName = Core.getInput('BRANCH_NAME');
         const imageTag = Core.getInput('IMAGE_TAG');
         const jobName = Core.getInput('JOB_NAME');
