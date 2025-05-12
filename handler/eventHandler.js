@@ -124,6 +124,32 @@ class EventHandler {
   }
 
   /**
+   * Normalizes a name by removing whitespace and parenthetical suffixes.
+   *
+   * This method standardizes names for consistent matching by:
+   * 1. Removing leading/trailing whitespace
+   * 2. Removing parenthetical expressions at the end (e.g., nicknames or titles)
+   * 3. Converting to lowercase for case-insensitive comparison
+   *
+   * @example
+   * // Returns "john doe"
+   * #normalizeName("John Doe (Manager) ")
+   *
+   * // Returns "이동민"
+   * #normalizeName("이동민 (Rooney)")
+   *
+   * @param {string} raw - The raw name to normalize
+   * @returns {string} The normalized name in lowercase without parentheses or extra spaces
+   * @private
+   */
+  static #normalizeName(raw = '') {
+    return raw
+      .trim() // Remove leading and trailing spaces
+      .replace(/\s*\(.*?\)$/, '') // Remove trailing parentheses and content within them
+      .toLowerCase();
+  }
+
+  /**
    * Finds a specific property of a Slack user by matching their real name or display name with the given GitHub username.
    * @param {Array} slackMembers - The list of Slack users.
    * @param {string} searchName - The GitHub username to search for in Slack user profiles.
@@ -131,14 +157,21 @@ class EventHandler {
    * @returns {string} The requested property of the found Slack user or the searchName if no user is found.
    */
   static #findSlackUserPropertyByGitName(slackMembers, searchName, property) {
+    const targetName = this.#normalizeName(searchName);
     const user = slackMembers.find(({ real_name: realName, profile, deleted }) => {
       if (deleted) return false;
+
       const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
 
       const isSkipUser = nameToCheck.some((name) => SKIP_SLACK_USER.some((skipName) => name?.includes(skipName)));
       if (isSkipUser) return false;
 
-      return nameToCheck.some((name) => name?.includes(searchName));
+      return nameToCheck.some((sourceName) => {
+        if (!sourceName) return false;
+
+        // 양방향 검사 진행
+        return sourceName.includes(targetName) || targetName.includes(sourceName);
+      });
     });
 
     if (!user) return searchName;
