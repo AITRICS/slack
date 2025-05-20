@@ -366,6 +366,8 @@ class EventHandler {
       commentContent: payload.comment?.diff_hunk,
     };
 
+    console.log(payload);
+
     // Check if the comment is a reply to another comment.
     if (payload.comment.in_reply_to_id) {
       // Get the author of the original comment this one is replying to.
