@@ -388,21 +388,79 @@ class EventHandler {
     await this.slackMessages.sendSlackMessageToSchedule(notificationData, channelId);
   }
 
+  /**
+   * Fetches all reviewers for a pull request, including those who haven't submitted a review yet.
+   *
+   * @param {Array} slackMembers - The list of Slack users.
+   * @param {string} repoName - The name of the repository.
+   * @param {number} prNumber - The number of the pull request.
+   * @returns {Promise<Array>} A promise that resolves to an array of reviewers' Slack IDs.
+   */
+  async #fetchAllPRReviewers(slackMembers, repoName, prNumber) {
+    try {
+      const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber);
+
+      // Get requested reviewers who haven't submitted a review yet
+      const requestedReviewers = prDetails.requested_reviewers || [];
+
+      // Get users who have already submitted reviews
+      const reviews = await this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber);
+      const reviewSubmitters = reviews.map((review) => review.user.login);
+
+      // Combine both lists and remove duplicates
+      const allReviewers = [...new Set([...requestedReviewers.map((r) => r.login), ...reviewSubmitters])];
+
+      // Map GitHub usernames to Slack IDs and return directly
+      return Promise.all(
+        allReviewers.map(async (githubUsername) => {
+          const slackId = await this.#getSlackUserProperty(slackMembers, githubUsername, 'id');
+          return { githubUsername, slackId };
+        }),
+      );
+    } catch (error) {
+      console.error(`Error fetching PR reviewers for PR number ${prNumber}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * EventHandler class processes different GitHub event types and sends corresponding notifications to Slack.
+   * It handles four main types of events: comment, PR page comment, approve, and review request.
+   * @param {object} payload - The payload of the GitHub event.
+   */
   async handleComment(payload) {
+    // 두 가지 코멘트 타입 구분
+    const isPRPageComment = payload.comment.issue_url !== undefined;
+
+    if (isPRPageComment) {
+      await this.#handlePRPageComment(payload);
+    } else {
+      await this.#handleCodeComment(payload);
+    }
+  }
+
+  /**
+   * Handles code review comments (comments on specific lines of code).
+   * @param {object} payload - The payload of the GitHub comment event.
+   */
+  async #handleCodeComment(payload) {
     const notificationData = {
       commentUrl: payload.comment?.html_url,
-      mentionedGitName: payload.issue?.user.login ?? payload.pull_request?.user.login,
-      prUrl: payload.pull_request?.html_url ?? payload.issue?.html_url,
+      mentionedGitName: payload.pull_request?.user.login,
+      prUrl: payload.pull_request?.html_url,
       commentAuthorGitName: payload.comment?.user.login,
       commentBody: payload.comment?.body,
-      prTitle: payload.issue?.title ?? payload.pull_request?.title,
+      prTitle: payload.pull_request?.title,
       commentContent: payload.comment?.diff_hunk,
     };
 
     // Check if the comment is a reply to another comment.
     if (payload.comment.in_reply_to_id) {
       // Get the author of the original comment this one is replying to.
-      const previousCommentAuthor = await this.gitHubApiHelper.fetchCommentAuthor(payload.repository.name, payload.comment.in_reply_to_id);
+      const previousCommentAuthor = await this.gitHubApiHelper.fetchCommentAuthor(
+        payload.repository.name,
+        payload.comment.in_reply_to_id,
+      );
 
       // If the author of the previous comment is different from the author of the current comment,
       // update the mentionedGitName to the previous comment's author.
@@ -425,6 +483,129 @@ class EventHandler {
     );
 
     await this.slackMessages.sendSlackMessageToComment(notificationData, channelId);
+  }
+
+  /**
+   * Handles comments on the PR page (not on specific code lines).
+   * @param {object} payload - The payload of the GitHub comment event.
+   */
+  async #handlePRPageComment(payload) {
+    try {
+      // 필요한 기본 정보 추출
+      const repoName = payload.repository.name;
+      const prNumber = payload.issue.number; // PR 번호는 issue.number에 있음
+      const commentAuthorGitName = payload.comment.user.login;
+
+      // PR 세부 정보 가져오기
+      const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber);
+      const prAuthorGitName = prDetails.user.login;
+
+      // Slack 멤버 정보 가져오기
+      const slackMembers = await fetchSlackUserList(this.web);
+
+      // PR의 모든 리뷰어 정보 가져오기
+      const reviewers = await this.#fetchAllPRReviewers(slackMembers, repoName, prNumber);
+
+      // 코멘트 작성자의 Slack 이름 가져오기
+      const commentAuthorSlackRealName = await this.#getSlackUserProperty(
+        slackMembers,
+        commentAuthorGitName,
+        'realName',
+      );
+
+      let recipients = [];
+
+      // 코멘트 작성자가 PR 작성자인 경우: 모든 리뷰어에게 알림 (작성자 제외)
+      if (commentAuthorGitName === prAuthorGitName) {
+        recipients = reviewers.filter((reviewer) => reviewer.githubUsername !== commentAuthorGitName);
+      }
+      // 코멘트 작성자가 리뷰어인 경우: 다른 모든 리뷰어 + PR 작성자에게 알림 (작성자 제외)
+      else {
+        // PR 작성자가 이미 reviewers 목록에 있는지 확인
+        const prAuthorInReviewers = reviewers.some(
+          (reviewer) => reviewer.githubUsername === prAuthorGitName,
+        );
+
+        // reviewers에서 코멘트 작성자를 제외한 리뷰어들
+        const filteredReviewers = reviewers.filter(
+          (reviewer) => reviewer.githubUsername !== commentAuthorGitName,
+        );
+
+        // PR 작성자가 reviewers에 없는 경우에만 추가
+        if (!prAuthorInReviewers) {
+          const prAuthorSlackId = await this.#getSlackUserProperty(slackMembers, prAuthorGitName, 'id');
+          recipients = [
+            { githubUsername: prAuthorGitName, slackId: prAuthorSlackId },
+            ...filteredReviewers,
+          ];
+        } else {
+          recipients = filteredReviewers;
+        }
+      }
+
+      // 수신자가 없으면 메시지 전송하지 않음
+      if (recipients.length === 0) {
+        console.log('PR 페이지 코멘트에 대한 수신자가 없습니다.');
+        return;
+      }
+
+      // 중복 제거를 위한 Set 사용
+      const uniqueRecipients = [];
+      const addedGithubUsernames = new Set();
+
+      // 중복 수신자 제거
+      recipients.forEach((recipient) => {
+        if (!addedGithubUsernames.has(recipient.githubUsername)) {
+          addedGithubUsernames.add(recipient.githubUsername);
+          uniqueRecipients.push(recipient);
+        }
+      });
+
+      // 각 수신자의 채널 찾기 및 채널별로, 팀별로 그룹화
+      const recipientsByChannel = {};
+
+      await Promise.all(
+        uniqueRecipients.map(async (recipient) => {
+          // 각 수신자가 속한 채널 찾기
+          const channelId = await this.#selectSlackChannel(recipient.githubUsername);
+
+          // 채널별로 수신자 그룹화
+          if (!recipientsByChannel[channelId]) {
+            recipientsByChannel[channelId] = [];
+          }
+
+          recipientsByChannel[channelId].push(recipient);
+        }),
+      );
+
+      // 각 채널에 맞는 메시지 전송
+      await Promise.all(
+        Object.entries(recipientsByChannel).map(async ([channelId, channelRecipients]) => {
+          // 현재 채널의 수신자들만 멘션하는 문자열 생성
+          const mentionsString = channelRecipients
+            .map((recipient) => `<@${recipient.slackId}>`)
+            .join(', ');
+
+          // 통합 알림 데이터 생성
+          const notificationData = {
+            commentUrl: payload.comment.html_url,
+            prUrl: `https://github.com/${payload.repository.full_name}/pull/${prNumber}`,
+            commentAuthorGitName,
+            commentBody: payload.comment.body,
+            prTitle: prDetails.title,
+            commentAuthorSlackRealName,
+            mentionsString,
+          };
+
+          // 해당 채널에 메시지 전송
+          await this.slackMessages.sendSlackMessageToPRPageComment(notificationData, channelId);
+
+          console.log(`채널 ${channelId}에 ${channelRecipients.length}명의 수신자에게 PR 페이지 코멘트 알림을 전송했습니다.`);
+        }),
+      );
+    } catch (error) {
+      console.error('PR 페이지 코멘트 처리 중 오류 발생:', error);
+    }
   }
 
   async handleApprove(payload) {
