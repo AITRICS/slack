@@ -488,14 +488,26 @@ class EventHandler {
       }
       // 코멘트 작성자가 리뷰어인 경우: 다른 모든 리뷰어 + PR 작성자에게 알림 (작성자 제외)
       else {
-        // PR 작성자 정보 추가
-        const prAuthorSlackId = await this.#getSlackUserProperty(slackMembers, prAuthorGitName, 'id');
+        // PR 작성자가 이미 reviewers 목록에 있는지 확인
+        const prAuthorInReviewers = reviewers.some(
+          (reviewer) => reviewer.githubUsername === prAuthorGitName,
+        );
 
-        // PR 작성자를 첫 번째로 추가하고, 코멘트 작성자를 제외한 모든 리뷰어 추가
-        recipients = [
-          { githubUsername: prAuthorGitName, slackId: prAuthorSlackId },
-          ...reviewers.filter((reviewer) => reviewer.githubUsername !== commentAuthorGitName),
-        ];
+        // reviewers에서 코멘트 작성자를 제외한 리뷰어들
+        const filteredReviewers = reviewers.filter(
+          (reviewer) => reviewer.githubUsername !== commentAuthorGitName,
+        );
+
+        // PR 작성자가 reviewers에 없는 경우에만 추가
+        if (!prAuthorInReviewers) {
+          const prAuthorSlackId = await this.#getSlackUserProperty(slackMembers, prAuthorGitName, 'id');
+          recipients = [
+            { githubUsername: prAuthorGitName, slackId: prAuthorSlackId },
+            ...filteredReviewers,
+          ];
+        } else {
+          recipients = filteredReviewers;
+        }
       }
 
       // 수신자가 없으면 메시지 전송하지 않음
@@ -504,11 +516,23 @@ class EventHandler {
         return;
       }
 
+      // 중복 제거를 위한 Set 사용
+      const uniqueRecipients = [];
+      const addedGithubUsernames = new Set();
+
+      // 중복 수신자 제거
+      recipients.forEach((recipient) => {
+        if (!addedGithubUsernames.has(recipient.githubUsername)) {
+          addedGithubUsernames.add(recipient.githubUsername);
+          uniqueRecipients.push(recipient);
+        }
+      });
+
       // 각 수신자의 채널 찾기 및 채널별로, 팀별로 그룹화
       const recipientsByChannel = {};
 
       await Promise.all(
-        recipients.map(async (recipient) => {
+        uniqueRecipients.map(async (recipient) => {
           // 각 수신자가 속한 채널 찾기
           const channelId = await this.#selectSlackChannel(recipient.githubUsername);
 
