@@ -17,7 +17,7 @@
     "jest": "^29.7.0"
   },
   "scripts": {
-    "test": "cross-env NODE_ENV=test jest",
+    "test": "jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   }
