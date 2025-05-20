@@ -67,6 +67,26 @@ class SlackMessages {
     await this.#sendSlackMessage(message);
   }
 
+  /**
+   * Sends a Slack message for PR page comments with multiple mentions.
+   * @param {object} notificationData - Data about the PR page comment event.
+   * @param {string} channelId - The ID of the Slack channel to send the message to.
+   */
+  async sendSlackMessageToPRPageComment(notificationData, channelId) {
+    const attachments = [{
+      color: 'good',
+      text: `*코멘트 내용:*\n${notificationData.commentBody}\n\n<${notificationData.commentUrl}|코멘트 보러가기>`,
+    }];
+
+    const message = SlackMessages.#createMessage(
+      channelId,
+      `*<${notificationData.prUrl}|${notificationData.prTitle}>*\n:speech_balloon: *${notificationData.commentAuthorSlackRealName}* 님이 코멘트를 남겼어요!! ${notificationData.mentionsString}`,
+      attachments,
+    );
+
+    await this.#sendSlackMessage(message);
+  }
+
   async sendSlackMessageToApprove(notificationData, channelId) {
     const attachments = [{
       color: 'good',
