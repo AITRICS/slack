@@ -504,30 +504,48 @@ class EventHandler {
         return;
       }
 
-      // 모든 수신자의 멘션 문자열 생성 (예: "@user1, @user2, @user3")
-      const mentionsString = recipients
-        .map((recipient) => `<@${recipient.slackId}>`)
-        .join(', ');
+      // 각 수신자의 채널 찾기 및 채널별로, 팀별로 그룹화
+      const recipientsByChannel = {};
 
-      // 통합 알림 데이터 생성
-      const notificationData = {
-        commentUrl: payload.comment.html_url,
-        prUrl: `https://github.com/${payload.repository.full_name}/pull/${prNumber}`,
-        commentAuthorGitName,
-        commentBody: payload.comment.body,
-        prTitle: prDetails.title,
-        commentAuthorSlackRealName,
-        // 개별 수신자 대신 모든 수신자 멘션 문자열 사용
-        mentionsString,
-      };
+      await Promise.all(
+        recipients.map(async (recipient) => {
+          // 각 수신자가 속한 채널 찾기
+          const channelId = await this.#selectSlackChannel(recipient.githubUsername);
 
-      // PR이 속한 팀의 채널 ID 가져오기
-      const channelId = await this.#selectSlackChannel(prAuthorGitName);
+          // 채널별로 수신자 그룹화
+          if (!recipientsByChannel[channelId]) {
+            recipientsByChannel[channelId] = [];
+          }
 
-      // 하나의 메시지로 모든 수신자에게 알림 전송
-      await this.slackMessages.sendSlackMessageToPRPageComment(notificationData, channelId);
+          recipientsByChannel[channelId].push(recipient);
+        }),
+      );
 
-      console.log(`PR 페이지 코멘트 알림이 ${recipients.length}명의 수신자에게 전송되었습니다.`);
+      // 각 채널에 맞는 메시지 전송
+      await Promise.all(
+        Object.entries(recipientsByChannel).map(async ([channelId, channelRecipients]) => {
+          // 현재 채널의 수신자들만 멘션하는 문자열 생성
+          const mentionsString = channelRecipients
+            .map((recipient) => `<@${recipient.slackId}>`)
+            .join(', ');
+
+          // 통합 알림 데이터 생성
+          const notificationData = {
+            commentUrl: payload.comment.html_url,
+            prUrl: `https://github.com/${payload.repository.full_name}/pull/${prNumber}`,
+            commentAuthorGitName,
+            commentBody: payload.comment.body,
+            prTitle: prDetails.title,
+            commentAuthorSlackRealName,
+            mentionsString,
+          };
+
+          // 해당 채널에 메시지 전송
+          await this.slackMessages.sendSlackMessageToPRPageComment(notificationData, channelId);
+
+          console.log(`채널 ${channelId}에 ${channelRecipients.length}명의 수신자에게 PR 페이지 코멘트 알림을 전송했습니다.`);
+        }),
+      );
     } catch (error) {
       console.error('PR 페이지 코멘트 처리 중 오류 발생:', error);
     }
