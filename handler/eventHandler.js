@@ -498,29 +498,34 @@ class EventHandler {
         ];
       }
 
-      // 각 수신자에게 알림 보내기 (최적화: 병렬 처리)
-      const baseNotificationData = {
+      // 수신자가 없으면 메시지 전송하지 않음
+      if (recipients.length === 0) {
+        console.log('PR 페이지 코멘트에 대한 수신자가 없습니다.');
+        return;
+      }
+
+      // 모든 수신자의 멘션 문자열 생성 (예: "@user1, @user2, @user3")
+      const mentionsString = recipients
+        .map((recipient) => `<@${recipient.slackId}>`)
+        .join(', ');
+
+      // 통합 알림 데이터 생성
+      const notificationData = {
         commentUrl: payload.comment.html_url,
         prUrl: `https://github.com/${payload.repository.full_name}/pull/${prNumber}`,
         commentAuthorGitName,
         commentBody: payload.comment.body,
         prTitle: prDetails.title,
         commentAuthorSlackRealName,
+        // 개별 수신자 대신 모든 수신자 멘션 문자열 사용
+        mentionsString,
       };
 
       // PR이 속한 팀의 채널 ID 가져오기
       const channelId = await this.#selectSlackChannel(prAuthorGitName);
 
-      // 각 수신자에게 개별 멘션 보내기
-      await Promise.all(recipients.map(async (recipient) => {
-        const notificationData = {
-          ...baseNotificationData,
-          mentionedGitName: recipient.githubUsername,
-          mentionedSlackId: recipient.slackId,
-        };
-
-        await this.slackMessages.sendSlackMessageToComment(notificationData, channelId);
-      }));
+      // 하나의 메시지로 모든 수신자에게 알림 전송
+      await this.slackMessages.sendSlackMessageToPRPageComment(notificationData, channelId);
 
       console.log(`PR 페이지 코멘트 알림이 ${recipients.length}명의 수신자에게 전송되었습니다.`);
     } catch (error) {
