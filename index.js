@@ -31,6 +31,7 @@ async function run() {
   }
 
   try {
+    console.log(context.payload);
     switch (ACTION_TYPE) {
       case 'schedule':
         await handler.handleSchedule(context.payload);
