@@ -50,6 +50,42 @@ class GitHubApiHelper {
   }
 
   /**
+   * Fetches all review comments for a pull request to find thread participants.
+   * @param {string} repoName - The name of the repository.
+   * @param {number} prNumber - The number of the pull request.
+   * @param {string} path - The file path of the comment.
+   * @param {number} line - The line number of the comment.
+   * @returns {Promise<Array>} Array of usernames who participated in the comment thread.
+   * @throws Will throw an error if the GitHub API request fails.
+   */
+  async fetchCommentThreadParticipants(repoName, prNumber, path, line) {
+    try {
+      const response = await this.octokit.rest.pulls.listReviewComments({
+        owner: GITHUB_CONFIG.ORGANIZATION,
+        repo: repoName,
+        pull_number: prNumber,
+      });
+
+      // Filter comments that are on the same line and path
+      const threadComments = response.data.filter((comment) => {
+        // For multi-line comments, check if it's part of the same discussion
+        const isSamePath = comment.path === path;
+        const isSameLine = comment.line === line || comment.original_line === line;
+        const isInReplyChain = comment.in_reply_to_id !== undefined;
+
+        return isSamePath && (isSameLine || isInReplyChain);
+      });
+
+      // Extract unique usernames from thread participants
+      const participants = [...new Set(threadComments.map((comment) => comment.user.login))];
+      return participants;
+    } catch (error) {
+      console.error(`Error fetching comment thread participants for PR ${prNumber}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Retrieves the GitHub user's real name based on their username.
    * @param {string} username - The GitHub username to retrieve the real name for.
    * @returns {Promise<string>} The real name of the GitHub user or username if name is not available.

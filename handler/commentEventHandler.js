@@ -16,11 +16,96 @@ class CommentEventHandler extends BaseEventHandler {
   }
 
   async handleCodeComment(payload) {
-    const notificationData = await this.prepareCodeCommentData(payload);
-    const channelId = await this.slackChannelService.selectChannel(notificationData.mentionedGitName);
+    const { repoName, prNumber } = CommentEventHandler.extractCommentInfo(payload);
+    const recipients = await this.determineCodeCommentRecipients(payload, repoName, prNumber);
 
-    await this.enrichWithSlackData(notificationData);
-    await this.slackMessageService.sendCodeCommentMessage(notificationData, channelId);
+    if (recipients.length === 0) {
+      Logger.info('No recipients found for code comment notification');
+      return;
+    }
+
+    await this.sendCodeCommentToRecipients(payload, recipients, repoName, prNumber);
+  }
+
+  async determineCodeCommentRecipients(payload, repoName, prNumber) {
+    const commentAuthor = payload.comment.user.login;
+    const commentPath = payload.comment.path;
+    const commentLine = payload.comment.line || payload.comment.original_line;
+
+    // Get all participants in this comment thread
+    const threadParticipants = await this.gitHubApiHelper.fetchCommentThreadParticipants(
+      repoName,
+      prNumber,
+      commentPath,
+      commentLine,
+    );
+
+    // If no thread participants found, fall back to PR author
+    if (threadParticipants.length === 0) {
+      const prAuthor = payload.pull_request.user.login;
+      if (prAuthor !== commentAuthor) {
+        return [{ githubUsername: prAuthor }];
+      }
+      return []; // If comment author is also PR author and no other participants
+    }
+
+    // Exclude the current comment author from recipients
+    const recipients = threadParticipants
+      .filter((username) => username !== commentAuthor)
+      .map((username) => ({ githubUsername: username }));
+
+    // Add Slack IDs to recipients
+    return Promise.all(
+      recipients.map(async (recipient) => {
+        const slackId = await this.slackUserService.getSlackUserPropertyByGithubUsername(
+          recipient.githubUsername,
+          'id',
+        );
+        return { ...recipient, slackId };
+      }),
+    );
+  }
+
+  async sendCodeCommentToRecipients(payload, recipients, repoName, prNumber) {
+    const recipientsByChannel = await this.groupRecipientsByChannel(recipients);
+
+    const baseNotificationData = {
+      commentUrl: payload.comment.html_url,
+      prUrl: payload.pull_request.html_url,
+      commentAuthorGitName: payload.comment.user.login,
+      commentBody: payload.comment.body,
+      prTitle: payload.pull_request.title,
+      commentContent: payload.comment.diff_hunk,
+    };
+
+    baseNotificationData.commentAuthorSlackRealName = await this.slackUserService
+      .getSlackUserPropertyByGithubUsername(
+        baseNotificationData.commentAuthorGitName,
+        'realName',
+      );
+
+    await Promise.all(
+      Object.entries(recipientsByChannel).map(async ([channelId, channelRecipients]) => {
+        const mentionsString = channelRecipients
+          .map((recipient) => `<@${recipient.slackId}>`)
+          .join(', ');
+
+        const notificationData = {
+          ...baseNotificationData,
+          mentionedSlackId: mentionsString, // Modified to handle multiple mentions
+        };
+
+        await this.slackMessageService.sendCodeCommentMessage(notificationData, channelId);
+        Logger.info(`Sent code comment notification to channel ${channelId} for ${channelRecipients.length} recipients`);
+      }),
+    );
+  }
+
+  static extractCommentInfo(payload) {
+    return {
+      repoName: payload.repository.name,
+      prNumber: payload.pull_request.number,
+    };
   }
 
   async handlePRPageComment(payload) {

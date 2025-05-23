@@ -66,7 +66,13 @@ class SlackMessageFormatter {
     const attachmentText = `${contentText}\n*코멘트 내용:*\n${commentBody}\n\n<${commentUrl}|코멘트 보러가기>\n\n`;
 
     const attachment = this.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
-    const text = `*<${prUrl}|${prTitle}>*\n${SLACK_CONFIG.ICONS.COMMENT} *${commentAuthorSlackRealName}* 님이 코멘트를 남겼어요!! <@${mentionedSlackId}>:\n`;
+
+    // Handle both single mention (legacy) and multiple mentions (new feature)
+    const mentionsText = typeof mentionedSlackId === 'string' && mentionedSlackId.includes('<@')
+      ? mentionedSlackId // Already formatted mentions string
+      : `<@${mentionedSlackId}>`; // Single mention ID
+
+    const text = `*<${prUrl}|${prTitle}>*\n${SLACK_CONFIG.ICONS.COMMENT} *${commentAuthorSlackRealName}* 님이 코멘트를 남겼어요!! ${mentionsText}:\n`;
 
     return { text, attachment };
   }
