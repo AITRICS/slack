@@ -3,7 +3,7 @@ const { SLACK_CONFIG, SLACK_CHANNELS } = require('../constants');
 const { calculateDurationInMinutes, formatDuration } = require('../utils/timeUtils');
 
 /**
- * Handles deployment and build events
+ * Handles deployment and build events with optimized Slack API usage
  */
 class DeploymentEventHandler extends BaseEventHandler {
   /**
@@ -30,10 +30,13 @@ class DeploymentEventHandler extends BaseEventHandler {
     const repoData = BaseEventHandler.extractRepoData(context.payload.repository);
     const workflowData = await this.gitHubApiHelper.fetchWorkflowRunData(repoData.name, context.runId);
     const totalDurationMinutes = calculateDurationInMinutes(workflowData.run_started_at, new Date());
-    const triggerUser = await this.slackUserService.getSlackUserPropertyByGithubUsername(
-      workflowData.actor.login,
+
+    // Use batch processing to get Slack ID for trigger user
+    const triggerUserMap = await this.slackUserService.getSlackUserPropertiesBatch(
+      [workflowData.actor.login],
       'id',
     );
+    const triggerUser = triggerUserMap.get(workflowData.actor.login) || workflowData.actor.login;
 
     const isSuccess = jobStatus === 'success';
 
@@ -55,10 +58,13 @@ class DeploymentEventHandler extends BaseEventHandler {
     const repoData = BaseEventHandler.extractRepoData(context.payload.repository);
     const workflowData = await this.gitHubApiHelper.fetchWorkflowRunData(repoData.name, context.runId);
     const totalDurationMinutes = calculateDurationInMinutes(workflowData.run_started_at, new Date());
-    const triggerUser = await this.slackUserService.getSlackUserPropertyByGithubUsername(
-      workflowData.actor.login,
+
+    // Use batch processing to get Slack ID for trigger user
+    const triggerUserMap = await this.slackUserService.getSlackUserPropertiesBatch(
+      [workflowData.actor.login],
       'id',
     );
+    const triggerUser = triggerUserMap.get(workflowData.actor.login) || workflowData.actor.login;
 
     const jobNames = jobName ? jobName.split(',').map((name) => name.trim()) : [];
     const isSuccess = jobStatus === 'success';

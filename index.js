@@ -11,7 +11,7 @@ const GITHUB_TOKEN = Core.getInput('GITHUB_TOKEN');
 const ACTION_TYPE = Core.getInput('ACTION_TYPE');
 
 /**
- * Main function to run the GitHub Action
+ * Main function to run the GitHub Action with optimized Slack API usage
  */
 async function run() {
   const web = new WebClient(SLACK_TOKEN);
@@ -31,6 +31,9 @@ async function run() {
   try {
     Logger.info(`Processing ${ACTION_TYPE} event`);
     Logger.debug('Payload:', context.payload);
+
+    // Pre-initialize handlers to cache Slack users
+    await handlerFactory.preInitialize();
 
     switch (ACTION_TYPE) {
       case ACTION_TYPES.DEPLOY: {
@@ -53,6 +56,10 @@ async function run() {
     }
 
     Logger.info('Message sent to Slack!');
+
+    // Log cache statistics for debugging
+    const cacheStats = handlerFactory.getCacheStats();
+    Logger.debug('Cache statistics:', cacheStats);
   } catch (error) {
     Logger.error('Error executing action:', error);
     process.exit(1);

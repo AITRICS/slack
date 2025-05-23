@@ -5,7 +5,7 @@ const GitHubApiHelper = require('../github/gitHubApiHelper');
 const Logger = require('../utils/logger');
 
 /**
- * Base class for event handlers
+ * Base class for event handlers with optimized Slack API usage
  */
 class BaseEventHandler {
   /**
@@ -17,6 +17,31 @@ class BaseEventHandler {
     this.slackUserService = new SlackUserService(webClient, this.gitHubApiHelper);
     this.slackChannelService = new SlackChannelService(this.gitHubApiHelper);
     this.slackMessageService = new SlackMessageService(webClient);
+    this.isInitialized = false;
+  }
+
+  /**
+   * Initializes the handler (especially Slack user cache and team memberships)
+   * @returns {Promise<void>}
+   */
+  async initialize() {
+    if (this.isInitialized) {
+      return;
+    }
+
+    try {
+      // Initialize Slack user service and team memberships in parallel
+      await Promise.all([
+        this.slackUserService.initialize(),
+        this.slackChannelService.preloadTeamMemberships(),
+      ]);
+
+      this.isInitialized = true;
+      Logger.info(`${this.constructor.name} initialized successfully`);
+    } catch (error) {
+      Logger.error(`Failed to initialize ${this.constructor.name}`, error);
+      // Don't throw, allow handler to work with fallback methods
+    }
   }
 
   /**
@@ -26,6 +51,9 @@ class BaseEventHandler {
    */
   async handle(payload) {
     try {
+      // Initialize if not already done
+      await this.initialize();
+
       await this.validatePayload(payload);
       await this.processEvent(payload);
     } catch (error) {
@@ -64,6 +92,18 @@ class BaseEventHandler {
       name: repository.name,
       fullName: repository.full_name,
       url: repository.html_url,
+    };
+  }
+
+  /**
+   * Gets cache statistics for debugging
+   * @returns {Object}
+   */
+  getCacheStats() {
+    return {
+      isInitialized: this.isInitialized,
+      slackUserCache: this.slackUserService.getCacheStats(),
+      slackChannelCache: this.slackChannelService.getCacheStats(),
     };
   }
 }

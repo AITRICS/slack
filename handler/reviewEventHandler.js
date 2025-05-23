@@ -2,7 +2,7 @@ const BaseEventHandler = require('./baseEventHandler');
 const { REVIEW_STATES, GITHUB_CONFIG, SLACK_CHANNELS } = require('../constants');
 
 /**
- * Handles review-related events
+ * Handles review-related events with optimized Slack API usage
  */
 class ReviewEventHandler extends BaseEventHandler {
   /**
@@ -62,25 +62,23 @@ class ReviewEventHandler extends BaseEventHandler {
   }
 
   async enrichWithSlackData(notificationData) {
-    notificationData.mentionedSlackId = await this.slackUserService.getSlackUserPropertyByGithubUsername(
-      notificationData.mentionedGitName,
-      'id',
-    );
-    notificationData.commentAuthorSlackRealName = await this.slackUserService.getSlackUserPropertyByGithubUsername(
-      notificationData.commentAuthorGitName,
-      'realName',
-    );
+    // Use batch processing for multiple Slack lookups
+    const usernames = [notificationData.mentionedGitName, notificationData.commentAuthorGitName];
+    const slackIdMap = await this.slackUserService.getSlackUserPropertiesBatch(usernames, 'id');
+    const realNameMap = await this.slackUserService.getSlackUserPropertiesBatch([notificationData.commentAuthorGitName], 'realName');
+
+    notificationData.mentionedSlackId = slackIdMap.get(notificationData.mentionedGitName) || notificationData.mentionedGitName;
+    notificationData.commentAuthorSlackRealName = realNameMap.get(notificationData.commentAuthorGitName) || notificationData.commentAuthorGitName;
   }
 
   async enrichReviewRequestData(notificationData) {
-    notificationData.mentionedSlackId = await this.slackUserService.getSlackUserPropertyByGithubUsername(
-      notificationData.reviewerGitName,
-      'id',
-    );
-    notificationData.commentAuthorSlackRealName = await this.slackUserService.getSlackUserPropertyByGithubUsername(
-      notificationData.mentionedGitName,
-      'realName',
-    );
+    // Use batch processing for multiple Slack lookups
+    const usernames = [notificationData.reviewerGitName, notificationData.mentionedGitName];
+    const slackIdMap = await this.slackUserService.getSlackUserPropertiesBatch(usernames, 'id');
+    const realNameMap = await this.slackUserService.getSlackUserPropertiesBatch([notificationData.mentionedGitName], 'realName');
+
+    notificationData.mentionedSlackId = slackIdMap.get(notificationData.reviewerGitName) || notificationData.reviewerGitName;
+    notificationData.commentAuthorSlackRealName = realNameMap.get(notificationData.mentionedGitName) || notificationData.mentionedGitName;
   }
 
   async enrichPRsWithReviewData(prs, repoName) {
@@ -101,32 +99,34 @@ class ReviewEventHandler extends BaseEventHandler {
       this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber),
     ]);
 
-    const mapReviewersToSlackIdAndState = async (reviewers, defaultState = null) => {
-      const results = await Promise.all(
-        reviewers.map(async (reviewer) => {
-          const githubUsername = reviewer.user?.login || reviewer.login;
-          const slackId = await this.slackUserService.getSlackUserPropertyByGithubUsername(
-            githubUsername,
-            'id',
-          );
-          return { slackId, state: reviewer.state || defaultState };
-        }),
-      );
-      return results;
-    };
+    // Collect all GitHub usernames
+    const submittedReviewers = reviewsData.map((review) => review.user.login);
+    const requestedReviewers = (prDetailsData.requested_reviewers || []).map((reviewer) => reviewer.login);
+    const allUsernames = [...new Set([...submittedReviewers, ...requestedReviewers])];
 
-    const [submittedReviewers, requestedReviewers] = await Promise.all([
-      mapReviewersToSlackIdAndState(reviewsData, REVIEW_STATES.COMMENTED),
-      mapReviewersToSlackIdAndState(prDetailsData.requested_reviewers, REVIEW_STATES.AWAITING),
-    ]);
+    // Batch process Slack IDs
+    const slackIdMap = await this.slackUserService.getSlackUserPropertiesBatch(allUsernames, 'id');
 
-    return [...submittedReviewers, ...requestedReviewers].reduce(
-      (reviewersStatus, { slackId, state }) => ({
-        ...reviewersStatus,
-        [slackId]: state,
-      }),
-      {},
-    );
+    // Map reviewers to their status and Slack IDs
+    const reviewersStatus = {};
+
+    // Process submitted reviews
+    reviewsData.forEach((review) => {
+      const githubUsername = review.user.login;
+      const slackId = slackIdMap.get(githubUsername) || githubUsername;
+      reviewersStatus[slackId] = review.state || REVIEW_STATES.COMMENTED;
+    });
+
+    // Process requested reviewers
+    requestedReviewers.forEach((githubUsername) => {
+      const slackId = slackIdMap.get(githubUsername) || githubUsername;
+      // Only add if not already present (submitted review takes precedence)
+      if (!reviewersStatus[slackId]) {
+        reviewersStatus[slackId] = REVIEW_STATES.AWAITING;
+      }
+    });
+
+    return reviewersStatus;
   }
 
   static formatReviewerStatusString(reviewersAndStatus) {

@@ -5,7 +5,7 @@ const { ACTION_TYPES } = require('../constants');
 const Logger = require('../utils/logger');
 
 /**
- * Factory for creating event handlers
+ * Factory for creating event handlers with optimized Slack API usage
  */
 class EventHandlerFactory {
   /**
@@ -16,6 +16,7 @@ class EventHandlerFactory {
     this.octokit = octokit;
     this.webClient = webClient;
     this.handlers = this.initializeHandlers();
+    this.isInitialized = false;
   }
 
   initializeHandlers() {
@@ -24,20 +25,44 @@ class EventHandlerFactory {
     const deploymentHandler = new DeploymentEventHandler(this.octokit, this.webClient);
 
     return {
-      [ACTION_TYPES.COMMENT]: (payload) => commentHandler.handle(payload),
-      [ACTION_TYPES.APPROVE]: (payload) => reviewHandler.handleApprove(payload),
-      [ACTION_TYPES.REVIEW_REQUESTED]: (payload) => reviewHandler.handleReviewRequested(payload),
-      [ACTION_TYPES.CHANGES_REQUESTED]: (payload) => reviewHandler.handleReviewRequested(payload),
-      [ACTION_TYPES.SCHEDULE]: (payload) => reviewHandler.handleSchedule(payload),
-      [ACTION_TYPES.DEPLOY]: (context, ...args) => deploymentHandler.handleDeploy(context, ...args),
-      [ACTION_TYPES.CI]: (context, ...args) => deploymentHandler.handleBuild(context, ...args),
+      [ACTION_TYPES.COMMENT]: commentHandler,
+      [ACTION_TYPES.APPROVE]: reviewHandler,
+      [ACTION_TYPES.REVIEW_REQUESTED]: reviewHandler,
+      [ACTION_TYPES.CHANGES_REQUESTED]: reviewHandler,
+      [ACTION_TYPES.SCHEDULE]: reviewHandler,
+      [ACTION_TYPES.DEPLOY]: deploymentHandler,
+      [ACTION_TYPES.CI]: deploymentHandler,
     };
+  }
+
+  /**
+   * Pre-initializes all handlers (especially Slack user cache)
+   * @returns {Promise<void>}
+   */
+  async preInitialize() {
+    if (this.isInitialized) {
+      return;
+    }
+
+    try {
+      Logger.info('Pre-initializing event handlers...');
+
+      // Initialize all unique handlers
+      const uniqueHandlers = [...new Set(Object.values(this.handlers))];
+      await Promise.all(uniqueHandlers.map((handler) => handler.initialize()));
+
+      this.isInitialized = true;
+      Logger.info('All event handlers pre-initialized successfully');
+    } catch (error) {
+      Logger.error('Failed to pre-initialize event handlers', error);
+      // Don't throw, allow individual handlers to initialize on demand
+    }
   }
 
   /**
    * Gets a handler for the specified action type
    * @param {string} actionType
-   * @returns {Function|null}
+   * @returns {Object|null}
    */
   getHandler(actionType) {
     const handler = this.handlers[actionType];
@@ -55,12 +80,59 @@ class EventHandlerFactory {
    * @returns {Promise<void>}
    */
   async handleEvent(actionType, ...args) {
+    // Pre-initialize if not done
+    if (!this.isInitialized) {
+      await this.preInitialize();
+    }
+
     const handler = this.getHandler(actionType);
     if (!handler) {
       throw new Error(`Unknown action type: ${actionType}`);
     }
 
-    await handler(...args);
+    // Call the appropriate method based on action type
+    switch (actionType) {
+      case ACTION_TYPES.COMMENT:
+        await handler.handle(...args);
+        break;
+      case ACTION_TYPES.APPROVE:
+        await handler.handleApprove(...args);
+        break;
+      case ACTION_TYPES.REVIEW_REQUESTED:
+      case ACTION_TYPES.CHANGES_REQUESTED:
+        await handler.handleReviewRequested(...args);
+        break;
+      case ACTION_TYPES.SCHEDULE:
+        await handler.handleSchedule(...args);
+        break;
+      case ACTION_TYPES.DEPLOY:
+        await handler.handleDeploy(...args);
+        break;
+      case ACTION_TYPES.CI:
+        await handler.handleBuild(...args);
+        break;
+      default:
+        throw new Error(`Unhandled action type: ${actionType}`);
+    }
+  }
+
+  /**
+   * Gets cache statistics for all handlers
+   * @returns {Object}
+   */
+  getCacheStats() {
+    const stats = {
+      isFactoryInitialized: this.isInitialized,
+      handlers: {},
+    };
+
+    Object.entries(this.handlers).forEach(([actionType, handler]) => {
+      if (handler.getCacheStats) {
+        stats.handlers[actionType] = handler.getCacheStats();
+      }
+    });
+
+    return stats;
   }
 }
 
