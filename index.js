@@ -25,6 +25,8 @@ async function run() {
     process.exit(1);
   }
 
+  Logger.info(context.payload);
+
   try {
     Logger.info(`Processing ${ACTION_TYPE} event`);
     Logger.debug('Payload:', context.payload);
