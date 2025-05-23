@@ -16,7 +16,7 @@ describe('GitHubApiHelper', () => {
       const mockMembers = [{ login: 'member1' }, { login: 'member2' }];
       mockOctokit.teams.listMembersInOrg.mockResolvedValue({ data: mockMembers });
 
-      const result = await gitHubApiHelper.fetchListMembersInOrg('SE');
+      const result = await gitHubApiHelper.fetchTeamMembers('SE');
 
       expect(mockOctokit.teams.listMembersInOrg).toHaveBeenCalledWith({
         org: 'aitrics',
@@ -31,7 +31,7 @@ describe('GitHubApiHelper', () => {
 
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      await expect(gitHubApiHelper.fetchListMembersInOrg('SE')).rejects.toThrow('API Error');
+      await expect(gitHubApiHelper.fetchTeamMembers('SE')).rejects.toThrow('API Error');
       expect(consoleSpy).toHaveBeenCalledWith(
         'Error fetching member list for team slug SE:',
         error,
@@ -123,7 +123,7 @@ describe('GitHubApiHelper', () => {
         data: { name: '홍길동', login: 'hong' },
       });
 
-      const result = await gitHubApiHelper.fetchGithubNickNameToGitHub('hong');
+      const result = await gitHubApiHelper.fetchUserRealName('hong');
 
       expect(mockOctokit.rest.users.getByUsername).toHaveBeenCalledWith({
         username: 'hong',
@@ -136,7 +136,7 @@ describe('GitHubApiHelper', () => {
         data: { name: null, login: 'hong' },
       });
 
-      const result = await gitHubApiHelper.fetchGithubNickNameToGitHub('hong');
+      const result = await gitHubApiHelper.fetchUserRealName('hong');
 
       expect(result).toBe('hong');
     });
@@ -147,8 +147,8 @@ describe('GitHubApiHelper', () => {
 
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      await expect(gitHubApiHelper.fetchGithubNickNameToGitHub('nonexistent')).rejects.toThrow('User not found');
-      expect(consoleSpy).toHaveBeenCalledWith('Error fetching GitHub username:', error);
+      await expect(gitHubApiHelper.fetchUserRealName('nonexistent')).rejects.toThrow('User not found');
+      expect(consoleSpy).toHaveBeenCalledWith('Error fetching GitHub user info for nonexistent:', error);
 
       consoleSpy.mockRestore();
     });
@@ -164,7 +164,7 @@ describe('GitHubApiHelper', () => {
       };
       mockOctokit.actions.getWorkflowRun.mockResolvedValue({ data: mockRunData });
 
-      const result = await gitHubApiHelper.fetchGitActionRunData('test-repo', '123');
+      const result = await gitHubApiHelper.fetchWorkflowRunData('test-repo', '123');
 
       expect(mockOctokit.actions.getWorkflowRun).toHaveBeenCalledWith({
         owner: 'aitrics',
@@ -180,9 +180,9 @@ describe('GitHubApiHelper', () => {
 
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      await expect(gitHubApiHelper.fetchGitActionRunData('test-repo', '123')).rejects.toThrow('Workflow run not found');
+      await expect(gitHubApiHelper.fetchWorkflowRunData('test-repo', '123')).rejects.toThrow('Workflow run not found');
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Error fetching action run status for run ID 123:',
+        'Error fetching workflow run data for run ID 123:',
         error,
       );
 

@@ -1,7 +1,9 @@
+const { GITHUB_CONFIG } = require('../constants');
+
 class GitHubApiHelper {
   /**
-   * GitHubClient class constructor.
-   * @param {Octokit} octokit - Octokit instance.
+   * GitHubApiHelper class constructor.
+   * @param {import('@octokit/rest').Octokit} octokit - Octokit instance.
    */
   constructor(octokit) {
     this.octokit = octokit;
@@ -10,16 +12,16 @@ class GitHubApiHelper {
   /**
    * Fetches the member list of a specific GitHub team.
    * @param {string} teamSlug - The slug of the GitHub team.
-   * @returns {Promise<Object>} A promise that resolves to team members.
+   * @returns {Promise<Array>} A promise that resolves to team members.
    * @throws Will throw an error if the GitHub API request fails.
    */
-  async fetchListMembersInOrg(teamSlug) {
+  async fetchTeamMembers(teamSlug) {
     try {
-      const memberList = await this.octokit.teams.listMembersInOrg({
-        org: 'aitrics',
+      const response = await this.octokit.teams.listMembersInOrg({
+        org: GITHUB_CONFIG.ORGANIZATION,
         team_slug: teamSlug,
       });
-      return memberList.data;
+      return response.data;
     } catch (error) {
       console.error(`Error fetching member list for team slug ${teamSlug}:`, error);
       throw error;
@@ -30,13 +32,13 @@ class GitHubApiHelper {
    * Retrieves the GitHub username of the author of a specific review comment.
    * @param {string} repoName - The name of the repository.
    * @param {number} commentId - The ID of the review comment.
-   * @returns {Promise<string|null>} The GitHub username of the comment author, or null if an error occurs.
+   * @returns {Promise<string>} The GitHub username of the comment author.
+   * @throws Will throw an error if the GitHub API request fails.
    */
   async fetchCommentAuthor(repoName, commentId) {
     try {
-      // Fetching the review comment from GitHub using the Octokit client.
       const response = await this.octokit.rest.pulls.getReviewComment({
-        owner: 'aitrics',
+        owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         comment_id: commentId,
       });
@@ -49,58 +51,58 @@ class GitHubApiHelper {
 
   /**
    * Retrieves the GitHub user's real name based on their username.
-   * @param {string} githubName - The GitHub username to retrieve the real name for.
-   * @returns {Promise<string>} The real name of the GitHub user.
+   * @param {string} username - The GitHub username to retrieve the real name for.
+   * @returns {Promise<string>} The real name of the GitHub user or username if name is not available.
    * @throws Will throw an error if the GitHub API request fails.
    */
-  async fetchGithubNickNameToGitHub(githubName) {
+  async fetchUserRealName(username) {
     try {
-      const res = await this.octokit.rest.users.getByUsername({
-        username: githubName,
+      const response = await this.octokit.rest.users.getByUsername({
+        username,
       });
-      return res.data.name || githubName;
+      return response.data.name || username;
     } catch (error) {
-      console.error('Error fetching GitHub username:', error);
+      console.error(`Error fetching GitHub user info for ${username}:`, error);
       throw error;
     }
   }
 
   /**
    * Retrieves the reviews for a given pull request.
-   *
    * @param {string} repoName - The name of the repository.
-   * @param {string|number} prNumber - The number of the pull request for which reviews are being fetched.
-   * @returns {Promise<Object>} A promise that resolves to review objects for the pull request.
+   * @param {number} prNumber - The number of the pull request.
+   * @returns {Promise<Array>} A promise that resolves to review objects.
+   * @throws Will throw an error if the GitHub API request fails.
    */
   async fetchPullRequestReviews(repoName, prNumber) {
     try {
-      const reviewsResponse = await this.octokit.rest.pulls.listReviews({
-        owner: 'aitrics',
+      const response = await this.octokit.rest.pulls.listReviews({
+        owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         pull_number: prNumber,
       });
-      return reviewsResponse.data;
+      return response.data;
     } catch (error) {
       console.error(`Error fetching PR reviews for PR number ${prNumber}:`, error);
-      throw error; // 혹은 에러에 따라 적절한 처리를 할 수 있습니다.
+      throw error;
     }
   }
 
   /**
    * Fetches the details of a pull request.
-   *
    * @param {string} repoName - The name of the repository.
    * @param {number} prNumber - The number of the pull request.
-   * @returns {Promise<Object>} A promise that resolves to an object containing the pull request details.
+   * @returns {Promise<Object>} A promise that resolves to pull request details.
+   * @throws Will throw an error if the GitHub API request fails.
    */
   async fetchPullRequestDetails(repoName, prNumber) {
     try {
-      const prDetails = await this.octokit.rest.pulls.get({
-        owner: 'aitrics',
+      const response = await this.octokit.rest.pulls.get({
+        owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         pull_number: prNumber,
       });
-      return prDetails.data;
+      return response.data;
     } catch (error) {
       console.error(`Error fetching PR details for PR number ${prNumber}:`, error);
       throw error;
@@ -109,20 +111,20 @@ class GitHubApiHelper {
 
   /**
    * Fetches all open pull requests for a given repository.
-   *
    * @param {string} repoName - Repository name.
    * @returns {Promise<Array>} A promise that resolves to open pull request objects.
+   * @throws Will throw an error if the GitHub API request fails.
    */
   async fetchOpenPullRequests(repoName) {
     try {
       const response = await this.octokit.rest.pulls.list({
-        owner: 'aitrics',
+        owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         state: 'open',
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching open PRs for repo ${repoName}`, error);
+      console.error(`Error fetching open PRs for repo ${repoName}:`, error);
       throw error;
     }
   }
@@ -132,17 +134,18 @@ class GitHubApiHelper {
    * @param {string} repoName - The name of the GitHub repository.
    * @param {string} runId - The ID of the workflow run.
    * @returns {Promise<Object>} A promise containing the GitHub Actions workflow run data.
+   * @throws Will throw an error if the GitHub API request fails.
    */
-  async fetchGitActionRunData(repoName, runId) {
+  async fetchWorkflowRunData(repoName, runId) {
     try {
       const response = await this.octokit.actions.getWorkflowRun({
-        owner: 'aitrics',
+        owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         run_id: runId,
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching action run status for run ID ${runId}:`, error);
+      console.error(`Error fetching workflow run data for run ID ${runId}:`, error);
       throw error;
     }
   }

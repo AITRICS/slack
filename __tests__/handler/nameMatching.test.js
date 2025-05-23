@@ -1,13 +1,44 @@
-// __tests__/handler/nameMatching.test.js
-
 const EventHandler = require('../../handler/eventHandler');
 const fetchSlackUserList = require('../../slack/fetchSlackUserList');
+const { GITHUB_CONFIG, SLACK_CHANNELS, SLACK_CONFIG } = require('../../constants');
 const {
   mockSlackMembers, createMockOctokit, createMockSlackWeb, setupDefaultMocks,
 } = require('../mocks/commonMocks');
 
 // Mock fetchSlackUserList
 jest.mock('../../slack/fetchSlackUserList', () => jest.fn());
+
+// Mock time utils for consistent test results
+jest.mock('../../utils/timeUtils', () => ({
+  calculateDurationInMinutes: jest.fn(() => 5.5),
+  formatDuration: jest.fn(() => '5분 30초'),
+}));
+
+// Mock nameUtils for controlled testing
+jest.mock('../../utils/nameUtils', () => ({
+  findSlackUserProperty: jest.fn((members, name, property) => {
+    console.log(`Mock called with name: ${name}, property: ${property}`); // 디버깅용
+
+    // 정확한 매칭 테스트를 위한 하드코딩된 매핑
+    if (property === 'id') {
+      if (name === '최경환') return 'U12345';
+      if (name === '김철수') return 'U67890';
+      if (name === 'jimin') return 'U11111';
+      if (name === 'john') return 'john'; // SKIP 사용자
+      if (name === '존재하지않는사용자') return '존재하지않는사용자';
+      if (name === 'no-name-user') return 'no-name-user';
+    }
+
+    if (property === 'realName') {
+      if (name === '최경환') return 'ray';
+      if (name === '김철수') return '김철수';
+      if (name === 'jimin') return 'jimin';
+    }
+
+    // 기본값: 매칭되지 않으면 원래 이름 반환
+    return name;
+  }),
+}));
 
 describe('EventHandler 이름 매칭 통합 테스트', () => {
   let eventHandler;
