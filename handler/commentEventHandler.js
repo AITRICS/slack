@@ -24,7 +24,14 @@ class CommentEventHandler extends BaseEventHandler {
       return;
     }
 
-    await this.sendCodeCommentToRecipients(payload, recipients, repoName, prNumber);
+    // Check if this is a single recipient (first comment) or multiple recipients (thread)
+    if (recipients.length === 1 && recipients[0].githubUsername === payload.pull_request.user.login) {
+      // First comment case - use legacy single-user notification
+      await this.sendSingleCodeCommentNotification(payload, recipients[0]);
+    } else {
+      // Thread case - use multi-user notification
+      await this.sendCodeCommentToRecipients(payload, recipients, repoName, prNumber);
+    }
   }
 
   async determineCodeCommentRecipients(payload, repoName, prNumber) {
@@ -64,6 +71,18 @@ class CommentEventHandler extends BaseEventHandler {
     );
   }
 
+  async sendSingleCodeCommentNotification(payload, recipient) {
+    const notificationData = await this.prepareCodeCommentData(payload);
+    // Override the mentionedGitName with the actual recipient
+    notificationData.mentionedGitName = recipient.githubUsername;
+
+    const channelId = await this.slackChannelService.selectChannel(recipient.githubUsername);
+    await this.enrichWithSlackData(notificationData);
+    await this.slackMessageService.sendCodeCommentMessage(notificationData, channelId);
+
+    Logger.info(`Sent single code comment notification to ${recipient.githubUsername}`);
+  }
+
   async sendCodeCommentToRecipients(payload, recipients, repoName, prNumber) {
     const recipientsByChannel = await this.groupRecipientsByChannel(recipients);
 
@@ -90,7 +109,7 @@ class CommentEventHandler extends BaseEventHandler {
 
         const notificationData = {
           ...baseNotificationData,
-          mentionedSlackId: mentionsString, // Modified to handle multiple mentions
+          mentionedSlackId: mentionsString, // For multiple mentions
         };
 
         await this.slackMessageService.sendCodeCommentMessage(notificationData, channelId);
