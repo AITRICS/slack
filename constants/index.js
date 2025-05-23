@@ -39,10 +39,21 @@ const JOB_STATUS = {
   FAILURE: 'failure',
 };
 
+const ACTION_TYPES = {
+  SCHEDULE: 'schedule',
+  APPROVE: 'approve',
+  COMMENT: 'comment',
+  REVIEW_REQUESTED: 'review_requested',
+  CHANGES_REQUESTED: 'changes_requested',
+  DEPLOY: 'deploy',
+  CI: 'ci',
+};
+
 module.exports = {
   GITHUB_CONFIG,
   SLACK_CHANNELS,
   SLACK_CONFIG,
   REVIEW_STATES,
   JOB_STATUS,
+  ACTION_TYPES,
 };
