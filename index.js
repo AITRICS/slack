@@ -26,6 +26,7 @@ async function run() {
   }
 
   Logger.info(context.payload);
+  console.log(context.payload);
 
   try {
     Logger.info(`Processing ${ACTION_TYPE} event`);
