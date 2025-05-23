@@ -29,19 +29,17 @@ class CommentEventHandler extends BaseEventHandler {
 
   async determineCodeCommentRecipients(payload, repoName, prNumber) {
     const commentAuthor = payload.comment.user.login;
-    const commentPath = payload.comment.path;
-    const commentLine = payload.comment.line || payload.comment.original_line;
+    const commentId = payload.comment.id;
 
-    // Get all participants in this comment thread
+    // Get all participants in this specific comment thread
     const threadParticipants = await this.gitHubApiHelper.fetchCommentThreadParticipants(
       repoName,
       prNumber,
-      commentPath,
-      commentLine,
+      commentId,
     );
 
-    // If no thread participants found, fall back to PR author
-    if (threadParticipants.length === 0) {
+    // If no other thread participants found, fall back to PR author
+    if (threadParticipants.length <= 1) {
       const prAuthor = payload.pull_request.user.login;
       if (prAuthor !== commentAuthor) {
         return [{ githubUsername: prAuthor }];

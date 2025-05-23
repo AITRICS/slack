@@ -53,12 +53,11 @@ class GitHubApiHelper {
    * Fetches all review comments for a pull request to find thread participants.
    * @param {string} repoName - The name of the repository.
    * @param {number} prNumber - The number of the pull request.
-   * @param {string} path - The file path of the comment.
-   * @param {number} line - The line number of the comment.
+   * @param {number} currentCommentId - The ID of the current comment.
    * @returns {Promise<Array>} Array of usernames who participated in the comment thread.
    * @throws Will throw an error if the GitHub API request fails.
    */
-  async fetchCommentThreadParticipants(repoName, prNumber, path, line) {
+  async fetchCommentThreadParticipants(repoName, prNumber, currentCommentId) {
     try {
       const response = await this.octokit.rest.pulls.listReviewComments({
         owner: GITHUB_CONFIG.ORGANIZATION,
@@ -66,15 +65,19 @@ class GitHubApiHelper {
         pull_number: prNumber,
       });
 
-      // Filter comments that are on the same line and path
-      const threadComments = response.data.filter((comment) => {
-        // For multi-line comments, check if it's part of the same discussion
-        const isSamePath = comment.path === path;
-        const isSameLine = comment.line === line || comment.original_line === line;
-        const isInReplyChain = comment.in_reply_to_id !== undefined;
+      const allComments = response.data;
+      const currentComment = allComments.find((comment) => comment.id === currentCommentId);
 
-        return isSamePath && (isSameLine || isInReplyChain);
-      });
+      if (!currentComment) {
+        console.warn(`Current comment with ID ${currentCommentId} not found`);
+        return [];
+      }
+
+      // Find the thread root (the comment that started this thread)
+      const threadRootId = this.findThreadRoot(allComments, currentComment);
+
+      // Collect all comments in this specific thread
+      const threadComments = this.collectThreadComments(allComments, threadRootId);
 
       // Extract unique usernames from thread participants
       const participants = [...new Set(threadComments.map((comment) => comment.user.login))];
@@ -83,6 +86,58 @@ class GitHubApiHelper {
       console.error(`Error fetching comment thread participants for PR ${prNumber}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Finds the root comment of a thread by following in_reply_to_id chain.
+   * @param {Array} allComments - All comments from the PR.
+   * @param {Object} comment - The comment to find the root for.
+   * @returns {number} The ID of the root comment.
+   */
+  findThreadRoot(allComments, comment) {
+    let currentComment = comment;
+
+    // Follow the reply chain to find the root
+    while (currentComment.in_reply_to_id) {
+      const parentComment = allComments.find((c) => c.id === currentComment.in_reply_to_id);
+      if (!parentComment) break;
+      currentComment = parentComment;
+    }
+
+    return currentComment.id;
+  }
+
+  /**
+   * Collects all comments that belong to the same thread.
+   * @param {Array} allComments - All comments from the PR.
+   * @param {number} threadRootId - The ID of the thread root comment.
+   * @returns {Array} Array of comments in the thread.
+   */
+  collectThreadComments(allComments, threadRootId) {
+    const threadComments = [];
+    const visited = new Set();
+
+    // Add the root comment
+    const rootComment = allComments.find((c) => c.id === threadRootId);
+    if (rootComment) {
+      threadComments.push(rootComment);
+      visited.add(rootComment.id);
+    }
+
+    // Find all replies to this thread (recursively)
+    const findReplies = (parentId) => {
+      const replies = allComments.filter((comment) => comment.in_reply_to_id === parentId && !visited.has(comment.id));
+
+      replies.forEach((reply) => {
+        threadComments.push(reply);
+        visited.add(reply.id);
+        // Recursively find replies to this reply
+        findReplies(reply.id);
+      });
+    };
+
+    findReplies(threadRootId);
+    return threadComments;
   }
 
   /**
