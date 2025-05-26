@@ -136,6 +136,17 @@ class GitHubApiHelper {
       const currentComment = this.#findCommentById(allComments, currentCommentId);
 
       if (!currentComment) {
+        Logger.error('코멘트를 찾을 수 없습니다', {
+          repoName,
+          prNumber,
+          currentCommentId,
+          isReviewComment,
+          totalComments: allComments.length,
+          commentIds: allComments.map((c) => c.id),
+          searchedId: currentCommentId,
+          searchedIdType: typeof currentCommentId,
+        });
+
         throw new GitHubAPIError(
           `코멘트를 찾을 수 없습니다: ${currentCommentId}`,
           {
@@ -208,11 +219,22 @@ class GitHubApiHelper {
    * @returns {Comment|undefined}
    */
   #findCommentById(comments, commentId) {
-    return comments.find((comment) => String(comment.id) === String(commentId));
+    // 숫자와 문자열 모두 비교하여 타입 변환 문제 해결
+    const targetId = String(commentId);
+    return comments.find((comment) => {
+      const commentIdStr = String(comment.id);
+      const commentIdNum = Number(comment.id);
+      const targetIdNum = Number(commentId);
+
+      // 문자열 비교와 숫자 비교 모두 시도
+      return commentIdStr === targetId
+        || commentIdNum === targetIdNum
+        || comment.id === commentId;
+    });
   }
 
   /**
-   * 스레드의 루트 코멘트 찾기
+   * 스레드의 루트 코멘트 찾기 (개선된 타입 비교)
    * @private
    * @param {Comment[]} allComments
    * @param {Comment} comment
@@ -223,7 +245,17 @@ class GitHubApiHelper {
 
     while (current.in_reply_to_id) {
       const replyToId = current.in_reply_to_id;
-      const parent = allComments.find((c) => String(c.id) === String(replyToId));
+      const parent = allComments.find((c) => {
+        const cIdStr = String(c.id);
+        const replyToIdStr = String(replyToId);
+        const cIdNum = Number(c.id);
+        const replyToIdNum = Number(replyToId);
+
+        return cIdStr === replyToIdStr
+          || cIdNum === replyToIdNum
+          || c.id === replyToId;
+      });
+
       if (!parent) break;
       current = parent;
     }
@@ -232,7 +264,7 @@ class GitHubApiHelper {
   }
 
   /**
-   * 스레드의 모든 코멘트 수집
+   * 스레드의 모든 코멘트 수집 (개선된 타입 비교)
    * @private
    * @param {Comment[]} allComments
    * @param {number} threadRootId
@@ -242,17 +274,37 @@ class GitHubApiHelper {
     const threadComments = [];
     const visited = new Set();
 
-    const root = allComments.find((c) => String(c.id) === String(threadRootId));
+    const root = allComments.find((c) => {
+      const cIdStr = String(c.id);
+      const rootIdStr = String(threadRootId);
+      const cIdNum = Number(c.id);
+      const rootIdNum = Number(threadRootId);
+
+      return cIdStr === rootIdStr
+        || cIdNum === rootIdNum
+        || c.id === threadRootId;
+    });
+
     if (root) {
       threadComments.push(root);
       visited.add(String(root.id));
     }
 
     const findReplies = (parentId) => {
-      const replies = allComments.filter(
-        (comment) => String(comment.in_reply_to_id) === String(parentId)
-          && !visited.has(String(comment.id)),
-      );
+      const parentIdStr = String(parentId);
+      const parentIdNum = Number(parentId);
+
+      const replies = allComments.filter((comment) => {
+        const replyToIdStr = String(comment.in_reply_to_id);
+        const replyToIdNum = Number(comment.in_reply_to_id);
+        const commentIdStr = String(comment.id);
+
+        const isReplyToParent = replyToIdStr === parentIdStr
+          || replyToIdNum === parentIdNum
+          || comment.in_reply_to_id === parentId;
+
+        return isReplyToParent && !visited.has(commentIdStr);
+      });
 
       replies.forEach((reply) => {
         threadComments.push(reply);

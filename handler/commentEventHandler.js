@@ -12,6 +12,7 @@ const Logger = require('../utils/logger');
  * @property {number} [comment.in_reply_to_id]
  * @property {string} [comment.diff_hunk]
  * @property {string} [comment.issue_url] - PR 페이지 코멘트인 경우 존재
+ * @property {string} [comment.pull_request_url] - 코드 리뷰 코멘트인 경우 존재
  * @property {Object} repository
  * @property {string} repository.name
  * @property {string} repository.full_name
@@ -32,6 +33,13 @@ const Logger = require('../utils/logger');
  */
 
 /**
+ * @typedef {Object} CommentTypeInfo
+ * @property {boolean} isCodeComment
+ * @property {number} prNumber
+ * @property {string} commentType - 'code_review' | 'pr_page'
+ */
+
+/**
  * GitHub 코멘트 이벤트 처리
  */
 class CommentEventHandler extends BaseEventHandler {
@@ -46,12 +54,10 @@ class CommentEventHandler extends BaseEventHandler {
 
     const commentType = this.#determineCommentType(payload);
 
-    Logger.debug(`코멘트 타입 판단: ${commentType.isCodeComment ? '코드 리뷰' : 'PR 페이지'} 코멘트`, {
-      hasDiffHunk: Boolean(payload.comment.diff_hunk),
-      hasPullRequest: Boolean(payload.pull_request),
-      hasIssue: Boolean(payload.issue),
-      hasIssueUrl: Boolean(payload.comment.issue_url),
+    Logger.info(`코멘트 이벤트 처리: ${commentType.commentType}`, {
       commentId: payload.comment.id,
+      prNumber: commentType.prNumber,
+      isCodeComment: commentType.isCodeComment,
     });
 
     if (commentType.isCodeComment) {
@@ -62,49 +68,97 @@ class CommentEventHandler extends BaseEventHandler {
   }
 
   /**
-   * 코멘트 타입 결정
+   * 코멘트 타입 결정 (개선된 로직)
    * @private
    * @param {CommentPayload} payload
-   * @returns {{isCodeComment: boolean, prNumber: number}}
+   * @returns {CommentTypeInfo}
    */
   #determineCommentType(payload) {
-    // GitHub webhook 페이로드 구조로 코멘트 타입 구분:
-    // 코드 리뷰 코멘트: diff_hunk 존재, pull_request 객체 존재, issue 객체 없음
-    // PR 페이지 코멘트: issue_url 존재, issue 객체 존재, pull_request 객체 없음
-    const isCodeComment = Boolean(
-      payload.comment.diff_hunk
-      && payload.pull_request
-      && !payload.issue,
-    );
+    // GitHub webhook 이벤트 구조를 더 정확하게 분석
+    const hasIssue = Boolean(payload.issue);
+    const hasPullRequest = Boolean(payload.pull_request);
+    const hasIssueUrl = Boolean(payload.comment.issue_url);
+    const hasPullRequestUrl = Boolean(payload.comment.pull_request_url);
+    const hasDiffHunk = Boolean(payload.comment.diff_hunk);
+
+    Logger.debug('코멘트 타입 판단 정보', {
+      hasIssue,
+      hasPullRequest,
+      hasIssueUrl,
+      hasPullRequestUrl,
+      hasDiffHunk,
+      commentId: payload.comment.id,
+    });
+
+    // 더 정확한 판단 로직
+    let isCodeComment = false;
+    let commentType = 'pr_page';
+
+    // 1. issue 객체가 있으면 무조건 PR 페이지 코멘트
+    if (hasIssue) {
+      isCodeComment = false;
+      commentType = 'pr_page';
+    }
+    // 2. pull_request 객체가 있고 diff_hunk가 있으면 코드 리뷰 코멘트
+    else if (hasPullRequest && hasDiffHunk) {
+      isCodeComment = true;
+      commentType = 'code_review';
+    }
+    // 3. pull_request_url이 있고 diff_hunk가 있으면 코드 리뷰 코멘트
+    else if (hasPullRequestUrl && hasDiffHunk) {
+      isCodeComment = true;
+      commentType = 'code_review';
+    }
+    // 4. issue_url이 있으면 PR 페이지 코멘트
+    else if (hasIssueUrl) {
+      isCodeComment = false;
+      commentType = 'pr_page';
+    }
 
     const prNumber = payload.pull_request?.number || payload.issue?.number;
 
-    return { isCodeComment, prNumber };
+    if (!prNumber) {
+      Logger.warn('PR 번호를 찾을 수 없습니다', { payload });
+      throw new Error('PR 번호를 찾을 수 없습니다');
+    }
+
+    return { isCodeComment, prNumber, commentType };
   }
 
   /**
    * 코드 리뷰 코멘트 처리
    * @private
    * @param {CommentPayload} payload
-   * @param {{isCodeComment: boolean, prNumber: number}} commentType
+   * @param {CommentTypeInfo} commentType
    */
   async #handleCodeComment(payload, commentType) {
-    const recipients = await this.#determineCodeCommentRecipients(payload, commentType);
+    try {
+      const recipients = await this.#determineCodeCommentRecipients(payload, commentType);
 
-    if (recipients.length === 0) {
-      Logger.info('코드 코멘트 알림 수신자 없음');
-      return;
-    }
+      if (recipients.length === 0) {
+        Logger.info('코드 코멘트 알림 수신자 없음');
+        return;
+      }
 
-    const isFirstTimeComment = this.#isFirstTimeComment(
-      recipients,
-      payload.pull_request.user.login,
-    );
+      const isFirstTimeComment = this.#isFirstTimeComment(
+        recipients,
+        payload.pull_request.user.login,
+      );
 
-    if (isFirstTimeComment) {
-      await this.#sendSingleRecipientNotification(payload, recipients[0], 'code');
-    } else {
-      await this.#sendMultipleRecipientsNotification(payload, recipients, 'code');
+      if (isFirstTimeComment) {
+        await this.#sendSingleRecipientNotification(payload, recipients[0], 'code');
+      } else {
+        await this.#sendMultipleRecipientsNotification(payload, recipients, 'code');
+      }
+    } catch (error) {
+      Logger.error('코드 리뷰 코멘트 처리 실패', error);
+      // 코드 리뷰 코멘트로 판단했지만 실제로는 PR 페이지 코멘트일 수 있음
+      Logger.warn('코드 리뷰 코멘트로 재시도하지 않고 PR 페이지 코멘트로 처리');
+      await this.#handlePullRequestComment(payload, {
+        ...commentType,
+        isCodeComment: false,
+        commentType: 'pr_page',
+      });
     }
   }
 
@@ -112,7 +166,7 @@ class CommentEventHandler extends BaseEventHandler {
    * PR 페이지 코멘트 처리
    * @private
    * @param {CommentPayload} payload
-   * @param {{isCodeComment: boolean, prNumber: number}} commentType
+   * @param {CommentTypeInfo} commentType
    */
   async #handlePullRequestComment(payload, commentType) {
     const recipients = await this.#determinePRCommentRecipients(payload, commentType);
@@ -137,44 +191,81 @@ class CommentEventHandler extends BaseEventHandler {
   }
 
   /**
-   * 코드 코멘트 수신자 결정
+   * 코드 코멘트 수신자 결정 (개선된 에러 처리)
    * @private
    * @param {CommentPayload} payload
-   * @param {{isCodeComment: boolean, prNumber: number}} commentType
+   * @param {CommentTypeInfo} commentType
    * @returns {Promise<NotificationRecipient[]>}
    */
   async #determineCodeCommentRecipients(payload, commentType) {
     const { repository, pull_request: pullRequest, comment } = payload;
     const commentAuthor = comment.user.login;
 
-    // 코멘트 타입에 따라 올바른 API 호출
-    const threadParticipants = await this.gitHubApiHelper.fetchCommentThreadParticipants(
-      repository.name,
-      commentType.prNumber,
-      comment.id,
-      commentType.isCodeComment,
-    );
+    try {
+      // 코멘트 존재 여부를 먼저 확인
+      const commentExists = await this.#verifyCommentExists(
+        repository.name,
+        comment.id,
+        commentType.isCodeComment,
+      );
 
-    // 스레드 참여자가 없거나 본인뿐인 경우 PR 작성자에게 알림
-    if (threadParticipants.length <= 1) {
-      const prAuthor = pullRequest.user.login;
-      return commentAuthor !== prAuthor
-        ? [{ githubUsername: prAuthor }]
-        : [];
+      if (!commentExists) {
+        Logger.warn('코멘트가 존재하지 않음. 타입 판단 오류일 가능성', {
+          commentId: comment.id,
+          isCodeComment: commentType.isCodeComment,
+        });
+        throw new Error(`코멘트 타입 판단 오류: ${comment.id}`);
+      }
+
+      const threadParticipants = await this.gitHubApiHelper.fetchCommentThreadParticipants(
+        repository.name,
+        commentType.prNumber,
+        comment.id,
+        commentType.isCodeComment,
+      );
+
+      // 스레드 참여자가 없거나 본인뿐인 경우 PR 작성자에게 알림
+      if (threadParticipants.length <= 1) {
+        const prAuthor = pullRequest.user.login;
+        return commentAuthor !== prAuthor
+          ? [{ githubUsername: prAuthor }]
+          : [];
+      }
+
+      const recipients = threadParticipants
+        .filter((username) => username !== commentAuthor)
+        .map((username) => ({ githubUsername: username }));
+
+      return this.slackUserService.addSlackIdsToRecipients(recipients);
+    } catch (error) {
+      Logger.error('코드 코멘트 수신자 결정 실패', error);
+      throw error;
     }
+  }
 
-    const recipients = threadParticipants
-      .filter((username) => username !== commentAuthor)
-      .map((username) => ({ githubUsername: username }));
-
-    return this.slackUserService.addSlackIdsToRecipients(recipients);
+  /**
+   * 코멘트 존재 여부 확인
+   * @private
+   * @param {string} repoName
+   * @param {number} commentId
+   * @param {boolean} isReviewComment
+   * @returns {Promise<boolean>}
+   */
+  async #verifyCommentExists(repoName, commentId, isReviewComment) {
+    try {
+      await this.gitHubApiHelper.fetchCommentAuthor(repoName, commentId, isReviewComment);
+      return true;
+    } catch (error) {
+      Logger.debug(`코멘트 존재 확인 실패: ${commentId}`, error);
+      return false;
+    }
   }
 
   /**
    * PR 페이지 코멘트 수신자 결정
    * @private
    * @param {CommentPayload} payload
-   * @param {{isCodeComment: boolean, prNumber: number}} commentType
+   * @param {CommentTypeInfo} commentType
    * @returns {Promise<NotificationRecipient[]>}
    */
   async #determinePRCommentRecipients(payload, commentType) {
@@ -263,13 +354,17 @@ class CommentEventHandler extends BaseEventHandler {
 
     // 답글인 경우 원본 코멘트 작성자를 대상으로 설정
     if (comment.in_reply_to_id && !actualTargetUsername) {
-      const originalAuthor = await this.gitHubApiHelper.fetchCommentAuthor(
-        repository.name,
-        comment.in_reply_to_id,
-        commentType.isCodeComment,
-      );
-      if (originalAuthor !== authorUsername) {
-        actualTargetUsername = originalAuthor;
+      try {
+        const originalAuthor = await this.gitHubApiHelper.fetchCommentAuthor(
+          repository.name,
+          comment.in_reply_to_id,
+          commentType.isCodeComment,
+        );
+        if (originalAuthor !== authorUsername) {
+          actualTargetUsername = originalAuthor;
+        }
+      } catch (error) {
+        Logger.warn('원본 코멘트 작성자 조회 실패', error);
       }
     }
 
