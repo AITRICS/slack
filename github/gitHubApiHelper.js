@@ -194,21 +194,23 @@ class GitHubApiHelper {
    * @returns {Promise<Comment[]>}
    */
   async #fetchAllComments(repoName, prNumber, isReviewComment) {
-    if (isReviewComment) {
-      const response = await this.octokit.rest.pulls.listReviewComments({
-        owner: GITHUB_CONFIG.ORGANIZATION,
-        repo: repoName,
-        pull_number: prNumber,
-      });
-      return response.data;
-    }
-
-    const response = await this.octokit.rest.issues.listComments({
+    const commonOpts = {
       owner: GITHUB_CONFIG.ORGANIZATION,
       repo: repoName,
-      issue_number: prNumber,
-    });
-    return response.data;
+      per_page: 100, // 최댓값
+    };
+
+    if (isReviewComment) {
+      return this.octokit.paginate(
+        this.octokit.rest.pulls.listReviewComments,
+        { ...commonOpts, pull_number: prNumber },
+      );
+    }
+
+    return this.octokit.paginate(
+      this.octokit.rest.issues.listComments,
+      { ...commonOpts, issue_number: prNumber },
+    );
   }
 
   /**
