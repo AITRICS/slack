@@ -40,6 +40,8 @@ module.exports = {
   },
   rules: {
     'max-len': ['error', { code: 140 }],
+    'no-param-reassign': ['error', { props: true }],
+    'consistent-return': 'error',
     'no-console': 'off',
     'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     'prefer-const': 'error',
@@ -47,13 +49,9 @@ module.exports = {
     'object-shorthand': 'error',
     'prefer-template': 'error',
     'no-underscore-dangle': 'off',
-    'no-param-reassign': ['error', {
-      props: true,
-      ignorePropertyModificationsFor: ['state', 'config', 'options'],
-    }],
-    // 클래스 메서드에서 this 사용 강제
-    'class-methods-use-this': ['error', {
-      exceptMethods: ['initialize', 'cleanup'],
-    }],
+    'import/prefer-default-export': 'off',
+    'import/no-cycle': 'error',
+    'no-throw-literal': 'error',
+    'prefer-promise-reject-errors': 'error',
   },
 };

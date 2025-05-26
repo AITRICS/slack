@@ -133,7 +133,6 @@ async function processActionEvent(handlerFactory, actionType, context, config) {
 /**
  * GitHub Action 메인 실행 함수
  */
-// eslint-disable-next-line consistent-return
 async function run() {
   const executionStartTime = Date.now();
   const serviceFactory = ServiceFactory.getInstance();
@@ -162,6 +161,7 @@ async function run() {
     return result;
   } catch (error) {
     handleExecutionError(error, executionStartTime);
+    return null;
   } finally {
     await cleanupResources(eventHandlerFactory, serviceFactory);
   }

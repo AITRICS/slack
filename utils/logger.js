@@ -54,14 +54,14 @@ class Logger {
    * @param {Array} args
    */
   static #writeLog(level, message, args) {
-    const currentLevel = this.#getCurrentLevel();
+    const currentLevel = Logger.#getCurrentLevel();
     const messageLevel = LOG_LEVELS[level];
 
     if (messageLevel < currentLevel) {
       return;
     }
 
-    const formatted = this.#formatLogMessage(level, message, args);
+    const formatted = Logger.#formatLogMessage(level, message, args);
     const isJsonFormat = environment.get('logging.formatJson', false);
 
     if (level === 'error') {
@@ -120,7 +120,7 @@ class Logger {
    * @param {...any} args
    */
   static debug(message, ...args) {
-    this.#writeLog('debug', message, args);
+    Logger.#writeLog('debug', message, args);
   }
 
   /**
@@ -129,7 +129,7 @@ class Logger {
    * @param {...any} args
    */
   static info(message, ...args) {
-    this.#writeLog('info', message, args);
+    Logger.#writeLog('info', message, args);
   }
 
   /**
@@ -138,7 +138,7 @@ class Logger {
    * @param {...any} args
    */
   static warn(message, ...args) {
-    this.#writeLog('warn', message, args);
+    Logger.#writeLog('warn', message, args);
   }
 
   /**
@@ -152,16 +152,16 @@ class Logger {
 
     if (error instanceof Error) {
       if (isJsonFormat) {
-        const errorData = this.#formatErrorForLogging(error);
-        this.#writeLog('error', message, [errorData, ...args]);
+        const errorData = Logger.#formatErrorForLogging(error);
+        Logger.#writeLog('error', message, [errorData, ...args]);
       } else {
-        this.#writeLog('error', message, []);
-        this.#logErrorDetails(error);
+        Logger.#writeLog('error', message, []);
+        Logger.#logErrorDetails(error);
       }
     } else if (error) {
-      this.#writeLog('error', message, [error, ...args]);
+      Logger.#writeLog('error', message, [error, ...args]);
     } else {
-      this.#writeLog('error', message, args);
+      Logger.#writeLog('error', message, args);
     }
   }
 
@@ -182,35 +182,6 @@ class Logger {
   static timeEnd(label) {
     if (environment.isDebug()) {
       console.timeEnd(label);
-    }
-  }
-
-  /**
-   * 그룹 로깅 시작
-   * @param {string} label
-   */
-  static group(label) {
-    if (!environment.get('logging.formatJson', false)) {
-      console.group(label);
-    }
-  }
-
-  /**
-   * 그룹 로깅 종료
-   */
-  static groupEnd() {
-    if (!environment.get('logging.formatJson', false)) {
-      console.groupEnd();
-    }
-  }
-
-  /**
-   * 테이블 형태로 로깅
-   * @param {any} data
-   */
-  static table(data) {
-    if (environment.isDebug() && !environment.get('logging.formatJson', false)) {
-      console.table(data);
     }
   }
 }

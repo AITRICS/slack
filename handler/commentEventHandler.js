@@ -36,70 +36,82 @@ const Logger = require('../utils/logger');
  */
 class CommentEventHandler extends BaseEventHandler {
   /**
+   * 코멘트 이벤트 처리
    * @param {CommentPayload} payload
    */
-  async processEvent(payload) {
+  async handle(payload) {
+    BaseEventHandler.validatePayload(payload);
+
+    await this.initialize();
+
     const isCodeComment = !payload.comment.issue_url;
 
     if (isCodeComment) {
-      await this.handleCodeComment(payload);
+      await this.#handleCodeComment(payload);
     } else {
-      await this.handlePullRequestComment(payload);
+      await this.#handlePullRequestComment(payload);
     }
   }
 
   /**
    * 코드 리뷰 코멘트 처리
+   * @private
    * @param {CommentPayload} payload
    */
-  async handleCodeComment(payload) {
-    const recipients = await this.determineCodeCommentRecipients(payload);
+  async #handleCodeComment(payload) {
+    const recipients = await this.#determineCodeCommentRecipients(payload);
 
     if (recipients.length === 0) {
       Logger.info('코드 코멘트 알림 수신자 없음');
       return;
     }
 
-    const isFirstTimeComment = CommentEventHandler.isFirstTimeComment(recipients, payload.pull_request.user.login);
+    const isFirstTimeComment = CommentEventHandler.#isFirstTimeComment(
+      recipients,
+      payload.pull_request.user.login,
+    );
 
     if (isFirstTimeComment) {
-      await this.sendSingleRecipientNotification(payload, recipients[0], 'code');
+      await this.#sendSingleRecipientNotification(payload, recipients[0], 'code');
     } else {
-      await this.sendMultipleRecipientsNotification(payload, recipients, 'code');
+      await this.#sendMultipleRecipientsNotification(payload, recipients, 'code');
     }
   }
 
   /**
    * PR 페이지 코멘트 처리
+   * @private
    * @param {CommentPayload} payload
    */
-  async handlePullRequestComment(payload) {
-    const recipients = await this.determinePRCommentRecipients(payload);
+  async #handlePullRequestComment(payload) {
+    const recipients = await this.#determinePRCommentRecipients(payload);
 
     if (recipients.length === 0) {
       Logger.info('PR 페이지 코멘트 알림 수신자 없음');
       return;
     }
 
-    await this.sendMultipleRecipientsNotification(payload, recipients, 'pr');
+    await this.#sendMultipleRecipientsNotification(payload, recipients, 'pr');
   }
 
   /**
    * 첫 번째 코멘트인지 확인 (PR 작성자 1명만 수신자인 경우)
+   * @private
    * @param {NotificationRecipient[]} recipients
    * @param {string} prAuthorLogin
    * @returns {boolean}
    */
-  static isFirstTimeComment(recipients, prAuthorLogin) {
+  static #isFirstTimeComment(recipients, prAuthorLogin) {
     return recipients.length === 1 && recipients[0].githubUsername === prAuthorLogin;
   }
 
   /**
    * 코드 코멘트 수신자 결정
+   * @private
    * @param {CommentPayload} payload
    * @returns {Promise<NotificationRecipient[]>}
    */
-  async determineCodeCommentRecipients(payload) {
+  async #determineCodeCommentRecipients(payload) {
     const { repository, pull_request: pullRequest, comment } = payload;
     const commentAuthor = comment.user.login;
 
@@ -126,16 +138,17 @@ class CommentEventHandler extends BaseEventHandler {
 
   /**
    * PR 페이지 코멘트 수신자 결정
+   * @private
    * @param {CommentPayload} payload
    * @returns {Promise<NotificationRecipient[]>}
    */
-  async determinePRCommentRecipients(payload) {
+  async #determinePRCommentRecipients(payload) {
     const { repository, issue, comment } = payload;
     const commentAuthor = comment.user.login;
 
     const [prDetails, allReviewers] = await Promise.all([
       this.gitHubApiHelper.fetchPullRequestDetails(repository.name, issue.number),
-      this.getAllReviewers(repository.name, issue.number),
+      this.#getAllReviewers(repository.name, issue.number),
     ]);
 
     const prAuthor = prDetails.user.login;
@@ -146,18 +159,19 @@ class CommentEventHandler extends BaseEventHandler {
     }
 
     // 리뷰어가 코멘트 → PR 작성자 + 다른 리뷰어들에게 알림
-    const recipients = await this.getRecipientsForReviewerComment(allReviewers, commentAuthor, prAuthor);
-    return CommentEventHandler.removeDuplicateRecipients(recipients);
+    const recipients = await this.#getRecipientsForReviewerComment(allReviewers, commentAuthor, prAuthor);
+    return CommentEventHandler.#removeDuplicateRecipients(recipients);
   }
 
   /**
    * 단일 수신자 알림 전송
+   * @private
    * @param {CommentPayload} payload
    * @param {NotificationRecipient} recipient
    * @param {'code'|'pr'} commentType
    */
-  async sendSingleRecipientNotification(payload, recipient, commentType) {
-    const notificationData = await this.buildNotificationData(payload, recipient.githubUsername);
+  async #sendSingleRecipientNotification(payload, recipient, commentType) {
+    const notificationData = await this.#buildNotificationData(payload, recipient.githubUsername);
     const channelId = await this.slackChannelService.selectChannel(recipient.githubUsername);
 
     const messageMethod = commentType === 'code'
@@ -170,13 +184,14 @@ class CommentEventHandler extends BaseEventHandler {
 
   /**
    * 다중 수신자 알림 전송
+   * @private
    * @param {CommentPayload} payload
    * @param {NotificationRecipient[]} recipients
    * @param {'code'|'pr'} commentType
    */
-  async sendMultipleRecipientsNotification(payload, recipients, commentType) {
-    const recipientsByChannel = await this.groupRecipientsByChannel(recipients);
-    const baseNotificationData = await this.buildNotificationData(payload);
+  async #sendMultipleRecipientsNotification(payload, recipients, commentType) {
+    const recipientsByChannel = await this.#groupRecipientsByChannel(recipients);
+    const baseNotificationData = await this.#buildNotificationData(payload);
 
     const messageMethod = commentType === 'code'
       ? 'sendCodeCommentMessage'
@@ -195,11 +210,12 @@ class CommentEventHandler extends BaseEventHandler {
 
   /**
    * 알림 데이터 생성
+   * @private
    * @param {CommentPayload} payload
    * @param {string} [targetUsername] - 특정 대상자 (단일 알림인 경우)
    * @returns {Promise<Object>}
    */
-  async buildNotificationData(payload, targetUsername) {
+  async #buildNotificationData(payload, targetUsername) {
     const {
       comment, pull_request: pullRequest, repository, issue,
     } = payload;
@@ -249,11 +265,12 @@ class CommentEventHandler extends BaseEventHandler {
 
   /**
    * PR의 모든 리뷰어 조회
+   * @private
    * @param {string} repoName
    * @param {number} prNumber
    * @returns {Promise<NotificationRecipient[]>}
    */
-  async getAllReviewers(repoName, prNumber) {
+  async #getAllReviewers(repoName, prNumber) {
     const [prDetails, reviews] = await Promise.all([
       this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber),
       this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
@@ -269,12 +286,13 @@ class CommentEventHandler extends BaseEventHandler {
 
   /**
    * 리뷰어 코멘트에 대한 수신자 결정
+   * @private
    * @param {NotificationRecipient[]} allReviewers
    * @param {string} commentAuthor
    * @param {string} prAuthor
    * @returns {Promise<NotificationRecipient[]>}
    */
-  async getRecipientsForReviewerComment(allReviewers, commentAuthor, prAuthor) {
+  async #getRecipientsForReviewerComment(allReviewers, commentAuthor, prAuthor) {
     const otherReviewers = allReviewers.filter((r) => r.githubUsername !== commentAuthor);
     const prAuthorIsReviewer = allReviewers.some((r) => r.githubUsername === prAuthor);
 
@@ -291,10 +309,11 @@ class CommentEventHandler extends BaseEventHandler {
 
   /**
    * 수신자를 채널별로 그룹화
+   * @private
    * @param {NotificationRecipient[]} recipients
    * @returns {Promise<Object<string, NotificationRecipient[]>>}
    */
-  async groupRecipientsByChannel(recipients) {
+  async #groupRecipientsByChannel(recipients) {
     const groups = {};
 
     await Promise.all(
@@ -313,10 +332,11 @@ class CommentEventHandler extends BaseEventHandler {
 
   /**
    * 중복 수신자 제거
+   * @private
    * @param {NotificationRecipient[]} recipients
    * @returns {NotificationRecipient[]}
    */
-  static removeDuplicateRecipients(recipients) {
+  static #removeDuplicateRecipients(recipients) {
     const seen = new Set();
     return recipients.filter((recipient) => {
       if (seen.has(recipient.githubUsername)) {

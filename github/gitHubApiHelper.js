@@ -1,4 +1,6 @@
 const { GITHUB_CONFIG } = require('../constants');
+const Logger = require('../utils/logger');
+const { GitHubAPIError } = require('../utils/errors');
 
 /**
  * @typedef {import('@octokit/rest').Octokit} Octokit
@@ -44,17 +46,25 @@ class GitHubApiHelper {
    * GitHub 팀 멤버 목록 조회
    * @param {string} teamSlug
    * @returns {Promise<GitHubUser[]>}
+   * @throws {GitHubAPIError}
    */
   async fetchTeamMembers(teamSlug) {
     try {
+      Logger.debug(`팀 멤버 조회 시작: ${teamSlug}`);
+
       const response = await this.octokit.teams.listMembersInOrg({
         org: GITHUB_CONFIG.ORGANIZATION,
         team_slug: teamSlug,
       });
+
+      Logger.debug(`팀 멤버 조회 완료: ${teamSlug} (${response.data.length}명)`);
       return response.data;
     } catch (error) {
-      console.error(`팀 멤버 조회 실패 (${teamSlug}):`, error);
-      throw error;
+      Logger.error(`팀 멤버 조회 실패 (${teamSlug})`, error);
+      throw new GitHubAPIError(
+        `팀 멤버 조회 실패: ${teamSlug}`,
+        { teamSlug, originalError: error.message },
+      );
     }
   }
 
@@ -63,18 +73,27 @@ class GitHubApiHelper {
    * @param {string} repoName
    * @param {number} commentId
    * @returns {Promise<string>}
+   * @throws {GitHubAPIError}
    */
   async fetchCommentAuthor(repoName, commentId) {
     try {
+      Logger.debug(`코멘트 작성자 조회: ${repoName}#${commentId}`);
+
       const response = await this.octokit.rest.pulls.getReviewComment({
         owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         comment_id: commentId,
       });
-      return response.data.user.login;
+
+      const authorLogin = response.data.user.login;
+      Logger.debug(`코멘트 작성자 조회 완료: ${authorLogin}`);
+      return authorLogin;
     } catch (error) {
-      console.error(`코멘트 작성자 조회 실패 (ID: ${commentId}):`, error);
-      throw error;
+      Logger.error(`코멘트 작성자 조회 실패 (ID: ${commentId})`, error);
+      throw new GitHubAPIError(
+        `코멘트 작성자 조회 실패: ${commentId}`,
+        { repoName, commentId, originalError: error.message },
+      );
     }
   }
 
@@ -84,9 +103,12 @@ class GitHubApiHelper {
    * @param {number} prNumber
    * @param {number} currentCommentId
    * @returns {Promise<string[]>}
+   * @throws {GitHubAPIError}
    */
   async fetchCommentThreadParticipants(repoName, prNumber, currentCommentId) {
     try {
+      Logger.debug(`코멘트 스레드 참여자 조회: ${repoName}#${prNumber}, 코멘트 ID: ${currentCommentId}`);
+
       const response = await this.octokit.rest.pulls.listReviewComments({
         owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
@@ -97,18 +119,24 @@ class GitHubApiHelper {
       const currentComment = allComments.find((comment) => comment.id === currentCommentId);
 
       if (!currentComment) {
-        console.warn(`코멘트를 찾을 수 없음 (ID: ${currentCommentId})`);
+        Logger.warn(`코멘트를 찾을 수 없음 (ID: ${currentCommentId})`);
         return [];
       }
 
-      const threadRootId = this.#findThreadRoot(allComments, currentComment);
-      const threadComments = this.#collectThreadComments(allComments, threadRootId);
+      const threadRootId = GitHubApiHelper.#findThreadRoot(allComments, currentComment);
+      const threadComments = GitHubApiHelper.#collectThreadComments(allComments, threadRootId);
       const participants = [...new Set(threadComments.map((comment) => comment.user.login))];
 
+      Logger.debug(`스레드 참여자 조회 완료: ${participants.length}명`);
       return participants;
     } catch (error) {
-      console.error(`코멘트 스레드 참여자 조회 실패 (PR #${prNumber}):`, error);
-      throw error;
+      Logger.error(`코멘트 스레드 참여자 조회 실패 (PR #${prNumber})`, error);
+      throw new GitHubAPIError(
+        `코멘트 스레드 참여자 조회 실패: PR #${prNumber}`,
+        {
+          repoName, prNumber, currentCommentId, originalError: error.message,
+        },
+      );
     }
   }
 
@@ -119,11 +147,12 @@ class GitHubApiHelper {
    * @param {Object} comment
    * @returns {number}
    */
-  #findThreadRoot(allComments, comment) {
+  static #findThreadRoot(allComments, comment) {
     let current = comment;
 
     while (current.in_reply_to_id) {
-      const parent = allComments.find((c) => c.id === current.in_reply_to_id);
+      const replyToId = current.in_reply_to_id;
+      const parent = allComments.find((c) => c.id === replyToId);
       if (!parent) break;
       current = parent;
     }
@@ -138,7 +167,7 @@ class GitHubApiHelper {
    * @param {number} threadRootId
    * @returns {Array}
    */
-  #collectThreadComments(allComments, threadRootId) {
+  static #collectThreadComments(allComments, threadRootId) {
     const threadComments = [];
     const visited = new Set();
 
@@ -168,14 +197,23 @@ class GitHubApiHelper {
    * GitHub 사용자의 실제 이름 조회
    * @param {string} username
    * @returns {Promise<string>}
+   * @throws {GitHubAPIError}
    */
   async fetchUserRealName(username) {
     try {
+      Logger.debug(`사용자 실명 조회: ${username}`);
+
       const response = await this.octokit.rest.users.getByUsername({ username });
-      return response.data.name || username;
+      const realName = response.data.name || username;
+
+      Logger.debug(`사용자 실명 조회 완료: ${username} → ${realName}`);
+      return realName;
     } catch (error) {
-      console.error(`사용자 정보 조회 실패 (${username}):`, error);
-      throw error;
+      Logger.error(`사용자 정보 조회 실패 (${username})`, error);
+      throw new GitHubAPIError(
+        `사용자 정보 조회 실패: ${username}`,
+        { username, originalError: error.message },
+      );
     }
   }
 
@@ -184,18 +222,26 @@ class GitHubApiHelper {
    * @param {string} repoName
    * @param {number} prNumber
    * @returns {Promise<Review[]>}
+   * @throws {GitHubAPIError}
    */
   async fetchPullRequestReviews(repoName, prNumber) {
     try {
+      Logger.debug(`PR 리뷰 목록 조회: ${repoName}#${prNumber}`);
+
       const response = await this.octokit.rest.pulls.listReviews({
         owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         pull_number: prNumber,
       });
+
+      Logger.debug(`PR 리뷰 조회 완료: ${response.data.length}개`);
       return response.data;
     } catch (error) {
-      console.error(`PR 리뷰 조회 실패 (PR #${prNumber}):`, error);
-      throw error;
+      Logger.error(`PR 리뷰 조회 실패 (PR #${prNumber})`, error);
+      throw new GitHubAPIError(
+        `PR 리뷰 조회 실패: PR #${prNumber}`,
+        { repoName, prNumber, originalError: error.message },
+      );
     }
   }
 
@@ -204,18 +250,26 @@ class GitHubApiHelper {
    * @param {string} repoName
    * @param {number} prNumber
    * @returns {Promise<PullRequest>}
+   * @throws {GitHubAPIError}
    */
   async fetchPullRequestDetails(repoName, prNumber) {
     try {
+      Logger.debug(`PR 상세 정보 조회: ${repoName}#${prNumber}`);
+
       const response = await this.octokit.rest.pulls.get({
         owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         pull_number: prNumber,
       });
+
+      Logger.debug(`PR 상세 정보 조회 완료: ${response.data.title}`);
       return response.data;
     } catch (error) {
-      console.error(`PR 상세 조회 실패 (PR #${prNumber}):`, error);
-      throw error;
+      Logger.error(`PR 상세 조회 실패 (PR #${prNumber})`, error);
+      throw new GitHubAPIError(
+        `PR 상세 조회 실패: PR #${prNumber}`,
+        { repoName, prNumber, originalError: error.message },
+      );
     }
   }
 
@@ -223,18 +277,26 @@ class GitHubApiHelper {
    * 열린 PR 목록 조회
    * @param {string} repoName
    * @returns {Promise<PullRequest[]>}
+   * @throws {GitHubAPIError}
    */
   async fetchOpenPullRequests(repoName) {
     try {
+      Logger.debug(`열린 PR 목록 조회: ${repoName}`);
+
       const response = await this.octokit.rest.pulls.list({
         owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         state: 'open',
       });
+
+      Logger.debug(`열린 PR 조회 완료: ${response.data.length}개`);
       return response.data;
     } catch (error) {
-      console.error(`열린 PR 조회 실패 (${repoName}):`, error);
-      throw error;
+      Logger.error(`열린 PR 조회 실패 (${repoName})`, error);
+      throw new GitHubAPIError(
+        `열린 PR 조회 실패: ${repoName}`,
+        { repoName, originalError: error.message },
+      );
     }
   }
 
@@ -243,18 +305,26 @@ class GitHubApiHelper {
    * @param {string} repoName
    * @param {string} runId
    * @returns {Promise<Object>}
+   * @throws {GitHubAPIError}
    */
   async fetchWorkflowRunData(repoName, runId) {
     try {
+      Logger.debug(`워크플로우 실행 정보 조회: ${repoName}, Run ID: ${runId}`);
+
       const response = await this.octokit.actions.getWorkflowRun({
         owner: GITHUB_CONFIG.ORGANIZATION,
         repo: repoName,
         run_id: runId,
       });
+
+      Logger.debug(`워크플로우 실행 정보 조회 완료: ${response.data.name}`);
       return response.data;
     } catch (error) {
-      console.error(`워크플로우 실행 조회 실패 (ID: ${runId}):`, error);
-      throw error;
+      Logger.error(`워크플로우 실행 조회 실패 (ID: ${runId})`, error);
+      throw new GitHubAPIError(
+        `워크플로우 실행 조회 실패: ${runId}`,
+        { repoName, runId, originalError: error.message },
+      );
     }
   }
 }

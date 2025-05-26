@@ -19,13 +19,14 @@ class EventHandlerFactory {
     this.handlerRegistry = new Map();
     this.isInitialized = false;
 
-    this.registerEventHandlers();
+    this.#registerEventHandlers();
   }
 
   /**
    * 액션 타입별 핸들러 등록
+   * @private
    */
-  registerEventHandlers() {
+  #registerEventHandlers() {
     const commentHandler = new CommentEventHandler(this.services);
     const reviewHandler = new ReviewEventHandler(this.services);
     const deploymentHandler = new DeploymentEventHandler(this.services);
@@ -58,7 +59,7 @@ class EventHandlerFactory {
       Logger.info('이벤트 핸들러 사전 초기화 중...');
       Logger.time('핸들러 초기화');
 
-      await this.initializeUniqueHandlers();
+      await this.#initializeUniqueHandlers();
       await this.serviceFactory.initializeAllServices();
 
       this.isInitialized = true;
@@ -73,9 +74,10 @@ class EventHandlerFactory {
 
   /**
    * 중복되지 않는 핸들러들만 초기화
+   * @private
    */
-  async initializeUniqueHandlers() {
-    const uniqueHandlers = this.getUniqueHandlers();
+  async #initializeUniqueHandlers() {
+    const uniqueHandlers = this.#getUniqueHandlers();
 
     await Promise.all(
       Array.from(uniqueHandlers).map((handler) => handler.initialize()),
@@ -84,9 +86,10 @@ class EventHandlerFactory {
 
   /**
    * 중복되지 않는 핸들러 인스턴스들 추출
+   * @private
    * @returns {Set}
    */
-  getUniqueHandlers() {
+  #getUniqueHandlers() {
     const uniqueHandlers = new Set();
 
     this.handlerRegistry.forEach(({ handler }) => {
@@ -109,25 +112,26 @@ class EventHandlerFactory {
       await this.preInitialize();
     }
 
-    const handlerInfo = this.getHandlerInfo(actionType);
+    const handlerInfo = this.#getHandlerInfo(actionType);
     if (!handlerInfo) {
-      this.throwUnknownActionTypeError(actionType);
+      this.#throwUnknownActionTypeError(actionType);
     }
 
     try {
-      await this.executeHandler(handlerInfo, actionType, args);
+      await EventHandlerFactory.#executeHandler(handlerInfo, actionType, args);
       Logger.info(`이벤트 처리 완료: ${actionType}`);
     } catch (error) {
-      this.handleEventProcessingError(error, actionType);
+      EventHandlerFactory.#handleEventProcessingError(error, actionType);
     }
   }
 
   /**
    * 핸들러 정보 조회
+   * @private
    * @param {string} actionType
    * @returns {Object|null}
    */
-  getHandlerInfo(actionType) {
+  #getHandlerInfo(actionType) {
     const handlerInfo = this.handlerRegistry.get(actionType);
 
     if (!handlerInfo) {
@@ -140,21 +144,23 @@ class EventHandlerFactory {
 
   /**
    * 핸들러 실행
+   * @private
    * @param {Object} handlerInfo
    * @param {string} actionType
    * @param {Array} args
    */
-  async executeHandler(handlerInfo, actionType, args) {
+  static async #executeHandler(handlerInfo, actionType, args) {
     const { handler, method } = handlerInfo;
     await handler[method](...args);
   }
 
   /**
    * 알 수 없는 액션 타입 에러 발생
+   * @private
    * @param {string} actionType
    * @throws {SlackNotificationError}
    */
-  throwUnknownActionTypeError(actionType) {
+  #throwUnknownActionTypeError(actionType) {
     throw new SlackNotificationError(
       `알 수 없는 액션 타입: ${actionType}`,
       'UNKNOWN_ACTION_TYPE',
@@ -167,11 +173,12 @@ class EventHandlerFactory {
 
   /**
    * 이벤트 처리 에러 핸들링
+   * @private
    * @param {Error} error
    * @param {string} actionType
    * @throws {SlackNotificationError}
    */
-  handleEventProcessingError(error, actionType) {
+  static #handleEventProcessingError(error, actionType) {
     Logger.error(`이벤트 처리 실패: ${actionType}`, error);
 
     if (error instanceof SlackNotificationError) {
@@ -218,7 +225,7 @@ class EventHandlerFactory {
     };
 
     // 각 핸들러의 캐시 통계 (중복 제거)
-    const uniqueHandlers = this.getUniqueHandlers();
+    const uniqueHandlers = this.#getUniqueHandlers();
     stats.handlers = {};
 
     uniqueHandlers.forEach((handler) => {
@@ -236,7 +243,7 @@ class EventHandlerFactory {
   async cleanup() {
     Logger.info('이벤트 핸들러 팩토리 정리 중...');
 
-    const uniqueHandlers = this.getUniqueHandlers();
+    const uniqueHandlers = this.#getUniqueHandlers();
 
     await Promise.all(
       Array.from(uniqueHandlers).map((handler) => {

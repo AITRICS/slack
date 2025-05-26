@@ -117,11 +117,11 @@ class Environment {
 
     return {
       slack: {
-        token: this.#maskToken(config.slack.token),
+        token: Environment.#maskToken(config.slack.token),
         defaultChannel: config.slack.defaultChannel,
       },
       github: {
-        token: this.#maskToken(config.github.token),
+        token: Environment.#maskToken(config.github.token),
         organization: config.github.organization,
         apiVersion: config.github.apiVersion,
       },
@@ -138,7 +138,7 @@ class Environment {
    * @param {string} token
    * @returns {string}
    */
-  #maskToken(token) {
+  static #maskToken(token) {
     if (!token || token.length < 8) return '***';
     return `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
   }

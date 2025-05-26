@@ -1,38 +1,81 @@
 const BaseEventHandler = require('./baseEventHandler');
-const { SLACK_CONFIG, SLACK_CHANNELS } = require('../constants');
+const { SLACK_CHANNELS } = require('../constants');
 const { calculateDurationInMinutes, formatDuration } = require('../utils/timeUtils');
+const Logger = require('../utils/logger');
 
 /**
- * Handles deployment and build events with optimized Slack API usage
+ * 배포 및 빌드 이벤트 처리
  */
 class DeploymentEventHandler extends BaseEventHandler {
   /**
-   * Handles deployment events
+   * 배포 이벤트 처리
+   * @param {Object} context - GitHub context
+   * @param {string} ec2Name - EC2 instance name
+   * @param {string} imageTag - Docker image tag
+   * @param {string} jobStatus - Job status (success/failure)
    */
   async handleDeploy(context, ec2Name, imageTag, jobStatus) {
-    const deployData = await this.prepareDeployData(context, ec2Name, imageTag, jobStatus);
-    const notificationData = DeploymentEventHandler.formatDeploymentNotificationData(deployData);
+    try {
+      Logger.info(`배포 이벤트 처리 시작: ${ec2Name}, 상태: ${jobStatus}`);
 
-    await this.slackMessageService.sendDeploymentMessage(notificationData, SLACK_CHANNELS.deploy);
+      await this.initialize();
+      BaseEventHandler.validatePayload(context.payload);
+
+      const deployData = await this.#prepareDeployData(context, ec2Name, imageTag, jobStatus);
+      const notificationData = DeploymentEventHandler.#formatDeploymentNotificationData(deployData);
+
+      await this.slackMessageService.sendDeploymentMessage(notificationData, SLACK_CHANNELS.deploy);
+
+      Logger.info(`배포 알림 전송 완료: ${ec2Name}`);
+    } catch (error) {
+      Logger.error('배포 이벤트 처리 실패', error);
+      throw error;
+    }
   }
 
   /**
-   * Handles build events
+   * 빌드 이벤트 처리
+   * @param {Object} context - GitHub context
+   * @param {string} branchName - Branch name
+   * @param {string} imageTag - Docker image tag
+   * @param {string} jobName - Job name(s) (comma-separated)
+   * @param {string} jobStatus - Job status (success/failure)
    */
   async handleBuild(context, branchName, imageTag, jobName, jobStatus) {
-    const buildData = await this.prepareBuildData(context, branchName, imageTag, jobName, jobStatus);
-    const notificationData = DeploymentEventHandler.formatBuildNotificationData(buildData);
+    try {
+      Logger.info(`빌드 이벤트 처리 시작: ${branchName}, 상태: ${jobStatus}`);
 
-    await this.slackMessageService.sendBuildMessage(notificationData, SLACK_CHANNELS.deploy);
+      await this.initialize();
+      BaseEventHandler.validatePayload(context.payload);
+
+      const buildData = await this.#prepareBuildData(context, branchName, imageTag, jobName, jobStatus);
+      const notificationData = DeploymentEventHandler.#formatBuildNotificationData(buildData);
+
+      await this.slackMessageService.sendBuildMessage(notificationData, SLACK_CHANNELS.deploy);
+
+      Logger.info(`빌드 알림 전송 완료: ${branchName}`);
+    } catch (error) {
+      Logger.error('빌드 이벤트 처리 실패', error);
+      throw error;
+    }
   }
 
-  async prepareDeployData(context, ec2Name, imageTag, jobStatus) {
+  /**
+   * 배포 데이터 준비
+   * @private
+   * @param {Object} context - GitHub context
+   * @param {string} ec2Name - EC2 instance name
+   * @param {string} imageTag - Docker image tag
+   * @param {string} jobStatus - Job status
+   * @returns {Promise<Object>} 배포 데이터
+   */
+  async #prepareDeployData(context, ec2Name, imageTag, jobStatus) {
     const repoData = BaseEventHandler.extractRepoData(context.payload.repository);
     const workflowData = await this.gitHubApiHelper.fetchWorkflowRunData(repoData.name, context.runId);
     const totalDurationMinutes = calculateDurationInMinutes(workflowData.run_started_at, new Date());
 
-    // Use batch processing to get Slack ID for trigger user
-    const triggerUserMap = await this.slackUserService.getSlackUserPropertiesBatch(
+    // Slack ID 조회
+    const triggerUserMap = await this.slackUserService.getSlackProperties(
       [workflowData.actor.login],
       'id',
     );
@@ -46,106 +89,120 @@ class DeploymentEventHandler extends BaseEventHandler {
       repoData,
       ref: context.ref,
       sha: context.sha,
-      slackStatus: isSuccess ? SLACK_CONFIG.MESSAGE_COLORS.SUCCESS : SLACK_CONFIG.MESSAGE_COLORS.DANGER,
-      slackDeployResult: `${isSuccess ? SLACK_CONFIG.ICONS.SUCCESS : SLACK_CONFIG.ICONS.FAILURE}*${isSuccess ? 'Succeeded' : 'Failed'}*`,
+      status: jobStatus,
+      isSuccess,
       totalRunTime: formatDuration(totalDurationMinutes),
       triggerUser,
       workflowData,
     };
   }
 
-  async prepareBuildData(context, branchName, imageTag, jobName, jobStatus) {
+  /**
+   * 빌드 데이터 준비
+   * @private
+   * @param {Object} context - GitHub context
+   * @param {string} branchName - Branch name
+   * @param {string} imageTag - Docker image tag
+   * @param {string} jobName - Job name(s)
+   * @param {string} jobStatus - Job status
+   * @returns {Promise<Object>} 빌드 데이터
+   */
+  async #prepareBuildData(context, branchName, imageTag, jobName, jobStatus) {
     const repoData = BaseEventHandler.extractRepoData(context.payload.repository);
     const workflowData = await this.gitHubApiHelper.fetchWorkflowRunData(repoData.name, context.runId);
     const totalDurationMinutes = calculateDurationInMinutes(workflowData.run_started_at, new Date());
 
-    // Use batch processing to get Slack ID for trigger user
-    const triggerUserMap = await this.slackUserService.getSlackUserPropertiesBatch(
+    // Slack ID 조회
+    const triggerUserMap = await this.slackUserService.getSlackProperties(
       [workflowData.actor.login],
       'id',
     );
     const triggerUser = triggerUserMap.get(workflowData.actor.login) || workflowData.actor.login;
 
-    const jobNames = jobName ? jobName.split(',').map((name) => name.trim()) : [];
+    const jobNames = jobName ? jobName.split(',').map((name) => name.trim()).filter(Boolean) : [];
     const isSuccess = jobStatus === 'success';
+    const failedJobs = isSuccess ? [] : jobNames;
 
     return {
       branchName: branchName || context.ref.replace('refs/heads/', ''),
       jobNames,
+      failedJobs,
       imageTag,
       repoData,
       sha: context.sha,
-      slackStatus: isSuccess ? SLACK_CONFIG.MESSAGE_COLORS.SUCCESS : SLACK_CONFIG.MESSAGE_COLORS.DANGER,
-      slackBuildResult: `${isSuccess ? SLACK_CONFIG.ICONS.SUCCESS : SLACK_CONFIG.ICONS.FAILURE}*${isSuccess ? 'Succeeded' : 'Failed'}*`,
+      status: jobStatus,
+      isSuccess,
       totalRunTime: formatDuration(totalDurationMinutes),
       triggerUser,
       workflowData,
     };
   }
 
-  static formatDeploymentNotificationData(deployData) {
+  /**
+   * 배포 알림 데이터 포맷
+   * @private
+   * @param {Object} deployData - 배포 데이터
+   * @returns {Object} 포맷된 알림 데이터
+   */
+  static #formatDeploymentNotificationData(deployData) {
     const {
       ec2Name,
       imageTag,
       repoData,
       ref,
       sha,
-      slackStatus,
-      slackDeployResult,
+      status,
       totalRunTime,
       triggerUser,
       workflowData,
     } = deployData;
 
     return {
+      status,
       ec2Name,
       imageTag,
       ref,
       sha,
-      slackStatus,
-      slackDeployResult,
-      triggerUser,
+      triggerUsername: triggerUser,
       repoName: repoData.name,
-      repoFullName: repoData.fullName,
       repoUrl: repoData.url,
-      commitUrl: `https://github.com/${repoData.fullName}/commit/${sha}`,
+      duration: totalRunTime,
       workflowName: workflowData.name,
-      totalRunTime,
-      actionUrl: workflowData.html_url,
+      workflowUrl: workflowData.html_url,
     };
   }
 
-  static formatBuildNotificationData(buildData) {
+  /**
+   * 빌드 알림 데이터 포맷
+   * @private
+   * @param {Object} buildData - 빌드 데이터
+   * @returns {Object} 포맷된 알림 데이터
+   */
+  static #formatBuildNotificationData(buildData) {
     const {
       branchName,
       imageTag,
       repoData,
-      ref,
       sha,
-      slackStatus,
-      slackBuildResult,
+      status,
       totalRunTime,
       triggerUser,
       workflowData,
-      jobNames,
+      failedJobs,
     } = buildData;
 
     return {
+      status,
       branchName,
       imageTag,
-      ref,
       sha,
-      slackStatus,
-      slackBuildResult,
-      triggerUser,
+      triggerUsername: triggerUser,
       repoName: repoData.name,
-      repoFullName: repoData.fullName,
       repoUrl: repoData.url,
-      commitUrl: `https://github.com/${repoData.fullName}/commit/${sha}`,
+      duration: totalRunTime,
       workflowName: workflowData.name,
-      totalRunTime,
-      actionUrl: workflowData.html_url,
-      jobNames,
+      workflowUrl: workflowData.html_url,
+      failedJobs,
     };
   }
 }

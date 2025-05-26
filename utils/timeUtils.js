@@ -1,8 +1,8 @@
 /**
- * Calculates the duration in minutes between two dates.
- * @param {Date|string} startTime - The start time.
- * @param {Date|string} endTime - The end time.
- * @returns {number} The duration in minutes.
+ * 두 날짜 간의 분 단위 지속 시간 계산
+ * @param {Date|string} startTime - 시작 시간
+ * @param {Date|string} endTime - 종료 시간
+ * @returns {number} 분 단위 지속 시간
  */
 function calculateDurationInMinutes(startTime, endTime) {
   const start = new Date(startTime);
@@ -11,9 +11,9 @@ function calculateDurationInMinutes(startTime, endTime) {
 }
 
 /**
- * Formats duration in minutes to Korean format.
- * @param {number} totalMinutes - Total duration in minutes.
- * @returns {string} Formatted duration string.
+ * 분 단위 지속 시간을 한국어 형식으로 포맷
+ * @param {number} totalMinutes - 전체 분 수
+ * @returns {string} 포맷된 지속 시간 문자열
  */
 function formatDuration(totalMinutes) {
   const minutes = Math.floor(totalMinutes);

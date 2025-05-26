@@ -8,18 +8,18 @@ const { ACTION_TYPES } = require('../constants');
 class ConfigValidator {
   /**
    * 필수 설정 검증
-   * @throws {ConfigurationError} 필수 설정이 누락된 경우
+   * @returns {boolean} 모든 필수 항목이 존재하면 true
+   * @throws {ConfigurationError}
    */
   static validateRequired() {
     const required = ['SLACK_TOKEN', 'GITHUB_TOKEN', 'ACTION_TYPE'];
-    const missing = required.filter((key) => !Core.getInput(key));
+    const inputs = required.map((k) => ({ k, v: Core.getInput(k) }));
+    const missingKeys = inputs.filter(({ v }) => !v).map(({ k }) => k);
 
-    if (missing.length > 0) {
-      throw new ConfigurationError(
-        `필수 설정이 누락되었습니다: ${missing.join(', ')}`,
-        missing,
-      );
+    if (missingKeys.length) {
+      throw new ConfigurationError(`필수 설정 누락: ${missingKeys.join(', ')}`, missingKeys);
     }
+    return true;
   }
 
   /**
@@ -100,21 +100,21 @@ class ConfigValidator {
    */
   static validateAll() {
     // 필수 설정 검증
-    this.validateRequired();
+    ConfigValidator.validateRequired();
 
     const slackToken = Core.getInput('SLACK_TOKEN');
     const githubToken = Core.getInput('GITHUB_TOKEN');
     const actionType = Core.getInput('ACTION_TYPE');
 
     // 토큰 형식 검증
-    this.validateTokenFormat(slackToken, 'SLACK_TOKEN');
-    this.validateTokenFormat(githubToken, 'GITHUB_TOKEN');
+    ConfigValidator.validateTokenFormat(slackToken, 'SLACK_TOKEN');
+    ConfigValidator.validateTokenFormat(githubToken, 'GITHUB_TOKEN');
 
     // 액션 타입 검증
-    this.validateActionType(actionType);
+    ConfigValidator.validateActionType(actionType);
 
     // 액션별 추가 설정 검증
-    this.validateActionSpecificConfig(actionType);
+    ConfigValidator.validateActionSpecificConfig(actionType);
 
     return { slackToken, githubToken, actionType };
   }

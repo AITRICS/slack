@@ -1,6 +1,6 @@
 const { SLACK_CHANNELS, GITHUB_CONFIG } = require('../constants');
 const Logger = require('../utils/logger');
-const { CacheError, SlackAPIError } = require('../utils/errors');
+const { CacheError } = require('../utils/errors');
 const environment = require('../config/environment');
 
 /**
@@ -64,7 +64,7 @@ class SlackChannelService {
     const teamChecks = await Promise.all(
       GITHUB_CONFIG.TEAM_SLUGS.map(async (teamSlug) => {
         try {
-          const isMember = await this.isUserInTeam(githubUsername, teamSlug);
+          const isMember = await this.#isUserInTeam(githubUsername, teamSlug);
           return isMember ? teamSlug : null;
         } catch (error) {
           Logger.error(`팀 멤버십 확인 실패 (${teamSlug})`, error);
@@ -91,10 +91,10 @@ class SlackChannelService {
    * @param {string} teamSlug - 팀 슬러그
    * @returns {Promise<boolean>}
    */
-  async isUserInTeam(githubUsername, teamSlug) {
+  async #isUserInTeam(githubUsername, teamSlug) {
     // 팀 캐시가 만료되었는지 확인
-    if (this.isCacheExpired(teamSlug)) {
-      await this.refreshTeamCache(teamSlug);
+    if (this.#isCacheExpired(teamSlug)) {
+      await this.#refreshTeamCache(teamSlug);
     }
 
     // 캐시에서 확인
@@ -104,7 +104,7 @@ class SlackChannelService {
     }
 
     // 캐시가 없으면 API 호출
-    await this.refreshTeamCache(teamSlug);
+    await this.#refreshTeamCache(teamSlug);
     const updatedTeamMembers = this.teamMembersCache.get(teamSlug);
     return updatedTeamMembers ? updatedTeamMembers.has(githubUsername) : false;
   }
@@ -115,7 +115,7 @@ class SlackChannelService {
    * @param {string} teamSlug - 팀 슬러그
    * @returns {boolean}
    */
-  isCacheExpired(teamSlug) {
+  #isCacheExpired(teamSlug) {
     if (!this.cacheEnabled) return true;
 
     const lastUpdate = this.lastCacheUpdate.get(teamSlug) || 0;
@@ -128,7 +128,7 @@ class SlackChannelService {
    * @param {string} teamSlug - 팀 슬러그
    * @returns {Promise<void>}
    */
-  async refreshTeamCache(teamSlug) {
+  async #refreshTeamCache(teamSlug) {
     try {
       Logger.debug(`팀 캐시 갱신 중: ${teamSlug}`);
 
@@ -175,7 +175,7 @@ class SlackChannelService {
       Logger.time('팀 멤버십 로드');
 
       await Promise.all(
-        GITHUB_CONFIG.TEAM_SLUGS.map((teamSlug) => this.refreshTeamCache(teamSlug)),
+        GITHUB_CONFIG.TEAM_SLUGS.map((teamSlug) => this.#refreshTeamCache(teamSlug)),
       );
 
       const totalMembers = Array.from(this.teamMembershipCache.values()).length;
@@ -230,8 +230,8 @@ class SlackChannelService {
    * @returns {Promise<string[]>} 팀 멤버 사용자명 목록
    */
   async getTeamMembers(teamSlug) {
-    if (this.isCacheExpired(teamSlug)) {
-      await this.refreshTeamCache(teamSlug);
+    if (this.#isCacheExpired(teamSlug)) {
+      await this.#refreshTeamCache(teamSlug);
     }
 
     const members = this.teamMembersCache.get(teamSlug);

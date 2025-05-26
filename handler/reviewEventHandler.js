@@ -1,5 +1,6 @@
 const BaseEventHandler = require('./baseEventHandler');
 const { REVIEW_STATES, GITHUB_CONFIG, SLACK_CHANNELS } = require('../constants');
+const Logger = require('../utils/logger');
 
 /**
  * @typedef {Object} ReviewPayload
@@ -33,229 +34,260 @@ const { REVIEW_STATES, GITHUB_CONFIG, SLACK_CHANNELS } = require('../constants')
  */
 
 /**
- * PR 리뷰 관련 이벤트 처리
+ * 리뷰 이벤트 처리
  */
 class ReviewEventHandler extends BaseEventHandler {
   /**
    * 승인 이벤트 처리
-   * @param {ReviewPayload} payload
+   * @param {ReviewPayload} payload GitHub webhook payload
+   * @returns {Promise<void>}
    */
   async handleApprovalEvent(payload) {
-    const notificationData = this.buildApprovalNotificationData(payload);
-    const channelId = await this.slackChannelService.selectChannel(notificationData.targetGithubUsername);
+    BaseEventHandler.validatePayload(payload);
+    await this.initialize();
 
-    await this.enrichNotificationWithSlackData(notificationData);
-    await this.slackMessageService.sendApprovalMessage(notificationData, channelId);
+    const notification = ReviewEventHandler.#buildApprovalNotificationData(payload);
+
+    const enriched = await this.#enrichWithSlackData({
+      targetGh: notification.targetGithubUsername,
+      authorGh: notification.authorGithubUsername,
+    });
+
+    const channelId = await this.slackChannelService.selectChannel(notification.targetGithubUsername);
+
+    await this.slackMessageService.sendApprovalMessage({ ...notification, ...enriched }, channelId);
+    Logger.info(`승인 알림 전송 완료: ${notification.targetGithubUsername}`);
   }
 
   /**
    * 리뷰 요청 이벤트 처리
-   * @param {ReviewRequestPayload} payload
+   * @param {ReviewRequestPayload} payload GitHub webhook payload
+   * @returns {Promise<void>}
    */
   async handleReviewRequestEvent(payload) {
-    const notificationData = this.buildReviewRequestNotificationData(payload);
-    const channelId = await this.slackChannelService.selectChannel(notificationData.reviewerGithubUsername);
+    BaseEventHandler.validatePayload(payload);
+    await this.initialize();
 
-    await this.enrichReviewRequestWithSlackData(notificationData);
-    await this.slackMessageService.sendReviewRequestMessage(notificationData, channelId);
+    const notification = ReviewEventHandler.#buildReviewRequestNotificationData(payload);
+
+    const enriched = await this.#enrichWithSlackData({
+      targetGh: notification.reviewerGithubUsername,
+      authorGh: notification.targetGithubUsername,
+    });
+
+    const channelId = await this.slackChannelService.selectChannel(notification.reviewerGithubUsername);
+
+    await this.slackMessageService.sendReviewRequestMessage({ ...notification, ...enriched }, channelId);
+    Logger.info(`리뷰 요청 알림 전송 완료: ${notification.reviewerGithubUsername}`);
   }
 
   /**
-   * 예약된 리뷰 알림 처리
-   * @param {Object} payload
+   * 예약된 리뷰 알림 처리 (크론 트리거)
+   * @param {Object} payload 저장소 정보를 포함한 페이로드
+   * @returns {Promise<void>}
    */
   async handleScheduledReview(payload) {
-    const repoName = payload.repository.name;
-    const openPullRequests = await this.gitHubApiHelper.fetchOpenPullRequests(repoName);
-    const nonDraftPRs = openPullRequests.filter((pr) => !pr.draft);
+    BaseEventHandler.validatePayload(payload);
+    await this.initialize();
 
-    const enrichedPRs = await this.enrichPRsWithReviewStatus(nonDraftPRs, repoName);
-    const teamGroupedPRs = this.groupPullRequestsByTeam(enrichedPRs);
+    const { repository: { name: repoName } } = payload;
 
-    await this.sendScheduledNotifications(teamGroupedPRs);
+    const open = await this.gitHubApiHelper.fetchOpenPullRequests(repoName);
+    const nonDraft = open.filter((pr) => !pr.draft);
+
+    const enrichedPrs = await this.#enrichPRsWithReviewStatus(nonDraft, repoName);
+    const grouped = ReviewEventHandler.#groupPullRequestsByTeam(enrichedPrs);
+
+    await this.#sendScheduledNotifications(grouped);
+    Logger.info(`예약된 리뷰 알림 전송 완료: ${repoName}`);
+  }
+
+  /**
+   * Slack 데이터로 알림 정보 보강
+   * @private
+   * @param {Object} params
+   * @param {string} params.targetGh GitHub 사용자명 (멘션 대상)
+   * @param {string} params.authorGh GitHub 사용자명 (이벤트 발생자)
+   * @returns {Promise<{targetSlackId:string,authorSlackName:string}>}
+   */
+  async #enrichWithSlackData({ targetGh, authorGh }) {
+    const usernames = [targetGh, authorGh];
+    const [idMap, realNameMap] = await this.#fetchSlackMaps(usernames);
+
+    return {
+      targetSlackId: ReviewEventHandler.#getSlackMapValue(idMap, targetGh),
+      authorSlackName: ReviewEventHandler.#getSlackMapValue(realNameMap, authorGh),
+    };
+  }
+
+  /**
+   * Slack ID 및 실명 맵 병렬 조회
+   * @private
+   * @param {string[]} ghUsernames GitHub 사용자명 목록
+   * @returns {Promise<[Map<string,string>,Map<string,string>]>}
+   */
+  async #fetchSlackMaps(ghUsernames) {
+    return Promise.all([
+      this.slackUserService.getSlackProperties(ghUsernames, 'id'),
+      this.slackUserService.getSlackProperties(ghUsernames, 'realName'),
+    ]);
+  }
+
+  /**
+   * Slack 맵에서 값 조회 (폴백 포함)
+   * @private
+   * @param {Map<string,string>} map Slack 매핑
+   * @param {string} ghUsername GitHub 사용자명
+   * @returns {string}
+   */
+  static #getSlackMapValue(map, ghUsername) {
+    return map.get(ghUsername) || ghUsername;
   }
 
   /**
    * 승인 알림 데이터 생성
+   * @private
    * @param {ReviewPayload} payload
    * @returns {Object}
    */
-  buildApprovalNotificationData(payload) {
+  static #buildApprovalNotificationData(payload) {
     return {
       commentUrl: payload.review.html_url,
-      targetGithubUsername: payload.pull_request.user.login,
-      prUrl: payload.pull_request.html_url,
-      authorGithubUsername: payload.review.user.login,
       commentBody: payload.review.body || '',
+      prUrl: payload.pull_request.html_url,
       prTitle: payload.pull_request.title,
+      targetGithubUsername: payload.pull_request.user.login, // PR 작성자
+      authorGithubUsername: payload.review.user.login, // 리뷰어
     };
   }
 
   /**
    * 리뷰 요청 알림 데이터 생성
+   * @private
    * @param {ReviewRequestPayload} payload
    * @returns {Object}
    */
-  buildReviewRequestNotificationData(payload) {
+  static #buildReviewRequestNotificationData(payload) {
     return {
-      targetGithubUsername: payload.pull_request.user.login,
       prUrl: payload.pull_request.html_url,
-      reviewerGithubUsername: payload.requested_reviewer?.login,
       prTitle: payload.pull_request.title,
+      targetGithubUsername: payload.pull_request.user.login, // PR 작성자
+      reviewerGithubUsername: payload.requested_reviewer?.login,
     };
   }
 
   /**
-   * 승인 알림에 Slack 데이터 추가
-   * @param {Object} notificationData
-   */
-  async enrichNotificationWithSlackData(notificationData) {
-    const usernames = [notificationData.targetGithubUsername, notificationData.authorGithubUsername];
-
-    const [slackIdMap, realNameMap] = await Promise.all([
-      this.slackUserService.getSlackProperties(usernames, 'id'),
-      this.slackUserService.getSlackProperties([notificationData.authorGithubUsername], 'realName'),
-    ]);
-
-    notificationData.targetSlackId = slackIdMap.get(notificationData.targetGithubUsername)
-      || notificationData.targetGithubUsername;
-    notificationData.authorSlackName = realNameMap.get(notificationData.authorGithubUsername)
-      || notificationData.authorGithubUsername;
-  }
-
-  /**
-   * 리뷰 요청 알림에 Slack 데이터 추가
-   * @param {Object} notificationData
-   */
-  async enrichReviewRequestWithSlackData(notificationData) {
-    const usernames = [notificationData.reviewerGithubUsername, notificationData.targetGithubUsername];
-
-    const [slackIdMap, realNameMap] = await Promise.all([
-      this.slackUserService.getSlackProperties(usernames, 'id'),
-      this.slackUserService.getSlackProperties([notificationData.targetGithubUsername], 'realName'),
-    ]);
-
-    notificationData.targetSlackId = slackIdMap.get(notificationData.reviewerGithubUsername)
-      || notificationData.reviewerGithubUsername;
-    notificationData.authorSlackName = realNameMap.get(notificationData.targetGithubUsername)
-      || notificationData.targetGithubUsername;
-  }
-
-  /**
-   * PR들에 리뷰 상태 정보 추가
-   * @param {Array} pullRequests
-   * @param {string} repoName
+   * PR 목록에 리뷰 상태 정보 추가
+   * @private
+   * @param {Array} pullRequests PR 목록
+   * @param {string} repoName 저장소명
    * @returns {Promise<Array>}
    */
-  async enrichPRsWithReviewStatus(pullRequests, repoName) {
+  async #enrichPRsWithReviewStatus(pullRequests, repoName) {
     return Promise.all(
       pullRequests.map(async (pr) => {
-        const reviewersWithStatus = await this.getReviewersWithStatus(repoName, pr.number);
-        const reviewersStatusString = this.formatReviewersStatusString(reviewersWithStatus);
+        const reviewersStatus = await this.#getReviewersWithStatus(repoName, pr.number);
+        const statusString = ReviewEventHandler.#formatReviewersStatusString(reviewersStatus);
         const teamSlug = await this.slackChannelService.findUserTeamSlug(pr.user.login);
 
-        return {
-          ...pr,
-          reviewersStatusString,
-          teamSlug,
-        };
+        return { ...pr, reviewersStatusString: statusString, teamSlug };
       }),
     );
   }
 
   /**
-   * PR의 리뷰어별 상태 조회
-   * @param {string} repoName
-   * @param {number} prNumber
-   * @returns {Promise<Object>} 리뷰어별 상태 맵
+   * PR의 리뷰어 상태 조회
+   * @private
+   * @param {string} repoName 저장소명
+   * @param {number} prNumber PR 번호
+   * @returns {Promise<Object>}
    */
-  async getReviewersWithStatus(repoName, prNumber) {
+  async #getReviewersWithStatus(repoName, prNumber) {
     const [reviews, prDetails] = await Promise.all([
       this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
       this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber),
     ]);
 
-    const submittedReviewers = reviews.map((review) => review.user.login);
-    const requestedReviewers = (prDetails.requested_reviewers || []).map((reviewer) => reviewer.login);
-    const allReviewerUsernames = [...new Set([...submittedReviewers, ...requestedReviewers])];
+    const submitted = reviews.map((r) => r.user.login);
+    const requested = (prDetails.requested_reviewers || []).map((u) => u.login);
+    const unique = [...new Set([...submitted, ...requested])];
 
-    // Slack ID 일괄 조회
-    const slackIdMap = await this.slackUserService.getSlackProperties(allReviewerUsernames, 'id');
+    const idMap = await this.slackUserService.getSlackProperties(unique, 'id');
+    const reviewersState = {};
 
-    const reviewersStatus = {};
-
-    // 제출된 리뷰 처리
-    reviews.forEach((review) => {
-      const slackId = slackIdMap.get(review.user.login) || review.user.login;
-      reviewersStatus[slackId] = review.state || REVIEW_STATES.COMMENTED;
+    // 제출된 리뷰 상태 추가
+    reviews.forEach((r) => {
+      reviewersState[ReviewEventHandler.#getSlackMapValue(idMap, r.user.login)] = r.state || REVIEW_STATES.COMMENTED;
     });
 
-    // 요청된 리뷰어 처리 (아직 리뷰하지 않은 경우)
-    requestedReviewers.forEach((githubUsername) => {
-      const slackId = slackIdMap.get(githubUsername) || githubUsername;
-      if (!reviewersStatus[slackId]) {
-        reviewersStatus[slackId] = REVIEW_STATES.AWAITING;
+    // 아직 리뷰하지 않은 요청받은 리뷰어 추가
+    requested.forEach((gh) => {
+      const slackId = ReviewEventHandler.#getSlackMapValue(idMap, gh);
+      if (!reviewersState[slackId]) {
+        reviewersState[slackId] = REVIEW_STATES.AWAITING;
       }
     });
 
-    return reviewersStatus;
+    return reviewersState;
   }
 
   /**
-   * 리뷰어 상태를 문자열로 포맷
-   * @param {Object} reviewersWithStatus
+   * 리뷰어 상태 문자열 포맷
+   * @private
+   * @param {Object} statusMap 상태 맵
    * @returns {string}
    */
-  formatReviewersStatusString(reviewersWithStatus) {
-    return Object.entries(reviewersWithStatus)
-      .map(([reviewer, status]) => `<@${reviewer}> (${status})`)
+  static #formatReviewersStatusString(statusMap) {
+    return Object.entries(statusMap)
+      .map(([user, state]) => `<@${user}> (${state})`)
       .join(', ');
   }
 
   /**
-   * PR을 팀별로 그룹화
-   * @param {Array} pullRequestDetails
+   * 팀별 PR 그룹화
+   * @private
+   * @param {Array} prs PR 목록
    * @returns {Object}
    */
-  groupPullRequestsByTeam(pullRequestDetails) {
-    return GITHUB_CONFIG.TEAM_SLUGS.reduce((groupedPRs, teamSlug) => {
-      const teamPRs = pullRequestDetails.filter((pr) => pr.teamSlug === teamSlug);
-      return {
-        ...groupedPRs,
-        [teamSlug]: teamPRs,
-      };
-    }, {});
+  static #groupPullRequestsByTeam(prs) {
+    return GITHUB_CONFIG.TEAM_SLUGS.reduce((acc, slug) => ({
+      ...acc,
+      [slug]: prs.filter((pr) => pr.teamSlug === slug),
+    }), {});
   }
 
   /**
-   * 팀별 예약 알림 전송
-   * @param {Object} teamGroupedPRs
+   * 예약된 알림 전송
+   * @private
+   * @param {Object} groupedPrs 팀별 그룹화된 PR 목록
+   * @returns {Promise<void>}
    */
-  async sendScheduledNotifications(teamGroupedPRs) {
-    const notificationPromises = Object.entries(teamGroupedPRs).flatMap(([teamSlug, prs]) => {
+  async #sendScheduledNotifications(groupedPrs) {
+    const tasks = Object.entries(groupedPrs).flatMap(([teamSlug, prs]) => {
       if (prs.length === 0) return [];
-
       const channelId = SLACK_CHANNELS[teamSlug] || SLACK_CHANNELS.gitAny;
-      return prs.map((pr) => this.sendSinglePRNotification(pr, channelId));
+      return prs.map((pr) => this.#sendSinglePRNotification(pr, channelId));
     });
 
-    await Promise.all(notificationPromises);
+    await Promise.all(tasks);
   }
 
   /**
    * 단일 PR 알림 전송
-   * @param {Object} pullRequest
-   * @param {string} channelId
+   * @private
+   * @param {Object} pr PR 정보
+   * @param {string} channelId 채널 ID
+   * @returns {Promise<void>}
    */
-  async sendSinglePRNotification(pullRequest, channelId) {
-    const notificationData = {
-      targetGithubUsername: pullRequest.user.login,
-      prUrl: pullRequest.html_url,
-      body: pullRequest.reviewersStatusString,
-      prTitle: pullRequest.title,
+  async #sendSinglePRNotification(pr, channelId) {
+    const data = {
+      prUrl: pr.html_url,
+      prTitle: pr.title,
+      body: pr.reviewersStatusString,
+      targetGithubUsername: pr.user.login,
     };
 
-    await this.slackMessageService.sendScheduledReviewMessage(notificationData, channelId);
+    await this.slackMessageService.sendScheduledReviewMessage(data, channelId);
   }
 }
 

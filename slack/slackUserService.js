@@ -46,7 +46,7 @@ class SlackUserService {
 
     try {
       Logger.info('Slack 사용자 서비스 초기화 중...');
-      await this.loadSlackUsers();
+      await this.#loadSlackUsers();
       this.isInitialized = true;
       Logger.info('Slack 사용자 서비스 초기화 완료');
     } catch (error) {
@@ -57,9 +57,10 @@ class SlackUserService {
 
   /**
    * Slack 사용자 목록 로드
+   * @private
    * @returns {Promise<SlackUser[]>}
    */
-  async loadSlackUsers() {
+  async #loadSlackUsers() {
     if (this.slackUsers) return this.slackUsers;
 
     try {
@@ -99,26 +100,27 @@ class SlackUserService {
     if (!this.isInitialized) await this.initialize();
 
     const result = new Map();
-    const uncachedUsernames = this.separateCachedFromUncached(githubUsernames, property, result);
+    const uncachedUsernames = this.#separateCachedFromUncached(githubUsernames, property, result);
 
     if (uncachedUsernames.length === 0) return result;
 
-    await this.processUncachedUsers(uncachedUsernames, property, result);
+    await this.#processUncachedUsers(uncachedUsernames, property, result);
     return result;
   }
 
   /**
    * 캐시된 사용자와 캐시되지 않은 사용자 분리
+   * @private
    * @param {string[]} githubUsernames
    * @param {string} property
    * @param {Map} result
    * @returns {string[]} 캐시되지 않은 사용자명 목록
    */
-  separateCachedFromUncached(githubUsernames, property, result) {
+  #separateCachedFromUncached(githubUsernames, property, result) {
     const uncachedUsernames = [];
 
     githubUsernames.forEach((username) => {
-      const cacheKey = this.buildCacheKey(username, property);
+      const cacheKey = SlackUserService.#buildCacheKey(username, property);
 
       if (this.userMappingCache.has(cacheKey)) {
         result.set(username, this.userMappingCache.get(cacheKey));
@@ -132,16 +134,17 @@ class SlackUserService {
 
   /**
    * 캐시되지 않은 사용자들 처리
+   * @private
    * @param {string[]} uncachedUsernames
    * @param {string} property
    * @param {Map} result
    */
-  async processUncachedUsers(uncachedUsernames, property, result) {
+  async #processUncachedUsers(uncachedUsernames, property, result) {
     try {
-      const slackUsers = await this.loadSlackUsers();
+      const slackUsers = await this.#loadSlackUsers();
 
       await Promise.all(
-        uncachedUsernames.map((githubUsername) => this.processSingleUser(githubUsername, property, slackUsers, result)),
+        uncachedUsernames.map((githubUsername) => this.#processSingleUser(githubUsername, property, slackUsers, result)),
       );
     } catch (error) {
       Logger.error('Slack 속성 일괄 조회 실패', error);
@@ -152,17 +155,18 @@ class SlackUserService {
 
   /**
    * 단일 사용자 처리
+   * @private
    * @param {string} githubUsername
    * @param {string} property
    * @param {SlackUser[]} slackUsers
    * @param {Map} result
    */
-  async processSingleUser(githubUsername, property, slackUsers, result) {
+  async #processSingleUser(githubUsername, property, slackUsers, result) {
     try {
       const githubRealName = await this.gitHubApiHelper.fetchUserRealName(githubUsername);
       const slackValue = findSlackUserProperty(slackUsers, githubRealName, property);
 
-      this.cacheUserMapping(githubUsername, property, slackValue);
+      this.#cacheUserMapping(githubUsername, property, slackValue);
       result.set(githubUsername, slackValue);
     } catch (error) {
       Logger.error(`${githubUsername}의 Slack 속성 조회 실패`, error);
@@ -187,22 +191,24 @@ class SlackUserService {
 
   /**
    * 캐시 키 생성
+   * @private
    * @param {string} githubUsername
    * @param {string} property
    * @returns {string}
    */
-  static buildCacheKey(githubUsername, property) {
+  static #buildCacheKey(githubUsername, property) {
     return `${githubUsername}:${property}`;
   }
 
   /**
    * 사용자 매핑 캐시 저장
+   * @private
    * @param {string} githubUsername
    * @param {string} property
    * @param {string} slackValue
    */
-  cacheUserMapping(githubUsername, property, slackValue) {
-    const cacheKey = SlackUserService.buildCacheKey(githubUsername, property);
+  #cacheUserMapping(githubUsername, property, slackValue) {
+    const cacheKey = SlackUserService.#buildCacheKey(githubUsername, property);
     this.userMappingCache.set(cacheKey, slackValue);
   }
 

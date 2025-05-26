@@ -12,8 +12,12 @@ const Logger = require('../utils/logger');
  * 의존성 주입을 위한 모든 서비스 인스턴스를 생성하고 관리
  */
 class ServiceFactory {
+  static #instance = null;
+
   #services = null;
+
   #webClient = null;
+
   #octokit = null;
 
   /**
@@ -173,7 +177,5 @@ class ServiceFactory {
     return ServiceFactory.#instance;
   }
 }
-
-ServiceFactory.#instance = null;
 
 module.exports = ServiceFactory;
