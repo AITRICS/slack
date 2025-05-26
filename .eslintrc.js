@@ -9,7 +9,14 @@ module.exports = {
     'airbnb-base',
     'plugin:jest/recommended',
   ],
-  plugins: ['jest'],
+  plugins: ['import', 'jest', 'custom', '@mysticatea', 'unicorn'],
+  settings: {
+    'import/resolver': {
+      node: {
+        extensions: ['.js', '.json', '.mjs', '.cjs'],
+      },
+    },
+  },
   overrides: [
     {
       env: {
@@ -20,6 +27,7 @@ module.exports = {
       ],
       parserOptions: {
         sourceType: 'script',
+        ecmaVersion: 2024,
       },
     },
     {

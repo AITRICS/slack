@@ -52,6 +52,7 @@ class SlackMessageService {
           originalError: error.message,
           channel: message.channel,
         },
+        { cause: error },
       );
     }
   }
@@ -73,6 +74,7 @@ class SlackMessageService {
       throw new SlackAPIError(
         '코드 코멘트 알림 전송 실패',
         { channelId, data, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -94,6 +96,7 @@ class SlackMessageService {
       throw new SlackAPIError(
         'PR 페이지 코멘트 알림 전송 실패',
         { channelId, data, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -115,6 +118,7 @@ class SlackMessageService {
       throw new SlackAPIError(
         '승인 알림 전송 실패',
         { channelId, data, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -136,6 +140,7 @@ class SlackMessageService {
       throw new SlackAPIError(
         '리뷰 요청 알림 전송 실패',
         { channelId, data, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -157,6 +162,7 @@ class SlackMessageService {
       throw new SlackAPIError(
         '예약된 리뷰 알림 전송 실패',
         { channelId, data, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -178,6 +184,7 @@ class SlackMessageService {
       throw new SlackAPIError(
         '배포 알림 전송 실패',
         { channelId, data, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -199,6 +206,7 @@ class SlackMessageService {
       throw new SlackAPIError(
         '빌드 알림 전송 실패',
         { channelId, data, originalError: error.message },
+        { cause: error },
       );
     }
   }

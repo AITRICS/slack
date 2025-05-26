@@ -1,5 +1,7 @@
 const { WebClient } = require('@slack/web-api');
 const { Octokit } = require('@octokit/rest');
+const { retry } = require('@octokit/plugin-retry');
+const { paginateRest } = require('@octokit/plugin-paginate-rest');
 const GitHubApiHelper = require('../github/gitHubApiHelper');
 const SlackUserService = require('../slack/slackUserService');
 const SlackChannelService = require('../slack/slackChannelService');
@@ -7,6 +9,7 @@ const SlackMessageService = require('../slack/slackMessageService');
 const environment = require('../config/environment');
 const { API_CONFIG } = require('../constants');
 const Logger = require('../utils/logger');
+const EnhancedOctokit = Octokit.plugin(retry, paginateRest);
 
 /**
  * 서비스 팩토리 클래스 (싱글톤 패턴)
@@ -34,12 +37,20 @@ class ServiceFactory {
 
   /**
    * Octokit getter
-   * @returns {import('@octokit/rest').Octokit}
+   * * @returns {import('@octokit/plugin-paginate-rest').PaginateInterface
+   *          & import('@octokit/rest').RestEndpointMethods
+   *          & import('@octokit/rest').Api
+   *          & import('@octokit/rest').Octokit}
    */
   get octokit() {
     if (!this.#octokit) {
       this.#createApiClients();
     }
+
+    if (!this.#octokit) {
+      throw new Error('Octokit initialization failed');
+    }
+
     return this.#octokit;
   }
 
@@ -96,13 +107,17 @@ class ServiceFactory {
         timeout: API_CONFIG.REQUEST_TIMEOUT_MS,
       });
 
-      this.#octokit = new Octokit({
+      this.#octokit = new EnhancedOctokit({
         auth: config.github.token,
         userAgent: 'slack-notification-action/1.0',
         timeZone: config.runtime.timezone,
         baseUrl: 'https://api.github.com',
         request: {
           timeout: API_CONFIG.REQUEST_TIMEOUT_MS,
+          retry: {
+            maxRetries: config.features.maxRetries ?? API_CONFIG.MAX_RETRIES,
+            retryAfterBaseValue: config.features.retryDelay ?? API_CONFIG.RETRY_DELAY_MS,
+          },
         },
       });
 

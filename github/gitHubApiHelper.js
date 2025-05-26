@@ -74,6 +74,7 @@ class GitHubApiHelper {
       throw new GitHubAPIError(
         `팀 멤버 조회 실패: ${teamSlug}`,
         { teamSlug, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -115,6 +116,7 @@ class GitHubApiHelper {
         {
           repoName, commentId, isReviewComment, originalError: error.message,
         },
+        { cause: error },
       );
     }
   }
@@ -181,6 +183,7 @@ class GitHubApiHelper {
           isReviewComment,
           originalError: error.message,
         },
+        { cause: error },
       );
     }
   }
@@ -339,6 +342,7 @@ class GitHubApiHelper {
       throw new GitHubAPIError(
         `사용자 정보 조회 실패: ${username}`,
         { username, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -367,6 +371,7 @@ class GitHubApiHelper {
       throw new GitHubAPIError(
         `PR 리뷰 조회 실패: PR #${prNumber}`,
         { repoName, prNumber, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -395,6 +400,7 @@ class GitHubApiHelper {
       throw new GitHubAPIError(
         `PR 상세 조회 실패: PR #${prNumber}`,
         { repoName, prNumber, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -422,6 +428,7 @@ class GitHubApiHelper {
       throw new GitHubAPIError(
         `열린 PR 조회 실패: ${repoName}`,
         { repoName, originalError: error.message },
+        { cause: error },
       );
     }
   }
@@ -450,6 +457,7 @@ class GitHubApiHelper {
       throw new GitHubAPIError(
         `워크플로우 실행 조회 실패: ${runId}`,
         { repoName, runId, originalError: error.message },
+        { cause: error },
       );
     }
   }

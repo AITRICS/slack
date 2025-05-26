@@ -1,59 +1,207 @@
+// eslint-disable-next-line max-classes-per-file
 const { SLACK_CONFIG } = require('../constants');
 
 /**
- * @typedef {import('../types').SlackMessage} SlackMessage
- * @typedef {import('../types').SlackAttachment} SlackAttachment
- * @typedef {import('../types').SlackField} SlackField
- * @typedef {import('../types').NotificationData} NotificationData
- * @typedef {import('../types').DeploymentData} DeploymentData
+ * Field Builder – 체이닝 API로 Slack field 객체를 생성합니다.
  */
+class SlackFieldBuilder {
+  /** @type {string} */ #title;
+
+  /** @type {string} */ #value;
+
+  /** @type {boolean} */ #short = false;
+
+  /**
+   * @param {string} title
+   */
+  setTitle(title) {
+    this.#title = title;
+    return this;
+  }
+
+  /**
+   * @param {string} value
+   */
+  setValue(value) {
+    this.#value = value;
+    return this;
+  }
+
+  /**
+   * @param {boolean} isShort
+   */
+  setShort(isShort = false) {
+    this.#short = isShort;
+    return this;
+  }
+
+  /**
+   * @returns {SlackField}
+   */
+  build() {
+    return { title: this.#title, value: this.#value, short: this.#short };
+  }
+
+  /**
+   * 정적 헬퍼 – 기존 정적 메서드와 호환.
+   * @param {string} title
+   * @param {string} value
+   * @param {boolean} [isShort=false]
+   * @returns {SlackField}
+   */
+  static create(title, value, isShort = false) {
+    return new SlackFieldBuilder().setTitle(title).setValue(value).setShort(isShort)
+      .build();
+  }
+}
 
 /**
- * Slack 메시지 포맷터
+ * Attachment Builder – 색상·텍스트·필드를 체이닝으로 조합합니다.
  */
-class SlackMessageFormatter {
+class SlackAttachmentBuilder {
+  /** @type {string} */ #color;
+
+  /** @type {string} */ #text = '';
+
+  /** @type {SlackField[]} */ #fields = [];
+
   /**
-   * Slack 메시지 생성
-   * @param {string} channelId - 채널 ID
-   * @param {string} text - 메시지 텍스트
-   * @param {SlackAttachment[]} [attachments=[]] - 첨부 내용
+   * @param {string} color
+   */
+  setColor(color) {
+    this.#color = color;
+    return this;
+  }
+
+  /**
+   * @param {string} text
+   */
+  setText(text = '') {
+    this.#text = text;
+    return this;
+  }
+
+  /**
+   * @param {SlackField[]} fields
+   */
+  addFields(fields = []) {
+    this.#fields.push(...fields);
+    return this;
+  }
+
+  /**
+   * @returns {SlackAttachment}
+   */
+  build() {
+    return { color: this.#color, text: this.#text, fields: this.#fields };
+  }
+
+  /**
+   * 정적 헬퍼 – 기존 createAttachment 대체.
+   * @param {string} color
+   * @param {string} [text='']
+   * @param {SlackField[]} [fields=[]]
+   * @returns {SlackAttachment}
+   */
+  static create(color, text = '', fields = []) {
+    return new SlackAttachmentBuilder().setColor(color).setText(text).addFields(fields)
+      .build();
+  }
+}
+
+/**
+ * Message Builder – channel / text / attachments 를 조합하는 최상위 Builder.
+ */
+class SlackMessageBuilder {
+  /** @type {string} */ #channel;
+
+  /** @type {string} */ #text = '';
+
+  /** @type {SlackAttachment[]} */ #attachments = [];
+
+  /**
+   * @param {string} channelId
+   */
+  setChannel(channelId) {
+    this.#channel = channelId;
+    return this;
+  }
+
+  /**
+   * @param {string} text
+   */
+  setText(text) {
+    this.#text = text;
+    return this;
+  }
+
+  /**
+   * @param {SlackAttachment} attachment
+   */
+  addAttachment(attachment) {
+    this.#attachments.push(attachment);
+    return this;
+  }
+
+  /**
+   * @param {SlackAttachment[]} attachments
+   */
+  addAttachments(attachments = []) {
+    this.#attachments.push(...attachments);
+    return this;
+  }
+
+  /**
    * @returns {SlackMessage}
    */
-  static createMessage(channelId, text, attachments = []) {
+  build() {
     return {
-      channel: channelId,
-      text,
-      attachments,
+      channel: this.#channel,
+      text: this.#text,
+      attachments: this.#attachments,
       mrkdwn: true,
     };
   }
 
   /**
-   * 첨부 필드 생성
-   * @param {string} title - 필드 제목
-   * @param {string} value - 필드 값
-   * @param {boolean} [isShort=false] - 짧은 필드 여부
-   * @returns {SlackField}
+   * 정적 헬퍼 – 기존 createMessage 대체.
+   * @param {string} channelId
+   * @param {string} text
+   * @param {SlackAttachment[]} [attachments=[]]
+   * @returns {SlackMessage}
    */
-  static createField(title, value, isShort = false) {
-    return { title, value, short: isShort };
+  static create(channelId, text, attachments = []) {
+    return new SlackMessageBuilder().setChannel(channelId).setText(text).addAttachments(attachments)
+      .build();
   }
+}
+
+/**
+ * SlackMessageFormatter – 기존 API 유지 + Builder 패턴 노출.
+ */
+class SlackMessageFormatter {
+  /**
+   * ## LEGACY STATIC HELPERS
+   * createMessage / createAttachment / createField 함수를 유지해 기존 코드와의 호환성을 보장합니다.
+   */
+  static createMessage = SlackMessageBuilder.create;
+
+  static createAttachment = SlackAttachmentBuilder.create;
+
+  static createField = SlackFieldBuilder.create;
 
   /**
-   * 첨부 내용 생성
-   * @param {string} color - 색상
-   * @param {string} [text=''] - 텍스트
-   * @param {SlackField[]} [fields=[]] - 필드 목록
-   * @returns {SlackAttachment}
+   * Builder 클래스를 외부로 노출합니다 – 새 코드에서는 체이닝 API를 사용하세요.
    */
-  static createAttachment(color, text = '', fields = []) {
-    return { color, text, fields };
-  }
+  static MessageBuilder = SlackMessageBuilder;
+
+  static AttachmentBuilder = SlackAttachmentBuilder;
+
+  static FieldBuilder = SlackFieldBuilder;
 
   /**
-   * 코드 코멘트 메시지 포맷
-   * @param {NotificationData} data - 알림 데이터
-   * @returns {{text: string, attachment: SlackAttachment}}
+   * @param {NotificationData} data
+   * @returns {SlackMessage}
    */
   static formatCodeCommentMessage(data) {
     const {
@@ -67,25 +215,27 @@ class SlackMessageFormatter {
       mentionsString,
     } = data;
 
-    // 코드 스니펫 포맷
     const codeBlock = codeSnippet ? `\`\`\`${codeSnippet}\`\`\`\n` : '';
-
-    // 첨부 텍스트 구성
     const attachmentText = `${codeBlock}\n*코멘트 내용:*\n${commentBody}\n\n<${commentUrl}|코멘트 보러가기>\n\n`;
-    const attachment = SlackMessageFormatter.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
 
-    // 멘션 처리 (단일/다중 멘션 모두 지원)
+    const attachment = new SlackAttachmentBuilder()
+      .setColor(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS)
+      .setText(attachmentText)
+      .build();
+
     const mentions = mentionsString || (targetSlackId ? `<@${targetSlackId}>` : '');
     const icon = SLACK_CONFIG.ICONS.COMMENT;
     const text = `*<${prUrl}|${prTitle}>*\n${icon} *${authorSlackName}* 님이 코멘트를 남겼어요!! ${mentions}:\n`;
 
-    return { text, attachment };
+    return new SlackMessageBuilder()
+      .setText(text)
+      .addAttachment(attachment)
+      .build();
   }
 
   /**
-   * PR 페이지 코멘트 메시지 포맷
-   * @param {NotificationData} data - 알림 데이터
-   * @returns {{text: string, attachment: SlackAttachment}}
+   * @param {NotificationData} data
+   * @returns {SlackMessage}
    */
   static formatPRPageCommentMessage(data) {
     const {
@@ -98,18 +248,20 @@ class SlackMessageFormatter {
     } = data;
 
     const attachmentText = `*코멘트 내용:*\n${commentBody}\n\n<${commentUrl}|코멘트 보러가기>`;
-    const attachment = SlackMessageFormatter.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
+    const attachment = SlackAttachmentBuilder.create(
+      SLACK_CONFIG.MESSAGE_COLORS.SUCCESS,
+      attachmentText,
+    );
 
     const icon = SLACK_CONFIG.ICONS.PR_COMMENT;
     const text = `*<${prUrl}|${prTitle}>*\n${icon} *${authorSlackName}* 님이 코멘트를 남겼어요!! ${mentionsString}`;
 
-    return { text, attachment };
+    return new SlackMessageBuilder().setText(text).addAttachment(attachment).build();
   }
 
   /**
-   * PR 승인 메시지 포맷
-   * @param {NotificationData} data - 알림 데이터
-   * @returns {{text: string, attachment: SlackAttachment}}
+   * @param {NotificationData} data
+   * @returns {SlackMessage}
    */
   static formatApprovalMessage(data) {
     const {
@@ -122,18 +274,20 @@ class SlackMessageFormatter {
     } = data;
 
     const attachmentText = `${commentBody}\n\n<${commentUrl}|코멘트 보러가기>.`;
-    const attachment = SlackMessageFormatter.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
+    const attachment = SlackAttachmentBuilder.create(
+      SLACK_CONFIG.MESSAGE_COLORS.SUCCESS,
+      attachmentText,
+    );
 
     const icon = SLACK_CONFIG.ICONS.APPROVE;
     const text = `*<${prUrl}|${prTitle}>*\n${icon} *${authorSlackName}* 님이 Approve를 했습니다!! <@${targetSlackId}>:\n`;
 
-    return { text, attachment };
+    return SlackMessageBuilder.create(undefined, text, [attachment]);
   }
 
   /**
-   * 리뷰 요청 메시지 포맷
-   * @param {NotificationData} data - 알림 데이터
-   * @returns {{text: string, attachment: SlackAttachment}}
+   * @param {NotificationData} data
+   * @returns {SlackMessage}
    */
   static formatReviewRequestMessage(data) {
     const {
@@ -143,34 +297,37 @@ class SlackMessageFormatter {
       targetSlackId,
     } = data;
 
-    const attachmentText = `\n<${prUrl}|PR 보러가기>.`;
-    const attachment = SlackMessageFormatter.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
+    const attachment = SlackAttachmentBuilder.create(
+      SLACK_CONFIG.MESSAGE_COLORS.SUCCESS,
+      `\n<${prUrl}|PR 보러가기>.`,
+    );
 
     const icon = SLACK_CONFIG.ICONS.REVIEW_REQUEST;
     const text = `*<${prUrl}|${prTitle}>*\n${icon} *${authorSlackName}* 님이 Review를 요청했습니다!! <@${targetSlackId}>:\n`;
 
-    return { text, attachment };
+    return SlackMessageBuilder.create(undefined, text, [attachment]);
   }
 
   /**
-   * 예약된 리뷰 알림 메시지 포맷
-   * @param {Object} data - 알림 데이터
-   * @returns {{text: string, attachment: SlackAttachment}}
+   * @param {Object} data
+   * @returns {SlackMessage}
    */
   static formatScheduledReviewMessage(data) {
     const { prUrl, prTitle, body } = data;
 
-    const attachmentText = `\n<${prUrl}|PR 보러가기>.`;
-    const attachment = SlackMessageFormatter.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
+    const attachment = SlackAttachmentBuilder.create(
+      SLACK_CONFIG.MESSAGE_COLORS.SUCCESS,
+      `\n<${prUrl}|PR 보러가기>.`,
+    );
+
     const text = `*<${prUrl}|${prTitle}>* 에서 리뷰를 기다리고 있습니다. ${body}\n`;
 
-    return { text, attachment };
+    return SlackMessageBuilder.create(undefined, text, [attachment]);
   }
 
   /**
-   * 배포 알림 메시지 포맷
-   * @param {DeploymentData} data - 배포 데이터
-   * @returns {{text: string, attachment: SlackAttachment}}
+   * @param {DeploymentData} data
+   * @returns {SlackMessage}
    */
   static formatDeploymentMessage(data) {
     const {
@@ -192,28 +349,32 @@ class SlackMessageFormatter {
     const icon = isSuccess ? SLACK_CONFIG.ICONS.SUCCESS : SLACK_CONFIG.ICONS.FAILURE;
     const statusText = isSuccess ? 'Succeeded' : 'Failed';
 
-    const fields = [
-      SlackMessageFormatter.createField('Deploy Info', '', false),
-      SlackMessageFormatter.createField('Repository', `<${repoUrl}|${repoName}>`, true),
-      SlackMessageFormatter.createField('Deploy Server', `https://${ec2Name}`, true),
-      SlackMessageFormatter.createField('Author', `<@${triggerUsername}>`, true),
-      SlackMessageFormatter.createField('Commit', `<${repoUrl}/commit/${sha}|${sha.slice(0, 7)}>`, true),
-      SlackMessageFormatter.createField('Image Tag', imageTag, true),
-      SlackMessageFormatter.createField('Run Time', duration, true),
-      SlackMessageFormatter.createField('Workflow', `<${workflowUrl}|${workflowName}>`, true),
-      SlackMessageFormatter.createField('Ref', ref, true),
-    ];
+    const fields = [new SlackFieldBuilder().setTitle('Deploy Info').setValue('').build()];
 
-    const attachment = SlackMessageFormatter.createAttachment(color, '', fields);
+    fields.push(
+      SlackFieldBuilder.create('Repository', `<${repoUrl}|${repoName}>`, true),
+      SlackFieldBuilder.create('Deploy Server', `https://${ec2Name}`, true),
+      SlackFieldBuilder.create('Author', `<@${triggerUsername}>`, true),
+      SlackFieldBuilder.create('Commit', `<${repoUrl}/commit/${sha}|${sha.slice(0, 7)}>`, true),
+      SlackFieldBuilder.create('Image Tag', imageTag, true),
+      SlackFieldBuilder.create('Run Time', duration, true),
+      SlackFieldBuilder.create('Workflow', `<${workflowUrl}|${workflowName}>`, true),
+      SlackFieldBuilder.create('Ref', ref, true),
+    );
+
+    const attachment = new SlackAttachmentBuilder()
+      .setColor(color)
+      .addFields(fields)
+      .build();
+
     const text = `${icon}*${statusText}* *GitHub Actions Deploy Notification*`;
 
-    return { text, attachment };
+    return SlackMessageBuilder.create(undefined, text, [attachment]);
   }
 
   /**
-   * 빌드 알림 메시지 포맷
-   * @param {Object} data - 빌드 데이터
-   * @returns {{text: string, attachment: SlackAttachment}}
+   * @param {Object} data
+   * @returns {SlackMessage}
    */
   static formatBuildMessage(data) {
     const {
@@ -235,34 +396,37 @@ class SlackMessageFormatter {
     const icon = isSuccess ? SLACK_CONFIG.ICONS.SUCCESS : SLACK_CONFIG.ICONS.FAILURE;
     const statusText = isSuccess ? 'Succeeded' : 'Failed';
 
-    const fields = [SlackMessageFormatter.createField('Build Info', '', false)];
+    const fields = [SlackFieldBuilder.create('Build Info', '', false)];
 
-    // 실패한 작업 표시
-    if (!isSuccess && failedJobs && failedJobs.length > 0) {
+    if (!isSuccess && failedJobs?.length > 0) {
       const jobsList = failedJobs.map((job) => `\`${job}\``).join('\n');
-      fields.push(SlackMessageFormatter.createField('Failed Jobs', jobsList, false));
+      fields.push(SlackFieldBuilder.create('Failed Jobs', jobsList, false));
     }
 
     fields.push(
-      SlackMessageFormatter.createField('Repository', `<${repoUrl}|${repoName}>`, true),
-      SlackMessageFormatter.createField('Branch', branchName || 'N/A', true),
-      SlackMessageFormatter.createField('Author', `<@${triggerUsername}>`, true),
-      SlackMessageFormatter.createField('Commit', `<${repoUrl}/commit/${sha}|${sha.slice(0, 7)}>`, true),
+      SlackFieldBuilder.create('Repository', `<${repoUrl}|${repoName}>`, true),
+      SlackFieldBuilder.create('Branch', branchName || 'N/A', true),
+      SlackFieldBuilder.create('Author', `<@${triggerUsername}>`, true),
+      SlackFieldBuilder.create('Commit', `<${repoUrl}/commit/${sha}|${sha.slice(0, 7)}>`, true),
     );
 
     if (imageTag) {
-      fields.push(SlackMessageFormatter.createField('Image Tag', imageTag, true));
+      fields.push(SlackFieldBuilder.create('Image Tag', imageTag, true));
     }
 
     fields.push(
-      SlackMessageFormatter.createField('Run Time', duration, true),
-      SlackMessageFormatter.createField('Workflow', `<${workflowUrl}|${workflowName}>`, true),
+      SlackFieldBuilder.create('Run Time', duration, true),
+      SlackFieldBuilder.create('Workflow', `<${workflowUrl}|${workflowName}>`, true),
     );
 
-    const attachment = SlackMessageFormatter.createAttachment(color, '', fields);
+    const attachment = new SlackAttachmentBuilder()
+      .setColor(color)
+      .addFields(fields)
+      .build();
+
     const text = `${icon}*${statusText}* *GitHub Actions Build Notification*`;
 
-    return { text, attachment };
+    return SlackMessageBuilder.create(undefined, text, [attachment]);
   }
 }
 
