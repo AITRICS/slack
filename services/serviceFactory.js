@@ -5,6 +5,7 @@ const SlackUserService = require('../slack/slackUserService');
 const SlackChannelService = require('../slack/slackChannelService');
 const SlackMessageService = require('../slack/slackMessageService');
 const environment = require('../config/environment');
+const { API_CONFIG } = require('../constants');
 const Logger = require('../utils/logger');
 
 /**
@@ -53,56 +54,78 @@ class ServiceFactory {
 
     Logger.info('서비스 생성 중...');
 
-    const gitHubApiHelper = new GitHubApiHelper(this.octokit);
-    const slackUserService = new SlackUserService(this.webClient, gitHubApiHelper);
-    const slackChannelService = new SlackChannelService(gitHubApiHelper);
-    const slackMessageService = new SlackMessageService(this.webClient);
+    try {
+      const gitHubApiHelper = new GitHubApiHelper(this.octokit);
+      const slackUserService = new SlackUserService(this.webClient, gitHubApiHelper);
+      const slackChannelService = new SlackChannelService(gitHubApiHelper);
+      const slackMessageService = new SlackMessageService(this.webClient);
 
-    this.#services = {
-      gitHubApiHelper,
-      slackUserService,
-      slackChannelService,
-      slackMessageService,
-    };
+      this.#services = {
+        gitHubApiHelper,
+        slackUserService,
+        slackChannelService,
+        slackMessageService,
+      };
 
-    Logger.info('모든 서비스 생성 완료');
-    return this.#services;
+      Logger.info('모든 서비스 생성 완료');
+      return this.#services;
+    } catch (error) {
+      Logger.error('서비스 생성 실패', error);
+      throw error;
+    }
   }
 
   /**
-   * API 클라이언트 생성
-   * @private
-   */
+     * API 클라이언트 생성
+     * @private
+     */
   #createApiClients() {
     if (this.#webClient && this.#octokit) {
       return;
     }
 
-    const config = environment.load();
+    try {
+      const config = environment.load();
 
-    this.#webClient = new WebClient(config.slack.token, {
-      retryConfig: {
-        retries: config.features.maxRetries,
-        factor: 2,
-        minTimeout: config.features.retryDelay,
-      },
-    });
+      this.#webClient = new WebClient(config.slack.token, {
+        retryConfig: {
+          retries: config.features.maxRetries || API_CONFIG.MAX_RETRIES,
+          factor: 2,
+          minTimeout: config.features.retryDelay || API_CONFIG.RETRY_DELAY_MS,
+        },
+        timeout: API_CONFIG.REQUEST_TIMEOUT_MS,
+      });
 
-    this.#octokit = new Octokit({
-      auth: config.github.token,
-      userAgent: 'slack-notification-action/1.0',
-      timeZone: config.runtime.timezone,
-      baseUrl: 'https://api.github.com',
-      request: {
-        timeout: 30000,
-      },
-    });
+      this.#octokit = new Octokit({
+        auth: config.github.token,
+        userAgent: 'slack-notification-action/1.0',
+        timeZone: config.runtime.timezone,
+        baseUrl: 'https://api.github.com',
+        request: {
+          timeout: API_CONFIG.REQUEST_TIMEOUT_MS,
+        },
+      });
 
-    Logger.debug('API 클라이언트 생성 완료');
+      Logger.debug('API 클라이언트 생성 완료');
+    } catch (error) {
+      Logger.error('API 클라이언트 생성 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 서비스 정리 (테스트용)
+   */
+  cleanup() {
+    this.#services = null;
+    this.#webClient = null;
+    this.#octokit = null;
+    Logger.debug('서비스 팩토리 정리 완료');
   }
 
   /**
    * 싱글톤 인스턴스 반환
+   * @static
    * @returns {ServiceFactory}
    */
   static getInstance() {
@@ -110,6 +133,17 @@ class ServiceFactory {
       ServiceFactory.#instance = new ServiceFactory();
     }
     return ServiceFactory.#instance;
+  }
+
+  /**
+   * 싱글톤 인스턴스 재설정 (테스트용)
+   * @static
+   */
+  static resetInstance() {
+    if (ServiceFactory.#instance) {
+      ServiceFactory.#instance.cleanup();
+      ServiceFactory.#instance = null;
+    }
   }
 }
 

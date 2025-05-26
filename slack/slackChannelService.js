@@ -98,17 +98,6 @@ class SlackChannelService {
       throw new Error('팀 멤버 정보를 가져올 수 없습니다');
     }
   }
-
-  /**
-   * 특정 팀의 멤버 목록 조회
-   * @param {string} teamSlug - 팀 슬러그
-   * @returns {Promise<string[]>} 팀 멤버 사용자명 목록
-   */
-  async getTeamMembers(teamSlug) {
-    await this.#loadTeamMembers();
-    const members = this.teamMembers.get(teamSlug);
-    return members ? Array.from(members) : [];
-  }
 }
 
 module.exports = SlackChannelService;

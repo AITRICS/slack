@@ -31,6 +31,16 @@ const { GitHubAPIError } = require('../utils/errors');
  */
 
 /**
+ * @typedef {Object} Comment
+ * @property {number} id
+ * @property {string} body
+ * @property {string} html_url
+ * @property {GitHubUser} user
+ * @property {number} [in_reply_to_id]
+ * @property {string} [diff_hunk]
+ */
+
+/**
  * GitHub API 헬퍼 클래스
  * Octokit을 래핑하여 프로젝트에 필요한 GitHub API 호출을 제공
  */
@@ -69,21 +79,31 @@ class GitHubApiHelper {
   }
 
   /**
-   * 리뷰 코멘트 작성자 조회
+   * 코멘트 작성자 조회 (코멘트 타입에 따라 적절한 API 호출)
    * @param {string} repoName
    * @param {number} commentId
+   * @param {boolean} [isReviewComment=true] - 리뷰 코멘트 여부
    * @returns {Promise<string>}
    * @throws {GitHubAPIError}
    */
-  async fetchCommentAuthor(repoName, commentId) {
+  async fetchCommentAuthor(repoName, commentId, isReviewComment = true) {
     try {
-      Logger.debug(`코멘트 작성자 조회: ${repoName}#${commentId}`);
+      Logger.debug(`코멘트 작성자 조회: ${repoName}#${commentId} (리뷰코멘트: ${isReviewComment})`);
 
-      const response = await this.octokit.rest.pulls.getReviewComment({
-        owner: GITHUB_CONFIG.ORGANIZATION,
-        repo: repoName,
-        comment_id: commentId,
-      });
+      let response;
+      if (isReviewComment) {
+        response = await this.octokit.rest.pulls.getReviewComment({
+          owner: GITHUB_CONFIG.ORGANIZATION,
+          repo: repoName,
+          comment_id: commentId,
+        });
+      } else {
+        response = await this.octokit.rest.issues.getComment({
+          owner: GITHUB_CONFIG.ORGANIZATION,
+          repo: repoName,
+          comment_id: commentId,
+        });
+      }
 
       const authorLogin = response.data.user.login;
       Logger.debug(`코멘트 작성자 조회 완료: ${authorLogin}`);
@@ -92,7 +112,9 @@ class GitHubApiHelper {
       Logger.error(`코멘트 작성자 조회 실패 (ID: ${commentId})`, error);
       throw new GitHubAPIError(
         `코멘트 작성자 조회 실패: ${commentId}`,
-        { repoName, commentId, originalError: error.message },
+        {
+          repoName, commentId, isReviewComment, originalError: error.message,
+        },
       );
     }
   }
@@ -102,57 +124,105 @@ class GitHubApiHelper {
    * @param {string} repoName
    * @param {number} prNumber
    * @param {number} currentCommentId
+   * @param {boolean} [isReviewComment=true] - 리뷰 코멘트 여부
    * @returns {Promise<string[]>}
    * @throws {GitHubAPIError}
    */
-  async fetchCommentThreadParticipants(repoName, prNumber, currentCommentId) {
+  async fetchCommentThreadParticipants(repoName, prNumber, currentCommentId, isReviewComment = true) {
     try {
-      Logger.debug(`코멘트 스레드 참여자 조회: ${repoName}#${prNumber}, 코멘트 ID: ${currentCommentId}`);
+      Logger.debug(`코멘트 스레드 참여자 조회: ${repoName}#${prNumber}, 코멘트 ID: ${currentCommentId}, 리뷰코멘트: ${isReviewComment}`);
 
-      const response = await this.octokit.rest.pulls.listReviewComments({
-        owner: GITHUB_CONFIG.ORGANIZATION,
-        repo: repoName,
-        pull_number: prNumber,
-      });
-
-      const allComments = response.data;
-      const currentComment = allComments.find((comment) => comment.id === currentCommentId);
+      const allComments = await this.#fetchAllComments(repoName, prNumber, isReviewComment);
+      const currentComment = this.#findCommentById(allComments, currentCommentId);
 
       if (!currentComment) {
-        Logger.warn(`코멘트를 찾을 수 없음 (ID: ${currentCommentId})`);
-        return [];
+        throw new GitHubAPIError(
+          `코멘트를 찾을 수 없습니다: ${currentCommentId}`,
+          {
+            repoName,
+            prNumber,
+            currentCommentId,
+            isReviewComment,
+            totalComments: allComments.length,
+          },
+        );
       }
 
-      const threadRootId = GitHubApiHelper.#findThreadRoot(allComments, currentComment);
-      const threadComments = GitHubApiHelper.#collectThreadComments(allComments, threadRootId);
+      const threadRootId = this.#findThreadRoot(allComments, currentComment);
+      const threadComments = this.#collectThreadComments(allComments, threadRootId);
       const participants = [...new Set(threadComments.map((comment) => comment.user.login))];
 
       Logger.debug(`스레드 참여자 조회 완료: ${participants.length}명`);
       return participants;
     } catch (error) {
+      if (error instanceof GitHubAPIError) {
+        throw error;
+      }
+
       Logger.error(`코멘트 스레드 참여자 조회 실패 (PR #${prNumber})`, error);
       throw new GitHubAPIError(
         `코멘트 스레드 참여자 조회 실패: PR #${prNumber}`,
         {
-          repoName, prNumber, currentCommentId, originalError: error.message,
+          repoName,
+          prNumber,
+          currentCommentId,
+          isReviewComment,
+          originalError: error.message,
         },
       );
     }
   }
 
   /**
+   * 모든 코멘트 조회 (타입에 따라 적절한 API 호출)
+   * @private
+   * @param {string} repoName
+   * @param {number} prNumber
+   * @param {boolean} isReviewComment
+   * @returns {Promise<Comment[]>}
+   */
+  async #fetchAllComments(repoName, prNumber, isReviewComment) {
+    if (isReviewComment) {
+      const response = await this.octokit.rest.pulls.listReviewComments({
+        owner: GITHUB_CONFIG.ORGANIZATION,
+        repo: repoName,
+        pull_number: prNumber,
+      });
+      return response.data;
+    }
+
+    const response = await this.octokit.rest.issues.listComments({
+      owner: GITHUB_CONFIG.ORGANIZATION,
+      repo: repoName,
+      issue_number: prNumber,
+    });
+    return response.data;
+  }
+
+  /**
+   * ID로 코멘트 찾기
+   * @private
+   * @param {Comment[]} comments
+   * @param {number} commentId
+   * @returns {Comment|undefined}
+   */
+  #findCommentById(comments, commentId) {
+    return comments.find((comment) => Number(comment.id) === Number(commentId));
+  }
+
+  /**
    * 스레드의 루트 코멘트 찾기
    * @private
-   * @param {Array} allComments
-   * @param {Object} comment
+   * @param {Comment[]} allComments
+   * @param {Comment} comment
    * @returns {number}
    */
-  static #findThreadRoot(allComments, comment) {
+  #findThreadRoot(allComments, comment) {
     let current = comment;
 
     while (current.in_reply_to_id) {
       const replyToId = current.in_reply_to_id;
-      const parent = allComments.find((c) => c.id === replyToId);
+      const parent = allComments.find((c) => Number(c.id) === Number(replyToId));
       if (!parent) break;
       current = parent;
     }
@@ -163,28 +233,29 @@ class GitHubApiHelper {
   /**
    * 스레드의 모든 코멘트 수집
    * @private
-   * @param {Array} allComments
+   * @param {Comment[]} allComments
    * @param {number} threadRootId
-   * @returns {Array}
+   * @returns {Comment[]}
    */
-  static #collectThreadComments(allComments, threadRootId) {
+  #collectThreadComments(allComments, threadRootId) {
     const threadComments = [];
     const visited = new Set();
 
-    const root = allComments.find((c) => c.id === threadRootId);
+    const root = allComments.find((c) => Number(c.id) === Number(threadRootId));
     if (root) {
       threadComments.push(root);
-      visited.add(root.id);
+      visited.add(Number(root.id));
     }
 
     const findReplies = (parentId) => {
       const replies = allComments.filter(
-        (comment) => comment.in_reply_to_id === parentId && !visited.has(comment.id),
+        (comment) => Number(comment.in_reply_to_id) === Number(parentId)
+          && !visited.has(Number(comment.id)),
       );
 
       replies.forEach((reply) => {
         threadComments.push(reply);
-        visited.add(reply.id);
+        visited.add(Number(reply.id));
         findReplies(reply.id);
       });
     };

@@ -1,51 +1,58 @@
 // GitHub 조직 설정
-const GITHUB_CONFIG = {
+const GITHUB_CONFIG = Object.freeze({
   ORGANIZATION: 'aitrics',
-  TEAM_SLUGS: ['SE', 'Platform-frontend', 'Platform-backend'],
-};
+  TEAM_SLUGS: Object.freeze(['SE', 'Platform-frontend', 'Platform-backend']),
+});
 
 // Slack 채널 매핑
-const SLACK_CHANNELS = {
+const SLACK_CHANNELS = Object.freeze({
   SE: 'C06CS5Q4L8G',
   'Platform-frontend': 'C06B5J3KD8F',
   'Platform-backend': 'C06C8TLTURE',
   gitAny: 'C06CMAY8066', // 기본 채널
   deploy: 'C06CMU2S6JY',
-};
+});
 
 // Slack 메시지 설정
-const SLACK_CONFIG = {
-  SKIP_USERS: ['john (이주호)'], // 알림 제외 사용자
-  MESSAGE_COLORS: {
+const SLACK_CONFIG = Object.freeze({
+  SKIP_USERS: Object.freeze(['john (이주호)']), // 알림 제외 사용자
+  MESSAGE_COLORS: Object.freeze({
     SUCCESS: 'good',
     DANGER: 'danger',
-  },
-  ICONS: {
+    WARNING: 'warning',
+    INFO: '#439FE0',
+  }),
+  ICONS: Object.freeze({
     COMMENT: ':pencil:',
     PR_COMMENT: ':speech_balloon:',
     APPROVE: ':white_check_mark:',
     REVIEW_REQUEST: ':eyes:',
     SUCCESS: ':white_check_mark:',
     FAILURE: ':x:',
-  },
-};
+    WARNING: ':warning:',
+    INFO: ':information_source:',
+  }),
+});
 
 // PR 리뷰 상태
-const REVIEW_STATES = {
+const REVIEW_STATES = Object.freeze({
   AWAITING: 'AWAITING',
   COMMENTED: 'COMMENTED',
   APPROVED: 'APPROVED',
   CHANGES_REQUESTED: 'CHANGES_REQUESTED',
-};
+  DISMISSED: 'DISMISSED',
+});
 
 // 작업 상태
-const JOB_STATUS = {
+const JOB_STATUS = Object.freeze({
   SUCCESS: 'success',
   FAILURE: 'failure',
-};
+  CANCELLED: 'cancelled',
+  SKIPPED: 'skipped',
+});
 
 // 액션 타입
-const ACTION_TYPES = {
+const ACTION_TYPES = Object.freeze({
   SCHEDULE: 'schedule',
   APPROVE: 'approve',
   COMMENT: 'comment',
@@ -53,7 +60,23 @@ const ACTION_TYPES = {
   CHANGES_REQUESTED: 'changes_requested',
   DEPLOY: 'deploy',
   CI: 'ci',
-};
+});
+
+// API 제한 및 재시도 설정
+const API_CONFIG = Object.freeze({
+  MAX_RETRIES: 3,
+  RETRY_DELAY_MS: 1000,
+  REQUEST_TIMEOUT_MS: 30000,
+  RATE_LIMIT_BUFFER: 100, // GitHub API rate limit buffer
+});
+
+// 로깅 레벨
+const LOG_LEVELS = Object.freeze({
+  DEBUG: 'debug',
+  INFO: 'info',
+  WARN: 'warn',
+  ERROR: 'error',
+});
 
 module.exports = {
   GITHUB_CONFIG,
@@ -62,4 +85,6 @@ module.exports = {
   REVIEW_STATES,
   JOB_STATUS,
   ACTION_TYPES,
+  API_CONFIG,
+  LOG_LEVELS,
 };

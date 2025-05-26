@@ -97,6 +97,7 @@ class CommentEventHandler extends BaseEventHandler {
   /**
    * 첫 번째 코멘트인지 확인 (PR 작성자 1명만 수신자인 경우)
    * @private
+   * @static
    * @param {NotificationRecipient[]} recipients
    * @param {string} prAuthorLogin
    * @returns {boolean}
@@ -115,10 +116,12 @@ class CommentEventHandler extends BaseEventHandler {
     const { repository, pull_request: pullRequest, comment } = payload;
     const commentAuthor = comment.user.login;
 
+    // 코드 코멘트이므로 isReviewComment = true
     const threadParticipants = await this.gitHubApiHelper.fetchCommentThreadParticipants(
       repository.name,
       pullRequest.number,
       comment.id,
+      true, // 코드 리뷰 코멘트
     );
 
     // 스레드 참여자가 없거나 본인뿐인 경우 PR 작성자에게 알림
@@ -220,6 +223,7 @@ class CommentEventHandler extends BaseEventHandler {
       comment, pull_request: pullRequest, repository, issue,
     } = payload;
     const authorUsername = comment.user.login;
+    const isCodeComment = !comment.issue_url;
 
     // 실제 대상자 결정
     let actualTargetUsername = targetUsername;
@@ -229,6 +233,7 @@ class CommentEventHandler extends BaseEventHandler {
       const originalAuthor = await this.gitHubApiHelper.fetchCommentAuthor(
         repository.name,
         comment.in_reply_to_id,
+        isCodeComment, // 코멘트 타입에 따라 적절한 API 호출
       );
       if (originalAuthor !== authorUsername) {
         actualTargetUsername = originalAuthor;
@@ -333,6 +338,7 @@ class CommentEventHandler extends BaseEventHandler {
   /**
    * 중복 수신자 제거
    * @private
+   * @static
    * @param {NotificationRecipient[]} recipients
    * @returns {NotificationRecipient[]}
    */

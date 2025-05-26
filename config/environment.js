@@ -1,4 +1,5 @@
 const Core = require('@actions/core');
+const { API_CONFIG, LOG_LEVELS } = require('../constants');
 
 /**
  * 환경 설정 로더
@@ -38,20 +39,63 @@ class Environment {
         },
       },
       features: {
-        maxRetries: parseInt(process.env.MAX_RETRIES, 10) || 3,
-        retryDelay: parseInt(process.env.RETRY_DELAY_MS, 10) || 1000,
+        maxRetries: this.#parseInteger(process.env.MAX_RETRIES, API_CONFIG.MAX_RETRIES),
+        retryDelay: this.#parseInteger(process.env.RETRY_DELAY_MS, API_CONFIG.RETRY_DELAY_MS),
+        requestTimeout: this.#parseInteger(process.env.REQUEST_TIMEOUT_MS, API_CONFIG.REQUEST_TIMEOUT_MS),
       },
       logging: {
-        level: process.env.LOG_LEVEL || 'info',
-        debug: process.env.DEBUG === 'true',
-        formatJson: process.env.LOG_FORMAT === 'json',
+        level: this.#validateLogLevel(process.env.LOG_LEVEL, LOG_LEVELS.INFO),
+        debug: this.#parseBoolean(process.env.DEBUG, false),
+        formatJson: this.#parseBoolean(process.env.LOG_FORMAT === 'json', false),
       },
       runtime: {
         timezone: process.env.TZ || 'Asia/Seoul',
+        nodeEnv: process.env.NODE_ENV || 'production',
+        isDevelopment: process.env.NODE_ENV === 'development',
+        isTest: process.env.NODE_ENV === 'test',
       },
     };
 
     return this.#config;
+  }
+
+  /**
+   * 정수 파싱 (기본값 포함)
+   * @private
+   * @param {string|undefined} value
+   * @param {number} defaultValue
+   * @returns {number}
+   */
+  #parseInteger(value, defaultValue) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? defaultValue : parsed;
+  }
+
+  /**
+   * 불린 파싱 (기본값 포함)
+   * @private
+   * @param {string|boolean|undefined} value
+   * @param {boolean} defaultValue
+   * @returns {boolean}
+   */
+  #parseBoolean(value, defaultValue) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true';
+    }
+    return defaultValue;
+  }
+
+  /**
+   * 로그 레벨 검증
+   * @private
+   * @param {string|undefined} level
+   * @param {string} defaultLevel
+   * @returns {string}
+   */
+  #validateLogLevel(level, defaultLevel) {
+    const validLevels = Object.values(LOG_LEVELS);
+    return validLevels.includes(level) ? level : defaultLevel;
   }
 
   /**
@@ -87,35 +131,30 @@ class Environment {
   }
 
   /**
-   * 안전한 로깅을 위한 설정 복사 (민감한 정보 제거)
-   * @returns {Object}
-   */
-  toSafeObject() {
-    const config = this.load();
-
-    return {
-      slack: {
-        token: Environment.#maskToken(config.slack.token),
-      },
-      github: {
-        token: Environment.#maskToken(config.github.token),
-      },
-      action: config.action,
-      features: config.features,
-      logging: config.logging,
-      runtime: config.runtime,
-    };
-  }
-
-  /**
    * 토큰 마스킹
    * @private
+   * @static
    * @param {string} token - 마스킹할 토큰
    * @returns {string} 마스킹된 토큰
    */
   static #maskToken(token) {
     if (!token || token.length < 8) return '***';
     return `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
+  }
+
+  /**
+   * 필수 설정 검증
+   * @returns {string[]} 누락된 설정 목록
+   */
+  validateRequiredConfig() {
+    const config = this.load();
+    const missing = [];
+
+    if (!config.slack.token) missing.push('SLACK_TOKEN');
+    if (!config.github.token) missing.push('GITHUB_TOKEN');
+    if (!config.action.type) missing.push('ACTION_TYPE');
+
+    return missing;
   }
 }
 
