@@ -8,7 +8,7 @@ const GITHUB_CONFIG = {
 const SLACK_CHANNELS = {
   SE: 'C06CS5Q4L8G',
   'Platform-frontend': 'C06B5J3KD8F',
-  'Platform-backend': 'C06C8TLECTURE',
+  'Platform-backend': 'C06C8TLTURE',
   gitAny: 'C06CMAY8066', // 기본 채널
   deploy: 'C06CMU2S6JY',
 };
