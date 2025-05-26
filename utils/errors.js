@@ -1,6 +1,7 @@
 /**
  * Slack 알림 시스템 기본 에러 클래스
  */
+// eslint-disable-next-line max-classes-per-file
 class SlackNotificationError extends Error {
   /**
    * @param {string} message - 에러 메시지

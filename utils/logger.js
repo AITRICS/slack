@@ -1,8 +1,5 @@
 const environment = require('../config/environment');
 
-/**
- * 로그 레벨 우선순위
- */
 const LOG_LEVELS = {
   debug: 0,
   info: 1,
@@ -20,20 +17,20 @@ class Logger {
    * @private
    * @returns {number}
    */
-  static _getCurrentLevel() {
+  static #getCurrentLevel() {
     const level = environment.get('logging.level', 'info');
     return LOG_LEVELS[level] || LOG_LEVELS.info;
   }
 
   /**
-   * 로그 포맷팅
+   * 로그 메시지 포맷팅
    * @private
-   * @param {string} level - 로그 레벨
-   * @param {string} message - 메시지
-   * @param {Array} args - 추가 인자들
+   * @param {string} level
+   * @param {string} message
+   * @param {Array} args
    * @returns {Object|string}
    */
-  static _format(level, message, args) {
+  static #formatLogMessage(level, message, args) {
     const timestamp = new Date().toISOString();
     const isJsonFormat = environment.get('logging.formatJson', false);
 
@@ -52,20 +49,19 @@ class Logger {
   /**
    * 로그 출력
    * @private
-   * @param {string} level - 로그 레벨
-   * @param {string} message - 메시지
-   * @param {Array} args - 추가 인자들
+   * @param {string} level
+   * @param {string} message
+   * @param {Array} args
    */
-  static _log(level, message, args) {
-    const currentLevel = this._getCurrentLevel();
+  static #writeLog(level, message, args) {
+    const currentLevel = this.#getCurrentLevel();
     const messageLevel = LOG_LEVELS[level];
 
-    // 현재 로그 레벨보다 낮으면 출력하지 않음
     if (messageLevel < currentLevel) {
       return;
     }
 
-    const formatted = this._format(level, message, args);
+    const formatted = this.#formatLogMessage(level, message, args);
     const isJsonFormat = environment.get('logging.formatJson', false);
 
     if (level === 'error') {
@@ -82,75 +78,96 @@ class Logger {
   }
 
   /**
+   * 에러 객체를 로그용 데이터로 변환
+   * @private
+   * @param {Error} error
+   * @returns {Object}
+   */
+  static #formatErrorForLogging(error) {
+    return {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      ...(error.code && { code: error.code }),
+      ...(error.details && { details: error.details }),
+    };
+  }
+
+  /**
+   * 에러를 상세하게 출력 (JSON 형식이 아닐 때)
+   * @private
+   * @param {Error} error
+   */
+  static #logErrorDetails(error) {
+    console.error('상세 에러:', error.message);
+
+    if (error.stack && environment.isDebug()) {
+      console.error('스택 트레이스:', error.stack);
+    }
+
+    if (error.code) {
+      console.error('에러 코드:', error.code);
+    }
+
+    if (error.details) {
+      console.error('추가 정보:', error.details);
+    }
+  }
+
+  /**
    * 디버그 로그
-   * @param {string} message - 메시지
-   * @param {...any} args - 추가 데이터
+   * @param {string} message
+   * @param {...any} args
    */
   static debug(message, ...args) {
-    this._log('debug', message, args);
+    this.#writeLog('debug', message, args);
   }
 
   /**
    * 정보 로그
-   * @param {string} message - 메시지
-   * @param {...any} args - 추가 데이터
+   * @param {string} message
+   * @param {...any} args
    */
   static info(message, ...args) {
-    this._log('info', message, args);
+    this.#writeLog('info', message, args);
   }
 
   /**
    * 경고 로그
-   * @param {string} message - 메시지
-   * @param {...any} args - 추가 데이터
+   * @param {string} message
+   * @param {...any} args
    */
   static warn(message, ...args) {
-    this._log('warn', message, args);
+    this.#writeLog('warn', message, args);
   }
 
   /**
    * 에러 로그
-   * @param {string} message - 메시지
-   * @param {Error|any} [error] - 에러 객체 또는 추가 데이터
-   * @param {...any} args - 추가 데이터
+   * @param {string} message
+   * @param {Error|any} [error]
+   * @param {...any} args
    */
   static error(message, error = null, ...args) {
     const isJsonFormat = environment.get('logging.formatJson', false);
 
     if (error instanceof Error) {
       if (isJsonFormat) {
-        const errorData = {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-          // 커스텀 에러의 추가 정보
-          ...(error.code && { code: error.code }),
-          ...(error.details && { details: error.details }),
-        };
-        this._log('error', message, [errorData, ...args]);
+        const errorData = this.#formatErrorForLogging(error);
+        this.#writeLog('error', message, [errorData, ...args]);
       } else {
-        this._log('error', message, []);
-        console.error('상세 에러:', error.message);
-        if (error.stack && environment.isDebug()) {
-          console.error('스택 트레이스:', error.stack);
-        }
-        if (error.code) {
-          console.error('에러 코드:', error.code);
-        }
-        if (error.details) {
-          console.error('추가 정보:', error.details);
-        }
+        this.#writeLog('error', message, []);
+        this.#logErrorDetails(error);
       }
     } else if (error) {
-      this._log('error', message, [error, ...args]);
+      this.#writeLog('error', message, [error, ...args]);
     } else {
-      this._log('error', message, args);
+      this.#writeLog('error', message, args);
     }
   }
 
   /**
    * 성능 측정 시작
-   * @param {string} label - 측정 레이블
+   * @param {string} label
    */
   static time(label) {
     if (environment.isDebug()) {
@@ -160,7 +177,7 @@ class Logger {
 
   /**
    * 성능 측정 종료
-   * @param {string} label - 측정 레이블
+   * @param {string} label
    */
   static timeEnd(label) {
     if (environment.isDebug()) {
@@ -170,7 +187,7 @@ class Logger {
 
   /**
    * 그룹 로깅 시작
-   * @param {string} label - 그룹 레이블
+   * @param {string} label
    */
   static group(label) {
     if (!environment.get('logging.formatJson', false)) {
@@ -189,7 +206,7 @@ class Logger {
 
   /**
    * 테이블 형태로 로깅
-   * @param {any} data - 테이블로 표시할 데이터
+   * @param {any} data
    */
   static table(data) {
     if (environment.isDebug() && !environment.get('logging.formatJson', false)) {

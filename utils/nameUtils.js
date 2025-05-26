@@ -1,54 +1,74 @@
 const { SLACK_CONFIG } = require('../constants');
 
 /**
- * Normalizes a name by removing whitespace and parenthetical suffixes.
- * @param {string} rawName - The raw name to normalize.
- * @returns {string} The normalized name in lowercase.
+ * 이름을 정규화 (공백 제거, 괄호 내용 제거, 소문자 변환)
+ * @param {string} rawName
+ * @returns {string}
  */
-function normalizeName(rawName = '') {
+function normalizeUserName(rawName = '') {
   return rawName
     .trim()
-    .replace(/\s*\(.*?\)$/, '') // Remove trailing parentheses
+    .replace(/\s*\(.*?\)$/, '') // 괄호와 괄호 안 내용 제거
     .toLowerCase();
 }
 
 /**
- * Finds a specific property of a Slack user by matching names.
- * @param {Array} slackMembers - The list of Slack users.
- * @param {string} searchName - The name to search for.
- * @param {string} property - The property to retrieve ('id' or 'realName').
- * @returns {string} The requested property value or searchName if not found.
+ * Slack 사용자 객체에서 지정된 속성 추출
+ * @param {Object} slackUser
+ * @param {'id'|'realName'} property
+ * @returns {string}
  */
-function findSlackUserProperty(slackMembers, searchName, property) {
-  const targetName = normalizeName(searchName);
+function getSlackUserProperty(slackUser, property) {
+  const propertyExtractors = {
+    id: () => slackUser.id,
+    realName: () => slackUser.profile?.display_name || slackUser.real_name,
+  };
 
-  const user = slackMembers.find(({ real_name: realName, profile, deleted }) => {
-    if (deleted) return false;
+  const extractor = propertyExtractors[property];
+  return extractor ? extractor() : slackUser.real_name;
+}
 
-    const nameToCheck = [realName, profile.display_name].map((name) => name?.toLowerCase());
-    const isSkipUser = nameToCheck.some(
-      (name) => SLACK_CONFIG.SKIP_USERS.some((skipName) => name?.includes(skipName)),
+/**
+ * GitHub 실명으로 Slack 사용자 속성 조회
+ * @param {Array} slackMembers - Slack 사용자 목록
+ * @param {string} githubRealName - GitHub 실명
+ * @param {'id'|'realName'} property - 조회할 속성
+ * @returns {string} 조회된 속성값 또는 원본 이름
+ */
+function findSlackUserProperty(slackMembers, githubRealName, property) {
+  const normalizedSearchName = normalizeUserName(githubRealName);
+
+  const matchedUser = slackMembers.find((slackUser) => {
+    if (slackUser.deleted) return false;
+
+    const candidateNames = [
+      slackUser.real_name,
+      slackUser.profile?.display_name,
+    ].filter(Boolean);
+
+    // 건너뛸 사용자 체크
+    const shouldSkipUser = candidateNames.some(
+      (name) => SLACK_CONFIG.SKIP_USERS.some(
+        (skipName) => normalizeUserName(name).includes(normalizeUserName(skipName)),
+      ),
     );
 
-    if (isSkipUser) return false;
+    if (shouldSkipUser) return false;
 
-    return nameToCheck.some((sourceName) => {
-      if (!sourceName) return false;
-      return sourceName.includes(targetName) || targetName.includes(sourceName);
+    // 이름 매칭 체크 (부분 문자열 포함 관계)
+    return candidateNames.some((candidateName) => {
+      const normalizedCandidate = normalizeUserName(candidateName);
+      return normalizedCandidate.includes(normalizedSearchName)
+        || normalizedSearchName.includes(normalizedCandidate);
     });
   });
 
-  if (!user) return searchName;
+  if (!matchedUser) return githubRealName;
 
-  const propertyMap = {
-    id: () => user.id,
-    realName: () => user.profile.display_name,
-  };
-
-  return propertyMap[property] ? propertyMap[property]() : searchName;
+  return getSlackUserProperty(matchedUser, property);
 }
 
 module.exports = {
-  normalizeName,
+  normalizeUserName,
   findSlackUserProperty,
 };

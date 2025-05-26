@@ -5,20 +5,18 @@ const Core = require('@actions/core');
  * 모든 환경 변수와 설정을 중앙에서 관리
  */
 class Environment {
-  constructor() {
-    this._config = null;
-  }
+  #config = null;
 
   /**
    * 설정 로드 (싱글톤 패턴)
    * @returns {Object} 환경 설정
    */
   load() {
-    if (this._config) {
-      return this._config;
+    if (this.#config) {
+      return this.#config;
     }
 
-    this._config = {
+    this.#config = {
       slack: {
         token: Core.getInput('SLACK_TOKEN'),
         defaultChannel: process.env.SLACK_DEFAULT_CHANNEL || 'general',
@@ -30,7 +28,6 @@ class Environment {
       },
       action: {
         type: Core.getInput('ACTION_TYPE'),
-        // 액션별 추가 설정
         deploy: {
           ec2Name: Core.getInput('EC2_NAME'),
           imageTag: Core.getInput('IMAGE_TAG'),
@@ -44,14 +41,13 @@ class Environment {
         },
       },
       features: {
-        // 기능 플래그
-        enableCaching: process.env.ENABLE_CACHING !== 'false', // 기본값: true
-        cacheExpiry: parseInt(process.env.CACHE_EXPIRY_MS, 10) || 30 * 60 * 1000, // 30분
+        enableCaching: process.env.ENABLE_CACHING !== 'false',
+        cacheExpiry: parseInt(process.env.CACHE_EXPIRY_MS, 10) || 30 * 60 * 1000,
         maxRetries: parseInt(process.env.MAX_RETRIES, 10) || 3,
         retryDelay: parseInt(process.env.RETRY_DELAY_MS, 10) || 1000,
       },
       logging: {
-        level: process.env.LOG_LEVEL || 'info', // debug, info, warn, error
+        level: process.env.LOG_LEVEL || 'info',
         debug: process.env.DEBUG === 'true',
         formatJson: process.env.LOG_FORMAT === 'json',
       },
@@ -61,12 +57,12 @@ class Environment {
       },
     };
 
-    return this._config;
+    return this.#config;
   }
 
   /**
    * 특정 경로의 설정값 가져오기
-   * @param {string} path - 점 표기법 경로 (예: 'github.token')
+   * @param {string} path - 점 표기법 경로
    * @param {*} defaultValue - 기본값
    * @returns {*} 설정값
    */
@@ -82,7 +78,7 @@ class Environment {
   }
 
   /**
-   * 설정이 프로덕션 환경인지 확인
+   * 프로덕션 환경 여부 확인
    * @returns {boolean}
    */
   isProduction() {
@@ -109,7 +105,7 @@ class Environment {
    * 설정 재설정 (주로 테스트용)
    */
   reset() {
-    this._config = null;
+    this.#config = null;
   }
 
   /**
@@ -121,11 +117,11 @@ class Environment {
 
     return {
       slack: {
-        token: this._maskToken(config.slack.token),
+        token: this.#maskToken(config.slack.token),
         defaultChannel: config.slack.defaultChannel,
       },
       github: {
-        token: this._maskToken(config.github.token),
+        token: this.#maskToken(config.github.token),
         organization: config.github.organization,
         apiVersion: config.github.apiVersion,
       },
@@ -139,16 +135,15 @@ class Environment {
   /**
    * 토큰 마스킹
    * @private
-   * @param {string} token - 마스킹할 토큰
-   * @returns {string} 마스킹된 토큰
+   * @param {string} token
+   * @returns {string}
    */
-  _maskToken(token) {
+  #maskToken(token) {
     if (!token || token.length < 8) return '***';
     return `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
   }
 }
 
-// 싱글톤 인스턴스
 const environment = new Environment();
 
 module.exports = environment;

@@ -141,4 +141,4 @@
  * @property {string} duration - 실행 시간
  */
 
-module.exports = {}; // TypeScript처럼 타입만 정의
+module.exports = {};

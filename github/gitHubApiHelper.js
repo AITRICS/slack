@@ -2,9 +2,30 @@ const { GITHUB_CONFIG } = require('../constants');
 
 /**
  * @typedef {import('@octokit/rest').Octokit} Octokit
- * @typedef {import('../types').GitHubUser} GitHubUser
- * @typedef {import('../types').PullRequest} PullRequest
- * @typedef {import('../types').Review} Review
+ * @typedef {Object} GitHubUser
+ * @property {string} login
+ * @property {number} id
+ * @property {string} html_url
+ * @property {string} [name]
+ */
+
+/**
+ * @typedef {Object} PullRequest
+ * @property {number} number
+ * @property {string} title
+ * @property {string} html_url
+ * @property {GitHubUser} user
+ * @property {boolean} draft
+ * @property {GitHubUser[]} [requested_reviewers]
+ */
+
+/**
+ * @typedef {Object} Review
+ * @property {number} id
+ * @property {string} state
+ * @property {string} body
+ * @property {string} html_url
+ * @property {GitHubUser} user
  */
 
 /**
@@ -13,7 +34,7 @@ const { GITHUB_CONFIG } = require('../constants');
  */
 class GitHubApiHelper {
   /**
-   * @param {Octokit} octokit - Octokit 인스턴스
+   * @param {Octokit} octokit
    */
   constructor(octokit) {
     this.octokit = octokit;
@@ -21,8 +42,8 @@ class GitHubApiHelper {
 
   /**
    * GitHub 팀 멤버 목록 조회
-   * @param {string} teamSlug - 팀 슬러그
-   * @returns {Promise<GitHubUser[]>} 팀 멤버 목록
+   * @param {string} teamSlug
+   * @returns {Promise<GitHubUser[]>}
    */
   async fetchTeamMembers(teamSlug) {
     try {
@@ -39,9 +60,9 @@ class GitHubApiHelper {
 
   /**
    * 리뷰 코멘트 작성자 조회
-   * @param {string} repoName - 저장소 이름
-   * @param {number} commentId - 코멘트 ID
-   * @returns {Promise<string>} 작성자 GitHub 사용자명
+   * @param {string} repoName
+   * @param {number} commentId
+   * @returns {Promise<string>}
    */
   async fetchCommentAuthor(repoName, commentId) {
     try {
@@ -59,11 +80,10 @@ class GitHubApiHelper {
 
   /**
    * 코멘트 스레드 참여자 조회
-   * 특정 코멘트가 속한 스레드의 모든 참여자를 찾음
-   * @param {string} repoName - 저장소 이름
-   * @param {number} prNumber - PR 번호
-   * @param {number} currentCommentId - 현재 코멘트 ID
-   * @returns {Promise<string[]>} 스레드 참여자 사용자명 목록
+   * @param {string} repoName
+   * @param {number} prNumber
+   * @param {number} currentCommentId
+   * @returns {Promise<string[]>}
    */
   async fetchCommentThreadParticipants(repoName, prNumber, currentCommentId) {
     try {
@@ -81,14 +101,10 @@ class GitHubApiHelper {
         return [];
       }
 
-      // 스레드 루트 찾기
-      const threadRootId = this._findThreadRoot(allComments, currentComment);
-
-      // 스레드의 모든 코멘트 수집
-      const threadComments = this._collectThreadComments(allComments, threadRootId);
-
-      // 고유한 참여자 추출
+      const threadRootId = this.#findThreadRoot(allComments, currentComment);
+      const threadComments = this.#collectThreadComments(allComments, threadRootId);
       const participants = [...new Set(threadComments.map((comment) => comment.user.login))];
+
       return participants;
     } catch (error) {
       console.error(`코멘트 스레드 참여자 조회 실패 (PR #${prNumber}):`, error);
@@ -99,14 +115,13 @@ class GitHubApiHelper {
   /**
    * 스레드의 루트 코멘트 찾기
    * @private
-   * @param {Array} allComments - 모든 코멘트
-   * @param {Object} comment - 현재 코멘트
-   * @returns {number} 루트 코멘트 ID
+   * @param {Array} allComments
+   * @param {Object} comment
+   * @returns {number}
    */
-  _findThreadRoot(allComments, comment) {
+  #findThreadRoot(allComments, comment) {
     let current = comment;
 
-    // in_reply_to_id 체인을 따라 올라가며 루트 찾기
     while (current.in_reply_to_id) {
       const parent = allComments.find((c) => c.id === current.in_reply_to_id);
       if (!parent) break;
@@ -119,22 +134,20 @@ class GitHubApiHelper {
   /**
    * 스레드의 모든 코멘트 수집
    * @private
-   * @param {Array} allComments - 모든 코멘트
-   * @param {number} threadRootId - 스레드 루트 ID
-   * @returns {Array} 스레드 코멘트 목록
+   * @param {Array} allComments
+   * @param {number} threadRootId
+   * @returns {Array}
    */
-  _collectThreadComments(allComments, threadRootId) {
+  #collectThreadComments(allComments, threadRootId) {
     const threadComments = [];
     const visited = new Set();
 
-    // 루트 코멘트 추가
     const root = allComments.find((c) => c.id === threadRootId);
     if (root) {
       threadComments.push(root);
       visited.add(root.id);
     }
 
-    // 재귀적으로 모든 답글 찾기
     const findReplies = (parentId) => {
       const replies = allComments.filter(
         (comment) => comment.in_reply_to_id === parentId && !visited.has(comment.id),
@@ -143,7 +156,7 @@ class GitHubApiHelper {
       replies.forEach((reply) => {
         threadComments.push(reply);
         visited.add(reply.id);
-        findReplies(reply.id); // 답글의 답글 찾기
+        findReplies(reply.id);
       });
     };
 
@@ -153,8 +166,8 @@ class GitHubApiHelper {
 
   /**
    * GitHub 사용자의 실제 이름 조회
-   * @param {string} username - GitHub 사용자명
-   * @returns {Promise<string>} 실제 이름 또는 사용자명
+   * @param {string} username
+   * @returns {Promise<string>}
    */
   async fetchUserRealName(username) {
     try {
@@ -168,9 +181,9 @@ class GitHubApiHelper {
 
   /**
    * PR 리뷰 목록 조회
-   * @param {string} repoName - 저장소 이름
-   * @param {number} prNumber - PR 번호
-   * @returns {Promise<Review[]>} 리뷰 목록
+   * @param {string} repoName
+   * @param {number} prNumber
+   * @returns {Promise<Review[]>}
    */
   async fetchPullRequestReviews(repoName, prNumber) {
     try {
@@ -188,9 +201,9 @@ class GitHubApiHelper {
 
   /**
    * PR 상세 정보 조회
-   * @param {string} repoName - 저장소 이름
-   * @param {number} prNumber - PR 번호
-   * @returns {Promise<PullRequest>} PR 상세 정보
+   * @param {string} repoName
+   * @param {number} prNumber
+   * @returns {Promise<PullRequest>}
    */
   async fetchPullRequestDetails(repoName, prNumber) {
     try {
@@ -208,8 +221,8 @@ class GitHubApiHelper {
 
   /**
    * 열린 PR 목록 조회
-   * @param {string} repoName - 저장소 이름
-   * @returns {Promise<PullRequest[]>} 열린 PR 목록
+   * @param {string} repoName
+   * @returns {Promise<PullRequest[]>}
    */
   async fetchOpenPullRequests(repoName) {
     try {
@@ -227,9 +240,9 @@ class GitHubApiHelper {
 
   /**
    * 워크플로우 실행 정보 조회
-   * @param {string} repoName - 저장소 이름
-   * @param {string} runId - 실행 ID
-   * @returns {Promise<Object>} 워크플로우 실행 정보
+   * @param {string} repoName
+   * @param {string} runId
+   * @returns {Promise<Object>}
    */
   async fetchWorkflowRunData(repoName, runId) {
     try {

@@ -3,11 +3,11 @@ module.exports = {
     browser: true,
     es2021: true,
     node: true,
-    jest: true, // 일반적인 Jest 환경 활성화 방식
+    jest: true,
   },
   extends: [
     'airbnb-base',
-    'plugin:jest/recommended', // Jest 권장 설정 포함
+    'plugin:jest/recommended',
   ],
   plugins: ['jest'],
   overrides: [
@@ -25,7 +25,12 @@ module.exports = {
     {
       files: ['**/*.test.js', '**/*.spec.js', '**/__tests__/**/*.js'],
       env: {
-        jest: true, // 테스트 파일에 대해 명시적으로 설정
+        jest: true,
+      },
+      rules: {
+        // 테스트 파일에서는 더 유연한 규칙 적용
+        'no-unused-expressions': 'off',
+        'import/no-extraneous-dependencies': ['error', { devDependencies: true }],
       },
     },
   ],
@@ -36,5 +41,19 @@ module.exports = {
   rules: {
     'max-len': ['error', { code: 140 }],
     'no-console': 'off',
+    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    'prefer-const': 'error',
+    'no-var': 'error',
+    'object-shorthand': 'error',
+    'prefer-template': 'error',
+    'no-underscore-dangle': 'off',
+    'no-param-reassign': ['error', {
+      props: true,
+      ignorePropertyModificationsFor: ['state', 'config', 'options'],
+    }],
+    // 클래스 메서드에서 this 사용 강제
+    'class-methods-use-this': ['error', {
+      exceptMethods: ['initialize', 'cleanup'],
+    }],
   },
 };

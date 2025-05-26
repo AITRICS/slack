@@ -1,10 +1,34 @@
 const BaseEventHandler = require('./baseEventHandler');
 const Logger = require('../utils/logger');
-const { SlackNotificationError } = require('../utils/errors');
 
 /**
- * @typedef {import('../types').CommentEventPayload} CommentEventPayload
- * @typedef {import('../types').NotificationData} NotificationData
+ * @typedef {Object} CommentPayload
+ * @property {Object} comment
+ * @property {string} comment.html_url
+ * @property {string} comment.body
+ * @property {Object} comment.user
+ * @property {string} comment.user.login
+ * @property {number} comment.id
+ * @property {number} [comment.in_reply_to_id]
+ * @property {string} [comment.diff_hunk]
+ * @property {string} [comment.issue_url] - PR 페이지 코멘트인 경우 존재
+ * @property {Object} repository
+ * @property {string} repository.name
+ * @property {string} repository.full_name
+ * @property {Object} [pull_request] - 코드 코멘트인 경우 존재
+ * @property {Object} pull_request.user
+ * @property {string} pull_request.user.login
+ * @property {string} pull_request.html_url
+ * @property {string} pull_request.title
+ * @property {number} pull_request.number
+ * @property {Object} [issue] - PR 페이지 코멘트인 경우 존재
+ * @property {number} issue.number
+ */
+
+/**
+ * @typedef {Object} NotificationRecipient
+ * @property {string} githubUsername
+ * @property {string} slackId
  */
 
 /**
@@ -12,219 +36,222 @@ const { SlackNotificationError } = require('../utils/errors');
  */
 class CommentEventHandler extends BaseEventHandler {
   /**
-   * 코멘트 이벤트 처리
-   * @param {CommentEventPayload} payload - 이벤트 페이로드
+   * @param {CommentPayload} payload
    */
   async processEvent(payload) {
-    const isPRPageComment = payload.comment.issue_url !== undefined;
+    const isCodeComment = !payload.comment.issue_url;
 
-    if (isPRPageComment) {
-      await this.handlePRPageComment(payload);
-    } else {
+    if (isCodeComment) {
       await this.handleCodeComment(payload);
+    } else {
+      await this.handlePullRequestComment(payload);
     }
   }
 
   /**
    * 코드 리뷰 코멘트 처리
-   * @param {CommentEventPayload} payload
+   * @param {CommentPayload} payload
    */
   async handleCodeComment(payload) {
-    const { repository, pull_request: pr, comment } = payload;
-    const recipients = await this.getCodeCommentRecipients(payload);
+    const recipients = await this.determineCodeCommentRecipients(payload);
 
     if (recipients.length === 0) {
       Logger.info('코드 코멘트 알림 수신자 없음');
       return;
     }
 
-    // 수신자가 1명이고 PR 작성자인 경우 - 첫 코멘트로 간주
-    const isFirstComment = recipients.length === 1 && recipients[0].githubUsername === pr.user.login;
+    const isFirstTimeComment = CommentEventHandler.isFirstTimeComment(recipients, payload.pull_request.user.login);
 
-    if (isFirstComment) {
-      await this.sendSingleCodeComment(payload, recipients[0]);
+    if (isFirstTimeComment) {
+      await this.sendSingleRecipientNotification(payload, recipients[0], 'code');
     } else {
-      await this.sendMultipleCodeComments(payload, recipients);
+      await this.sendMultipleRecipientsNotification(payload, recipients, 'code');
     }
-  }
-
-  /**
-   * 코드 코멘트 수신자 결정
-   * @param {CommentEventPayload} payload
-   * @returns {Promise<Array<{githubUsername: string, slackId: string}>>}
-   */
-  async getCodeCommentRecipients(payload) {
-    const { repository, pull_request: pr, comment } = payload;
-    const commentAuthor = comment.user.login;
-
-    // 해당 코멘트 스레드의 모든 참여자 조회
-    const threadParticipants = await this.gitHubApiHelper.fetchCommentThreadParticipants(
-      repository.name,
-      pr.number,
-      comment.id,
-    );
-
-    // 스레드 참여자가 없거나 1명(본인)뿐인 경우 PR 작성자에게 알림
-    if (threadParticipants.length <= 1) {
-      const prAuthor = pr.user.login;
-      if (prAuthor !== commentAuthor) {
-        return [{ githubUsername: prAuthor }];
-      }
-      return [];
-    }
-
-    // 코멘트 작성자를 제외한 모든 스레드 참여자
-    const recipients = threadParticipants
-      .filter((username) => username !== commentAuthor)
-      .map((username) => ({ githubUsername: username }));
-
-    // Slack ID 추가
-    return this.slackUserService.addSlackIdsToRecipients(recipients);
-  }
-
-  /**
-   * 단일 수신자에게 코드 코멘트 알림 전송
-   * @param {CommentEventPayload} payload
-   * @param {{githubUsername: string, slackId?: string}} recipient
-   */
-  async sendSingleCodeComment(payload, recipient) {
-    const notificationData = await this.prepareCodeCommentData(payload, recipient.githubUsername);
-    const channelId = await this.slackChannelService.selectChannel(recipient.githubUsername);
-
-    await this.slackMessageService.sendCodeCommentMessage(notificationData, channelId);
-    Logger.info(`코드 코멘트 알림 전송: ${recipient.githubUsername}`);
-  }
-
-  /**
-   * 여러 수신자에게 코드 코멘트 알림 전송
-   * @param {CommentEventPayload} payload
-   * @param {Array<{githubUsername: string, slackId: string}>} recipients
-   */
-  async sendMultipleCodeComments(payload, recipients) {
-    const recipientsByChannel = await this.groupByChannel(recipients);
-    const baseData = await this.prepareCodeCommentData(payload);
-
-    await Promise.all(
-      Object.entries(recipientsByChannel).map(async ([channelId, channelRecipients]) => {
-        const mentions = channelRecipients.map((r) => `<@${r.slackId}>`).join(', ');
-
-        const notificationData = {
-          ...baseData,
-          mentionsString: mentions,
-        };
-
-        await this.slackMessageService.sendCodeCommentMessage(notificationData, channelId);
-        Logger.info(`코드 코멘트 알림 전송 (채널: ${channelId}, 수신자: ${channelRecipients.length}명)`);
-      }),
-    );
-  }
-
-  /**
-   * 코드 코멘트 알림 데이터 준비
-   * @param {CommentEventPayload} payload
-   * @param {string} [targetUsername] - 특정 대상자 (단일 알림인 경우)
-   * @returns {Promise<NotificationData>}
-   */
-  async prepareCodeCommentData(payload, targetUsername) {
-    const { comment, pull_request: pr } = payload;
-    const authorUsername = comment.user.login;
-
-    // 답글인 경우 원본 코멘트 작성자 확인
-    if (comment.in_reply_to_id && !targetUsername) {
-      const originalAuthor = await this.gitHubApiHelper.fetchCommentAuthor(
-        payload.repository.name,
-        comment.in_reply_to_id,
-      );
-      if (originalAuthor !== authorUsername) {
-        targetUsername = originalAuthor;
-      }
-    }
-
-    // 대상자가 없으면 PR 작성자를 기본값으로
-    if (!targetUsername) {
-      targetUsername = pr.user.login;
-    }
-
-    // Slack 정보 조회
-    const userMap = await this.slackUserService.getSlackProperties(
-      [authorUsername, targetUsername],
-      'id',
-    );
-    const nameMap = await this.slackUserService.getSlackProperties(
-      [authorUsername],
-      'realName',
-    );
-
-    return {
-      prUrl: pr.html_url,
-      prTitle: pr.title,
-      commentUrl: comment.html_url,
-      commentBody: comment.body,
-      codeSnippet: comment.diff_hunk,
-      authorUsername,
-      authorSlackName: nameMap.get(authorUsername) || authorUsername,
-      targetUsername,
-      targetSlackId: userMap.get(targetUsername) || targetUsername,
-    };
   }
 
   /**
    * PR 페이지 코멘트 처리
-   * @param {CommentEventPayload} payload
+   * @param {CommentPayload} payload
    */
-  async handlePRPageComment(payload) {
-    const { repository, issue } = payload;
-    const recipients = await this.getPRPageCommentRecipients(payload);
+  async handlePullRequestComment(payload) {
+    const recipients = await this.determinePRCommentRecipients(payload);
 
     if (recipients.length === 0) {
       Logger.info('PR 페이지 코멘트 알림 수신자 없음');
       return;
     }
 
-    await this.sendPRPageComments(payload, recipients);
+    await this.sendMultipleRecipientsNotification(payload, recipients, 'pr');
+  }
+
+  /**
+   * 첫 번째 코멘트인지 확인 (PR 작성자 1명만 수신자인 경우)
+   * @param {NotificationRecipient[]} recipients
+   * @param {string} prAuthorLogin
+   * @returns {boolean}
+   */
+  static isFirstTimeComment(recipients, prAuthorLogin) {
+    return recipients.length === 1 && recipients[0].githubUsername === prAuthorLogin;
+  }
+
+  /**
+   * 코드 코멘트 수신자 결정
+   * @param {CommentPayload} payload
+   * @returns {Promise<NotificationRecipient[]>}
+   */
+  async determineCodeCommentRecipients(payload) {
+    const { repository, pull_request: pullRequest, comment } = payload;
+    const commentAuthor = comment.user.login;
+
+    const threadParticipants = await this.gitHubApiHelper.fetchCommentThreadParticipants(
+      repository.name,
+      pullRequest.number,
+      comment.id,
+    );
+
+    // 스레드 참여자가 없거나 본인뿐인 경우 PR 작성자에게 알림
+    if (threadParticipants.length <= 1) {
+      const prAuthor = pullRequest.user.login;
+      return commentAuthor !== prAuthor
+        ? [{ githubUsername: prAuthor }]
+        : [];
+    }
+
+    const recipients = threadParticipants
+      .filter((username) => username !== commentAuthor)
+      .map((username) => ({ githubUsername: username }));
+
+    return this.slackUserService.addSlackIdsToRecipients(recipients);
   }
 
   /**
    * PR 페이지 코멘트 수신자 결정
-   * @param {CommentEventPayload} payload
-   * @returns {Promise<Array<{githubUsername: string, slackId: string}>>}
+   * @param {CommentPayload} payload
+   * @returns {Promise<NotificationRecipient[]>}
    */
-  async getPRPageCommentRecipients(payload) {
+  async determinePRCommentRecipients(payload) {
     const { repository, issue, comment } = payload;
     const commentAuthor = comment.user.login;
 
-    // PR 상세 정보 조회
-    const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(
+    const [prDetails, allReviewers] = await Promise.all([
+      this.gitHubApiHelper.fetchPullRequestDetails(repository.name, issue.number),
+      this.getAllReviewers(repository.name, issue.number),
+    ]);
+
+    const prAuthor = prDetails.user.login;
+
+    if (commentAuthor === prAuthor) {
+      // PR 작성자가 코멘트 → 모든 리뷰어에게 알림
+      return allReviewers.filter((reviewer) => reviewer.githubUsername !== commentAuthor);
+    }
+
+    // 리뷰어가 코멘트 → PR 작성자 + 다른 리뷰어들에게 알림
+    const recipients = await this.getRecipientsForReviewerComment(allReviewers, commentAuthor, prAuthor);
+    return CommentEventHandler.removeDuplicateRecipients(recipients);
+  }
+
+  /**
+   * 단일 수신자 알림 전송
+   * @param {CommentPayload} payload
+   * @param {NotificationRecipient} recipient
+   * @param {'code'|'pr'} commentType
+   */
+  async sendSingleRecipientNotification(payload, recipient, commentType) {
+    const notificationData = await this.buildNotificationData(payload, recipient.githubUsername);
+    const channelId = await this.slackChannelService.selectChannel(recipient.githubUsername);
+
+    const messageMethod = commentType === 'code'
+      ? 'sendCodeCommentMessage'
+      : 'sendPRPageCommentMessage';
+
+    await this.slackMessageService[messageMethod](notificationData, channelId);
+    Logger.info(`${commentType} 코멘트 알림 전송: ${recipient.githubUsername}`);
+  }
+
+  /**
+   * 다중 수신자 알림 전송
+   * @param {CommentPayload} payload
+   * @param {NotificationRecipient[]} recipients
+   * @param {'code'|'pr'} commentType
+   */
+  async sendMultipleRecipientsNotification(payload, recipients, commentType) {
+    const recipientsByChannel = await this.groupRecipientsByChannel(recipients);
+    const baseNotificationData = await this.buildNotificationData(payload);
+
+    const messageMethod = commentType === 'code'
+      ? 'sendCodeCommentMessage'
+      : 'sendPRPageCommentMessage';
+
+    await Promise.all(
+      Object.entries(recipientsByChannel).map(async ([channelId, channelRecipients]) => {
+        const mentions = channelRecipients.map((r) => `<@${r.slackId}>`).join(', ');
+        const notificationData = { ...baseNotificationData, mentionsString: mentions };
+
+        await this.slackMessageService[messageMethod](notificationData, channelId);
+        Logger.info(`${commentType} 코멘트 알림 전송 (채널: ${channelId}, 수신자: ${channelRecipients.length}명)`);
+      }),
+    );
+  }
+
+  /**
+   * 알림 데이터 생성
+   * @param {CommentPayload} payload
+   * @param {string} [targetUsername] - 특정 대상자 (단일 알림인 경우)
+   * @returns {Promise<Object>}
+   */
+  async buildNotificationData(payload, targetUsername) {
+    const {
+      comment, pull_request: pullRequest, repository, issue,
+    } = payload;
+    const authorUsername = comment.user.login;
+
+    // 실제 대상자 결정
+    let actualTargetUsername = targetUsername;
+
+    // 답글인 경우 원본 코멘트 작성자를 대상으로 설정
+    if (comment.in_reply_to_id && !actualTargetUsername) {
+      const originalAuthor = await this.gitHubApiHelper.fetchCommentAuthor(
+        repository.name,
+        comment.in_reply_to_id,
+      );
+      if (originalAuthor !== authorUsername) {
+        actualTargetUsername = originalAuthor;
+      }
+    }
+
+    // PR 데이터 처리 (코드 코멘트 vs PR 페이지 코멘트)
+    const prData = pullRequest || await this.gitHubApiHelper.fetchPullRequestDetails(
       repository.name,
       issue.number,
     );
-    const prAuthor = prDetails.user.login;
 
-    // 모든 리뷰어 조회
-    const reviewers = await this.getAllReviewers(repository.name, issue.number);
-
-    let recipients = [];
-
-    if (commentAuthor === prAuthor) {
-      // PR 작성자가 코멘트한 경우 - 모든 리뷰어에게 알림
-      recipients = reviewers.filter((r) => r.githubUsername !== commentAuthor);
-    } else {
-      // 리뷰어가 코멘트한 경우 - 다른 리뷰어 + PR 작성자에게 알림
-      recipients = await this.getRecipientsForReviewerComment(
-        reviewers,
-        commentAuthor,
-        prAuthor,
-      );
+    if (!actualTargetUsername) {
+      actualTargetUsername = prData.user.login;
     }
 
-    return this.removeDuplicates(recipients);
+    const [authorSlackInfo, targetSlackId] = await Promise.all([
+      this.slackUserService.getSlackProperty(authorUsername, 'realName'),
+      this.slackUserService.getSlackProperty(actualTargetUsername, 'id'),
+    ]);
+
+    return {
+      prUrl: prData.html_url || `https://github.com/${repository.full_name}/pull/${issue.number}`,
+      prTitle: prData.title,
+      commentUrl: comment.html_url,
+      commentBody: comment.body,
+      codeSnippet: comment.diff_hunk,
+      authorUsername,
+      authorSlackName: authorSlackInfo,
+      targetUsername: actualTargetUsername,
+      targetSlackId,
+    };
   }
 
   /**
    * PR의 모든 리뷰어 조회
    * @param {string} repoName
    * @param {number} prNumber
-   * @returns {Promise<Array<{githubUsername: string, slackId: string}>>}
+   * @returns {Promise<NotificationRecipient[]>}
    */
   async getAllReviewers(repoName, prNumber) {
     const [prDetails, reviews] = await Promise.all([
@@ -232,99 +259,42 @@ class CommentEventHandler extends BaseEventHandler {
       this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
     ]);
 
-    // 리뷰 요청 받은 사용자 + 실제 리뷰한 사용자
     const requestedReviewers = (prDetails.requested_reviewers || []).map((r) => r.login);
     const actualReviewers = reviews.map((review) => review.user.login);
+    const allReviewerUsernames = [...new Set([...requestedReviewers, ...actualReviewers])];
 
-    const allReviewers = [...new Set([...requestedReviewers, ...actualReviewers])];
-    const reviewerObjects = allReviewers.map((username) => ({ githubUsername: username }));
-
+    const reviewerObjects = allReviewerUsernames.map((username) => ({ githubUsername: username }));
     return this.slackUserService.addSlackIdsToRecipients(reviewerObjects);
   }
 
   /**
    * 리뷰어 코멘트에 대한 수신자 결정
-   * @param {Array<{githubUsername: string, slackId: string}>} reviewers
+   * @param {NotificationRecipient[]} allReviewers
    * @param {string} commentAuthor
    * @param {string} prAuthor
-   * @returns {Promise<Array<{githubUsername: string, slackId: string}>>}
+   * @returns {Promise<NotificationRecipient[]>}
    */
-  async getRecipientsForReviewerComment(reviewers, commentAuthor, prAuthor) {
-    // 코멘트 작성자를 제외한 리뷰어들
-    const otherReviewers = reviewers.filter((r) => r.githubUsername !== commentAuthor);
+  async getRecipientsForReviewerComment(allReviewers, commentAuthor, prAuthor) {
+    const otherReviewers = allReviewers.filter((r) => r.githubUsername !== commentAuthor);
+    const prAuthorIsReviewer = allReviewers.some((r) => r.githubUsername === prAuthor);
 
-    // PR 작성자가 리뷰어 목록에 없으면 추가
-    const prAuthorIsReviewer = reviewers.some((r) => r.githubUsername === prAuthor);
-
-    if (!prAuthorIsReviewer) {
-      const prAuthorWithSlackId = await this.slackUserService.addSlackIdsToRecipients([
-        { githubUsername: prAuthor },
-      ]);
-      return [...prAuthorWithSlackId, ...otherReviewers];
+    if (prAuthorIsReviewer) {
+      return otherReviewers;
     }
 
-    return otherReviewers;
-  }
+    const prAuthorWithSlackId = await this.slackUserService.addSlackIdsToRecipients([
+      { githubUsername: prAuthor },
+    ]);
 
-  /**
-   * PR 페이지 코멘트 알림 전송
-   * @param {CommentEventPayload} payload
-   * @param {Array<{githubUsername: string, slackId: string}>} recipients
-   */
-  async sendPRPageComments(payload, recipients) {
-    const recipientsByChannel = await this.groupByChannel(recipients);
-    const baseData = await this.preparePRPageCommentData(payload);
-
-    await Promise.all(
-      Object.entries(recipientsByChannel).map(async ([channelId, channelRecipients]) => {
-        const mentions = channelRecipients.map((r) => `<@${r.slackId}>`).join(', ');
-
-        const notificationData = {
-          ...baseData,
-          mentionsString: mentions,
-        };
-
-        await this.slackMessageService.sendPRPageCommentMessage(notificationData, channelId);
-        Logger.info(`PR 페이지 코멘트 알림 전송 (채널: ${channelId}, 수신자: ${channelRecipients.length}명)`);
-      }),
-    );
-  }
-
-  /**
-   * PR 페이지 코멘트 알림 데이터 준비
-   * @param {CommentEventPayload} payload
-   * @returns {Promise<NotificationData>}
-   */
-  async preparePRPageCommentData(payload) {
-    const { repository, issue, comment } = payload;
-    const authorUsername = comment.user.login;
-
-    const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(
-      repository.name,
-      issue.number,
-    );
-
-    const nameMap = await this.slackUserService.getSlackProperties(
-      [authorUsername],
-      'realName',
-    );
-
-    return {
-      prUrl: `https://github.com/${repository.full_name}/pull/${issue.number}`,
-      prTitle: prDetails.title,
-      commentUrl: comment.html_url,
-      commentBody: comment.body,
-      authorUsername,
-      authorSlackName: nameMap.get(authorUsername) || authorUsername,
-    };
+    return [...prAuthorWithSlackId, ...otherReviewers];
   }
 
   /**
    * 수신자를 채널별로 그룹화
-   * @param {Array<{githubUsername: string, slackId: string}>} recipients
-   * @returns {Promise<Object<string, Array>>} 채널 ID -> 수신자 배열
+   * @param {NotificationRecipient[]} recipients
+   * @returns {Promise<Object<string, NotificationRecipient[]>>}
    */
-  async groupByChannel(recipients) {
+  async groupRecipientsByChannel(recipients) {
     const groups = {};
 
     await Promise.all(
@@ -343,10 +313,10 @@ class CommentEventHandler extends BaseEventHandler {
 
   /**
    * 중복 수신자 제거
-   * @param {Array<{githubUsername: string}>} recipients
-   * @returns {Array<{githubUsername: string}>}
+   * @param {NotificationRecipient[]} recipients
+   * @returns {NotificationRecipient[]}
    */
-  removeDuplicates(recipients) {
+  static removeDuplicateRecipients(recipients) {
     const seen = new Set();
     return recipients.filter((recipient) => {
       if (seen.has(recipient.githubUsername)) {

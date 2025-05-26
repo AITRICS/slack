@@ -9,40 +9,121 @@ const { ACTION_TYPES } = require('./constants');
 const { SlackNotificationError, ConfigurationError } = require('./utils/errors');
 
 /**
- * 액션 타입별 처리
+ * @typedef {Object} ActionConfig
+ * @property {Object} action
+ * @property {Object} action.deploy
+ * @property {string} action.deploy.ec2Name
+ * @property {string} action.deploy.imageTag
+ * @property {string} action.deploy.jobStatus
+ * @property {Object} action.ci
+ * @property {string} action.ci.branchName
+ * @property {string} action.ci.imageTag
+ * @property {string} action.ci.jobName
+ * @property {string} action.ci.jobStatus
+ */
+
+/**
+ * 에러 타입에 따른 메시지 생성
+ * @param {Error} error
+ * @returns {string}
+ */
+function getErrorMessage(error) {
+  if (error instanceof ConfigurationError) {
+    return `설정 오류: ${error.message}`;
+  }
+
+  if (error instanceof SlackNotificationError) {
+    return `처리 오류: ${error.message}`;
+  }
+
+  return `예기치 않은 오류: ${error.message}`;
+}
+
+/**
+ * 실행 성공 로깅
+ * @param {number} startTime
+ * @param {EventHandlerFactory} handlerFactory
+ */
+function logExecutionSuccess(startTime, handlerFactory) {
+  const executionDuration = Date.now() - startTime;
+  Logger.info(`Action 실행 성공 (${executionDuration}ms)`);
+
+  // 디버그 모드에서 캐시 통계 출력
+  if (environment.isDebug()) {
+    const cacheStats = handlerFactory.getCacheStats();
+    Logger.debug('캐시 통계:', cacheStats);
+  }
+}
+
+/**
+ * 실행 에러 처리
+ * @param {Error} error
+ * @param {number} startTime
+ */
+function handleExecutionError(error, startTime) {
+  const executionDuration = Date.now() - startTime;
+  const errorMessage = getErrorMessage(error);
+
+  Logger.error(`Action 실행 실패 (${executionDuration}ms)`, error);
+  Core.setFailed(errorMessage);
+
+  // GitHub Actions 어노테이션에 상세 정보 추가
+  if (error.details) {
+    Core.error(JSON.stringify(error.details, null, 2));
+  }
+
+  process.exit(1);
+}
+
+/**
+ * 리소스 정리
+ * @param {EventHandlerFactory} handlerFactory
+ * @param {ServiceFactory} serviceFactory
+ */
+async function cleanupResources(handlerFactory, serviceFactory) {
+  try {
+    if (handlerFactory) {
+      await handlerFactory.cleanup();
+    }
+    if (serviceFactory) {
+      serviceFactory.cleanup();
+    }
+  } catch (cleanupError) {
+    Logger.error('리소스 정리 중 오류 발생', cleanupError);
+  }
+}
+
+/**
+ * 액션 타입에 따른 이벤트 처리
  * @param {EventHandlerFactory} handlerFactory
  * @param {string} actionType
  * @param {Object} context
- * @param {Object} config
+ * @param {ActionConfig} config
  * @returns {Promise<any>}
  */
-async function processAction(handlerFactory, actionType, context, config) {
+async function processActionEvent(handlerFactory, actionType, context, config) {
   Logger.info(`${actionType} 이벤트 처리 중`);
-  Logger.debug('페이로드:', context.payload);
+  Logger.debug('GitHub 컨텍스트 페이로드:', context.payload);
 
   switch (actionType) {
-    case ACTION_TYPES.DEPLOY: {
-      const deployConfig = config.action.deploy;
+    case ACTION_TYPES.DEPLOY:
       return handlerFactory.handleEvent(
         ACTION_TYPES.DEPLOY,
         context,
-        deployConfig.ec2Name,
-        deployConfig.imageTag,
-        deployConfig.jobStatus,
+        config.action.deploy.ec2Name,
+        config.action.deploy.imageTag,
+        config.action.deploy.jobStatus,
       );
-    }
 
-    case ACTION_TYPES.CI: {
-      const ciConfig = config.action.ci;
+    case ACTION_TYPES.CI:
       return handlerFactory.handleEvent(
         ACTION_TYPES.CI,
         context,
-        ciConfig.branchName,
-        ciConfig.imageTag,
-        ciConfig.jobName,
-        ciConfig.jobStatus,
+        config.action.ci.branchName,
+        config.action.ci.imageTag,
+        config.action.ci.jobName,
+        config.action.ci.jobStatus,
       );
-    }
 
     default:
       return handlerFactory.handleEvent(actionType, context.payload);
@@ -54,75 +135,40 @@ async function processAction(handlerFactory, actionType, context, config) {
  */
 // eslint-disable-next-line consistent-return
 async function run() {
-  const startTime = Date.now();
+  const executionStartTime = Date.now();
   const serviceFactory = ServiceFactory.getInstance();
   const eventHandlerFactory = new EventHandlerFactory(serviceFactory);
 
   try {
-    // 환경 설정 로드
+    // 환경 설정 로드 및 검증
     const config = environment.load();
-    Logger.info('Slack Notification Action 시작');
-    Logger.debug('환경 설정:', environment.toSafeObject());
-
-    // 설정 검증
     const { actionType } = ConfigValidator.validateAll();
+
+    Logger.info('Slack Notification Action 시작');
     Logger.info(`액션 타입: ${actionType}`);
+    Logger.debug('환경 설정:', environment.toSafeObject());
 
     // GitHub 컨텍스트 검증
     const { context } = Github;
     ConfigValidator.validatePayload(context.payload);
 
-    // 핸들러 사전 초기화 (성능 최적화)
+    // 핸들러 사전 초기화로 성능 최적화
     await eventHandlerFactory.preInitialize();
 
-    // 액션 타입별 처리
-    const result = await processAction(eventHandlerFactory, actionType, context, config);
+    // 액션 타입별 이벤트 처리
+    const result = await processActionEvent(eventHandlerFactory, actionType, context, config);
 
-    // 성공 로깅
-    const duration = Date.now() - startTime;
-    Logger.info(`Action 실행 성공 (${duration}ms)`);
-
-    // 캐시 통계 로깅 (디버그 모드)
-    if (environment.isDebug()) {
-      const cacheStats = eventHandlerFactory.getCacheStats();
-      Logger.debug('캐시 통계:', cacheStats);
-    }
-
+    logExecutionSuccess(executionStartTime, eventHandlerFactory);
     return result;
   } catch (error) {
-    const duration = Date.now() - startTime;
-
-    // 에러 처리
-    if (error instanceof ConfigurationError) {
-      Logger.error(`설정 오류 (${duration}ms)`, error);
-      Core.setFailed(`설정 오류: ${error.message}`);
-    } else if (error instanceof SlackNotificationError) {
-      Logger.error(`처리 오류 (${duration}ms)`, error);
-      Core.setFailed(`처리 오류: ${error.message}`);
-    } else {
-      Logger.error(`예기치 않은 오류 (${duration}ms)`, error);
-      Core.setFailed(`예기치 않은 오류: ${error.message}`);
-    }
-
-    // GitHub Actions 어노테이션 추가
-    if (error.details) {
-      Core.error(JSON.stringify(error.details, null, 2));
-    }
-
-    process.exit(1);
+    handleExecutionError(error, executionStartTime);
   } finally {
-    // 리소스 정리
-    if (eventHandlerFactory) {
-      await eventHandlerFactory.cleanup();
-    }
-    if (serviceFactory) {
-      serviceFactory.cleanup();
-    }
+    await cleanupResources(eventHandlerFactory, serviceFactory);
   }
 }
 
 /**
- * 에러 핸들러 설정
+ * 처리되지 않은 Promise 거부 핸들러
  */
 process.on('unhandledRejection', (reason) => {
   Logger.error('처리되지 않은 Promise 거부:', reason);
@@ -130,6 +176,9 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
+/**
+ * 처리되지 않은 예외 핸들러
+ */
 process.on('uncaughtException', (error) => {
   Logger.error('처리되지 않은 예외:', error);
   Core.setFailed(`처리되지 않은 예외: ${error.message}`);
