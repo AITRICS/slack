@@ -44,7 +44,22 @@ class CommentEventHandler extends BaseEventHandler {
 
     await this.initialize();
 
-    const isCodeComment = !payload.comment.issue_url;
+    // GitHub webhook 페이로드 구조로 코멘트 타입 구분:
+    // 코드 리뷰 코멘트: diff_hunk 존재, pull_request 객체 존재, issue 객체 없음
+    // PR 페이지 코멘트: issue_url 존재, issue 객체 존재, pull_request 객체 없음
+    const isCodeComment = Boolean(
+      payload.comment.diff_hunk
+      && payload.pull_request
+      && !payload.issue,
+    );
+
+    Logger.debug(`코멘트 타입 판단: ${isCodeComment ? '코드 리뷰' : 'PR 페이지'} 코멘트`, {
+      hasDiffHunk: Boolean(payload.comment.diff_hunk),
+      hasPullRequest: Boolean(payload.pull_request),
+      hasIssue: Boolean(payload.issue),
+      hasIssueUrl: Boolean(payload.comment.issue_url),
+      commentId: payload.comment.id,
+    });
 
     if (isCodeComment) {
       await this.#handleCodeComment(payload);
@@ -223,7 +238,13 @@ class CommentEventHandler extends BaseEventHandler {
       comment, pull_request: pullRequest, repository, issue,
     } = payload;
     const authorUsername = comment.user.login;
-    const isCodeComment = !comment.issue_url;
+
+    // 코멘트 타입 판단 (handle 메서드와 동일한 로직)
+    const isCodeComment = Boolean(
+      comment.diff_hunk
+      && pullRequest
+      && !issue,
+    );
 
     // 실제 대상자 결정
     let actualTargetUsername = targetUsername;
