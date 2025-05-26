@@ -23,7 +23,7 @@ const { findSlackUserProperty } = require('../utils/nameUtils');
 
 /**
  * Slack 사용자 관리 서비스
- * GitHub 사용자와 Slack 사용자 간의 매핑을 캐싱하여 성능 최적화
+ * 단순히 한 번 로드하고 재사용
  */
 class SlackUserService {
   /**
@@ -34,39 +34,37 @@ class SlackUserService {
     this.slackWebClient = slackWebClient;
     this.gitHubApiHelper = gitHubApiHelper;
     this.slackUsers = null;
-    this.userMappingCache = new Map(); // "githubUsername:property" -> slackValue
-    this.isInitialized = false;
+    this.loadingPromise = null;
   }
 
   /**
-   * 서비스 초기화 - Slack 사용자 목록 사전 로드
-   */
-  async initialize() {
-    if (this.isInitialized) return;
-
-    try {
-      Logger.info('Slack 사용자 서비스 초기화 중...');
-      await this.#loadSlackUsers();
-      this.isInitialized = true;
-      Logger.info('Slack 사용자 서비스 초기화 완료');
-    } catch (error) {
-      Logger.error('Slack 사용자 서비스 초기화 실패', error);
-      // 초기화 실패해도 개별 호출로 폴백 가능
-    }
-  }
-
-  /**
-   * Slack 사용자 목록 로드
-   * @private
+   * Slack 사용자 목록 로드 (한 번만)
    * @returns {Promise<SlackUser[]>}
    */
   async #loadSlackUsers() {
-    if (this.slackUsers) return this.slackUsers;
+    if (this.slackUsers) {
+      return this.slackUsers;
+    }
 
+    if (this.loadingPromise) {
+      return this.loadingPromise;
+    }
+
+    this.loadingPromise = this.#fetchSlackUsers();
+    this.slackUsers = await this.loadingPromise;
+    return this.slackUsers;
+  }
+
+  /**
+   * Slack API에서 사용자 목록 가져오기
+   * @private
+   * @returns {Promise<SlackUser[]>}
+   */
+  async #fetchSlackUsers() {
     try {
+      Logger.info('Slack 사용자 목록 로드 중...');
       const { members } = await this.slackWebClient.users.list();
-      this.slackUsers = members;
-      Logger.info(`${members.length}명의 Slack 사용자 캐시됨`);
+      Logger.info(`${members.length}명의 Slack 사용자 로드 완료`);
       return members;
     } catch (error) {
       Logger.error('Slack 사용자 목록 로드 실패', error);
@@ -76,108 +74,55 @@ class SlackUserService {
 
   /**
    * GitHub 사용자명으로 Slack 속성 조회
-   * @param {string} githubUsername
-   * @param {'id'|'realName'} property
-   * @returns {Promise<string>}
+   * @param {string} githubUsername - GitHub 사용자명
+   * @param {'id'|'realName'} property - 조회할 속성
+   * @returns {Promise<string>} Slack 속성값
    */
   async getSlackProperty(githubUsername, property) {
     if (!githubUsername) {
-      Logger.error('GitHub 사용자명이 제공되지 않음');
       return githubUsername;
     }
 
-    const resultMap = await this.getSlackProperties([githubUsername], property);
-    return resultMap.get(githubUsername) || githubUsername;
+    try {
+      const slackUsers = await this.#loadSlackUsers();
+      const githubRealName = await this.gitHubApiHelper.fetchUserRealName(githubUsername);
+      return findSlackUserProperty(slackUsers, githubRealName, property);
+    } catch (error) {
+      Logger.error(`${githubUsername}의 Slack 속성 조회 실패`, error);
+      return githubUsername;
+    }
   }
 
   /**
    * 여러 GitHub 사용자의 Slack 속성 일괄 조회
-   * @param {string[]} githubUsernames
-   * @param {'id'|'realName'} property
-   * @returns {Promise<Map<string, string>>}
+   * @param {string[]} githubUsernames - GitHub 사용자명 목록
+   * @param {'id'|'realName'} property - 조회할 속성
+   * @returns {Promise<Map<string, string>>} 사용자명-속성값 매핑
    */
   async getSlackProperties(githubUsernames, property) {
-    if (!this.isInitialized) await this.initialize();
-
+    const slackUsers = await this.#loadSlackUsers();
     const result = new Map();
-    const uncachedUsernames = this.#separateCachedFromUncached(githubUsernames, property, result);
 
-    if (uncachedUsernames.length === 0) return result;
+    await Promise.all(
+      githubUsernames.map(async (username) => {
+        try {
+          const githubRealName = await this.gitHubApiHelper.fetchUserRealName(username);
+          const slackValue = findSlackUserProperty(slackUsers, githubRealName, property);
+          result.set(username, slackValue);
+        } catch (error) {
+          Logger.error(`${username}의 Slack 속성 조회 실패`, error);
+          result.set(username, username);
+        }
+      }),
+    );
 
-    await this.#processUncachedUsers(uncachedUsernames, property, result);
     return result;
   }
 
   /**
-   * 캐시된 사용자와 캐시되지 않은 사용자 분리
-   * @private
-   * @param {string[]} githubUsernames
-   * @param {string} property
-   * @param {Map} result
-   * @returns {string[]} 캐시되지 않은 사용자명 목록
-   */
-  #separateCachedFromUncached(githubUsernames, property, result) {
-    const uncachedUsernames = [];
-
-    githubUsernames.forEach((username) => {
-      const cacheKey = SlackUserService.#buildCacheKey(username, property);
-
-      if (this.userMappingCache.has(cacheKey)) {
-        result.set(username, this.userMappingCache.get(cacheKey));
-      } else {
-        uncachedUsernames.push(username);
-      }
-    });
-
-    return uncachedUsernames;
-  }
-
-  /**
-   * 캐시되지 않은 사용자들 처리
-   * @private
-   * @param {string[]} uncachedUsernames
-   * @param {string} property
-   * @param {Map} result
-   */
-  async #processUncachedUsers(uncachedUsernames, property, result) {
-    try {
-      const slackUsers = await this.#loadSlackUsers();
-
-      await Promise.all(
-        uncachedUsernames.map((githubUsername) => this.#processSingleUser(githubUsername, property, slackUsers, result)),
-      );
-    } catch (error) {
-      Logger.error('Slack 속성 일괄 조회 실패', error);
-      // 실패한 사용자들은 GitHub 사용자명으로 폴백
-      uncachedUsernames.forEach((username) => result.set(username, username));
-    }
-  }
-
-  /**
-   * 단일 사용자 처리
-   * @private
-   * @param {string} githubUsername
-   * @param {string} property
-   * @param {SlackUser[]} slackUsers
-   * @param {Map} result
-   */
-  async #processSingleUser(githubUsername, property, slackUsers, result) {
-    try {
-      const githubRealName = await this.gitHubApiHelper.fetchUserRealName(githubUsername);
-      const slackValue = findSlackUserProperty(slackUsers, githubRealName, property);
-
-      this.#cacheUserMapping(githubUsername, property, slackValue);
-      result.set(githubUsername, slackValue);
-    } catch (error) {
-      Logger.error(`${githubUsername}의 Slack 속성 조회 실패`, error);
-      result.set(githubUsername, githubUsername);
-    }
-  }
-
-  /**
    * 수신자 목록에 Slack ID 추가
-   * @param {RecipientInput[]} recipients
-   * @returns {Promise<UserMappingResult[]>}
+   * @param {RecipientInput[]} recipients - 수신자 입력 목록
+   * @returns {Promise<UserMappingResult[]>} Slack ID가 추가된 사용자 매핑 결과
    */
   async addSlackIdsToRecipients(recipients) {
     const githubUsernames = recipients.map((r) => r.githubUsername);
@@ -187,51 +132,6 @@ class SlackUserService {
       githubUsername: recipient.githubUsername,
       slackId: slackIdMap.get(recipient.githubUsername) || recipient.githubUsername,
     }));
-  }
-
-  /**
-   * 캐시 키 생성
-   * @private
-   * @param {string} githubUsername
-   * @param {string} property
-   * @returns {string}
-   */
-  static #buildCacheKey(githubUsername, property) {
-    return `${githubUsername}:${property}`;
-  }
-
-  /**
-   * 사용자 매핑 캐시 저장
-   * @private
-   * @param {string} githubUsername
-   * @param {string} property
-   * @param {string} slackValue
-   */
-  #cacheUserMapping(githubUsername, property, slackValue) {
-    const cacheKey = SlackUserService.#buildCacheKey(githubUsername, property);
-    this.userMappingCache.set(cacheKey, slackValue);
-  }
-
-  /**
-   * 캐시 초기화
-   */
-  clearCache() {
-    this.slackUsers = null;
-    this.userMappingCache.clear();
-    this.isInitialized = false;
-    Logger.info('Slack 사용자 캐시 초기화됨');
-  }
-
-  /**
-   * 캐시 통계 조회
-   * @returns {Object}
-   */
-  getCacheStats() {
-    return {
-      isInitialized: this.isInitialized,
-      cachedUsersCount: this.slackUsers ? this.slackUsers.length : 0,
-      mappingCacheSize: this.userMappingCache.size,
-    };
   }
 }
 

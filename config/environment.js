@@ -2,7 +2,7 @@ const Core = require('@actions/core');
 
 /**
  * 환경 설정 로더
- * 모든 환경 변수와 설정을 중앙에서 관리
+ * GitHub Actions 환경에 최적화된 단순 설정 관리
  */
 class Environment {
   #config = null;
@@ -19,12 +19,9 @@ class Environment {
     this.#config = {
       slack: {
         token: Core.getInput('SLACK_TOKEN'),
-        defaultChannel: process.env.SLACK_DEFAULT_CHANNEL || 'general',
       },
       github: {
         token: Core.getInput('GITHUB_TOKEN'),
-        organization: process.env.GITHUB_ORG || 'aitrics',
-        apiVersion: process.env.GITHUB_API_VERSION || '2022-11-28',
       },
       action: {
         type: Core.getInput('ACTION_TYPE'),
@@ -41,8 +38,6 @@ class Environment {
         },
       },
       features: {
-        enableCaching: process.env.ENABLE_CACHING !== 'false',
-        cacheExpiry: parseInt(process.env.CACHE_EXPIRY_MS, 10) || 30 * 60 * 1000,
         maxRetries: parseInt(process.env.MAX_RETRIES, 10) || 3,
         retryDelay: parseInt(process.env.RETRY_DELAY_MS, 10) || 1000,
       },
@@ -52,7 +47,6 @@ class Environment {
         formatJson: process.env.LOG_FORMAT === 'json',
       },
       runtime: {
-        environment: process.env.NODE_ENV || 'production',
         timezone: process.env.TZ || 'Asia/Seoul',
       },
     };
@@ -78,27 +72,11 @@ class Environment {
   }
 
   /**
-   * 프로덕션 환경 여부 확인
-   * @returns {boolean}
-   */
-  isProduction() {
-    return this.get('runtime.environment') === 'production';
-  }
-
-  /**
    * 디버그 모드 확인
    * @returns {boolean}
    */
   isDebug() {
     return this.get('logging.debug', false);
-  }
-
-  /**
-   * 캐싱 활성화 확인
-   * @returns {boolean}
-   */
-  isCachingEnabled() {
-    return this.get('features.enableCaching', true);
   }
 
   /**
@@ -118,12 +96,9 @@ class Environment {
     return {
       slack: {
         token: Environment.#maskToken(config.slack.token),
-        defaultChannel: config.slack.defaultChannel,
       },
       github: {
         token: Environment.#maskToken(config.github.token),
-        organization: config.github.organization,
-        apiVersion: config.github.apiVersion,
       },
       action: config.action,
       features: config.features,
@@ -135,8 +110,8 @@ class Environment {
   /**
    * 토큰 마스킹
    * @private
-   * @param {string} token
-   * @returns {string}
+   * @param {string} token - 마스킹할 토큰
+   * @returns {string} 마스킹된 토큰
    */
   static #maskToken(token) {
     if (!token || token.length < 8) return '***';

@@ -15,7 +15,7 @@ class SlackMessageService {
 
   /**
    * Sends a message to Slack
-   * @param {Object} message
+   * @param {import('@slack/web-api').ChatPostMessageArguments} message
    * @throws {SlackAPIError}
    */
   async sendMessage(message) {

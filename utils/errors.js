@@ -20,21 +20,6 @@ class SlackNotificationError extends Error {
       Error.captureStackTrace(this, this.constructor);
     }
   }
-
-  /**
-   * 에러를 로그 포맷으로 변환
-   * @returns {Object}
-   */
-  toLogFormat() {
-    return {
-      name: this.name,
-      code: this.code,
-      message: this.message,
-      details: this.details,
-      timestamp: this.timestamp,
-      stack: this.stack,
-    };
-  }
 }
 
 /**
@@ -93,25 +78,10 @@ class PayloadValidationError extends SlackNotificationError {
   }
 }
 
-/**
- * 캐시 에러
- */
-class CacheError extends SlackNotificationError {
-  /**
-   * @param {string} message - 에러 메시지
-   * @param {string} [operation] - 실패한 작업
-   */
-  constructor(message, operation = '') {
-    super(message, 'CACHE_ERROR', { operation });
-    this.name = 'CacheError';
-  }
-}
-
 module.exports = {
   SlackNotificationError,
   GitHubAPIError,
   SlackAPIError,
   ConfigurationError,
   PayloadValidationError,
-  CacheError,
 };

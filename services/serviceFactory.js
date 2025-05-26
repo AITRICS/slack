@@ -8,8 +8,8 @@ const environment = require('../config/environment');
 const Logger = require('../utils/logger');
 
 /**
- * 서비스 팩토리 클래스
- * 의존성 주입을 위한 모든 서비스 인스턴스를 생성하고 관리
+ * 서비스 팩토리 클래스 (싱글톤 패턴)
+ * 모든 서비스 인스턴스를 생성하고 관리
  */
 class ServiceFactory {
   static #instance = null;
@@ -21,7 +21,29 @@ class ServiceFactory {
   #octokit = null;
 
   /**
-   * 모든 서비스 초기화 및 반환
+   * WebClient getter
+   * @returns {import('@slack/web-api').WebClient}
+   */
+  get webClient() {
+    if (!this.#webClient) {
+      this.#createApiClients();
+    }
+    return this.#webClient;
+  }
+
+  /**
+   * Octokit getter
+   * @returns {import('@octokit/rest').Octokit}
+   */
+  get octokit() {
+    if (!this.#octokit) {
+      this.#createApiClients();
+    }
+    return this.#octokit;
+  }
+
+  /**
+   * 모든 서비스 생성
    * @returns {Object} 서비스 객체들
    */
   createServices() {
@@ -29,13 +51,12 @@ class ServiceFactory {
       return this.#services;
     }
 
-    Logger.info('서비스 초기화 중...');
-    this.#createApiClients();
+    Logger.info('서비스 생성 중...');
 
-    const gitHubApiHelper = new GitHubApiHelper(this.#octokit);
-    const slackUserService = new SlackUserService(this.#webClient, gitHubApiHelper);
+    const gitHubApiHelper = new GitHubApiHelper(this.octokit);
+    const slackUserService = new SlackUserService(this.webClient, gitHubApiHelper);
     const slackChannelService = new SlackChannelService(gitHubApiHelper);
-    const slackMessageService = new SlackMessageService(this.#webClient);
+    const slackMessageService = new SlackMessageService(this.webClient);
 
     this.#services = {
       gitHubApiHelper,
@@ -44,7 +65,7 @@ class ServiceFactory {
       slackMessageService,
     };
 
-    Logger.info('모든 서비스 초기화 완료');
+    Logger.info('모든 서비스 생성 완료');
     return this.#services;
   }
 
@@ -53,6 +74,10 @@ class ServiceFactory {
    * @private
    */
   #createApiClients() {
+    if (this.#webClient && this.#octokit) {
+      return;
+    }
+
     const config = environment.load();
 
     this.#webClient = new WebClient(config.slack.token, {
@@ -74,96 +99,6 @@ class ServiceFactory {
     });
 
     Logger.debug('API 클라이언트 생성 완료');
-  }
-
-  /**
-   * WebClient 인스턴스 반환
-   * @returns {WebClient}
-   */
-  getWebClient() {
-    if (!this.#webClient) {
-      this.#createApiClients();
-    }
-    return this.#webClient;
-  }
-
-  /**
-   * Octokit 인스턴스 반환
-   * @returns {Octokit}
-   */
-  getOctokit() {
-    if (!this.#octokit) {
-      this.#createApiClients();
-    }
-    return this.#octokit;
-  }
-
-  /**
-   * 특정 서비스만 가져오기
-   * @param {string} serviceName
-   * @returns {Object|null}
-   */
-  getService(serviceName) {
-    const services = this.createServices();
-    return services[serviceName] || null;
-  }
-
-  /**
-   * 모든 서비스 초기화 (캐시 프리로드 등)
-   */
-  async initializeAllServices() {
-    const services = this.createServices();
-
-    try {
-      await Promise.all([
-        services.slackUserService.initialize(),
-        services.slackChannelService.preloadTeamMemberships(),
-      ]);
-
-      Logger.info('모든 서비스 사전 초기화 완료');
-    } catch (error) {
-      Logger.error('서비스 사전 초기화 중 오류 발생', error);
-    }
-  }
-
-  /**
-   * 캐시 통계 조회
-   * @returns {Object}
-   */
-  getCacheStats() {
-    if (!this.#services) {
-      return { initialized: false };
-    }
-
-    return {
-      initialized: true,
-      slackUserService: this.#services.slackUserService.getCacheStats(),
-      slackChannelService: this.#services.slackChannelService.getCacheStats(),
-    };
-  }
-
-  /**
-   * 모든 캐시 초기화
-   */
-  clearAllCaches() {
-    if (!this.#services) return;
-
-    this.#services.slackUserService.clearCache();
-    this.#services.slackChannelService.clearCache();
-
-    Logger.info('모든 서비스 캐시 초기화됨');
-  }
-
-  /**
-   * 리소스 정리
-   */
-  cleanup() {
-    this.clearAllCaches();
-    this.#services = null;
-    this.#webClient = null;
-    this.#octokit = null;
-
-    Logger.info('서비스 팩토리 리소스 정리 완료');
   }
 
   /**

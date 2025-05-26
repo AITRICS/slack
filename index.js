@@ -24,8 +24,8 @@ const { SlackNotificationError, ConfigurationError } = require('./utils/errors')
 
 /**
  * 에러 타입에 따른 메시지 생성
- * @param {Error} error
- * @returns {string}
+ * @param {Error} error - 발생한 에러
+ * @returns {string} 에러 메시지
  */
 function getErrorMessage(error) {
   if (error instanceof ConfigurationError) {
@@ -40,70 +40,15 @@ function getErrorMessage(error) {
 }
 
 /**
- * 실행 성공 로깅
- * @param {number} startTime
- * @param {EventHandlerFactory} handlerFactory
- */
-function logExecutionSuccess(startTime, handlerFactory) {
-  const executionDuration = Date.now() - startTime;
-  Logger.info(`Action 실행 성공 (${executionDuration}ms)`);
-
-  // 디버그 모드에서 캐시 통계 출력
-  if (environment.isDebug()) {
-    const cacheStats = handlerFactory.getCacheStats();
-    Logger.debug('캐시 통계:', cacheStats);
-  }
-}
-
-/**
- * 실행 에러 처리
- * @param {Error} error
- * @param {number} startTime
- */
-function handleExecutionError(error, startTime) {
-  const executionDuration = Date.now() - startTime;
-  const errorMessage = getErrorMessage(error);
-
-  Logger.error(`Action 실행 실패 (${executionDuration}ms)`, error);
-  Core.setFailed(errorMessage);
-
-  // GitHub Actions 어노테이션에 상세 정보 추가
-  if (error.details) {
-    Core.error(JSON.stringify(error.details, null, 2));
-  }
-
-  process.exit(1);
-}
-
-/**
- * 리소스 정리
- * @param {EventHandlerFactory} handlerFactory
- * @param {ServiceFactory} serviceFactory
- */
-async function cleanupResources(handlerFactory, serviceFactory) {
-  try {
-    if (handlerFactory) {
-      await handlerFactory.cleanup();
-    }
-    if (serviceFactory) {
-      serviceFactory.cleanup();
-    }
-  } catch (cleanupError) {
-    Logger.error('리소스 정리 중 오류 발생', cleanupError);
-  }
-}
-
-/**
  * 액션 타입에 따른 이벤트 처리
- * @param {EventHandlerFactory} handlerFactory
- * @param {string} actionType
- * @param {Object} context
- * @param {ActionConfig} config
- * @returns {Promise<any>}
+ * @param {EventHandlerFactory} handlerFactory - 핸들러 팩토리
+ * @param {string} actionType - 액션 타입
+ * @param {Object} context - GitHub context
+ * @param {ActionConfig} config - 액션 설정
+ * @returns {Promise<any>} 처리 결과
  */
 async function processActionEvent(handlerFactory, actionType, context, config) {
   Logger.info(`${actionType} 이벤트 처리 중`);
-  Logger.debug('GitHub 컨텍스트 페이로드:', context.payload);
 
   switch (actionType) {
     case ACTION_TYPES.DEPLOY:
@@ -132,11 +77,11 @@ async function processActionEvent(handlerFactory, actionType, context, config) {
 
 /**
  * GitHub Action 메인 실행 함수
+ * @returns {Promise<any>} 실행 결과
  */
+// eslint-disable-next-line consistent-return
 async function run() {
-  const executionStartTime = Date.now();
-  const serviceFactory = ServiceFactory.getInstance();
-  const eventHandlerFactory = new EventHandlerFactory(serviceFactory);
+  const startTime = Date.now();
 
   try {
     // 환경 설정 로드 및 검증
@@ -145,25 +90,34 @@ async function run() {
 
     Logger.info('Slack Notification Action 시작');
     Logger.info(`액션 타입: ${actionType}`);
-    Logger.debug('환경 설정:', environment.toSafeObject());
 
     // GitHub 컨텍스트 검증
     const { context } = Github;
     ConfigValidator.validatePayload(context.payload);
 
-    // 핸들러 사전 초기화로 성능 최적화
-    await eventHandlerFactory.preInitialize();
+    // 서비스 및 핸들러 생성
+    const serviceFactory = ServiceFactory.getInstance();
+    const eventHandlerFactory = new EventHandlerFactory(serviceFactory);
 
-    // 액션 타입별 이벤트 처리
+    // 이벤트 처리
     const result = await processActionEvent(eventHandlerFactory, actionType, context, config);
 
-    logExecutionSuccess(executionStartTime, eventHandlerFactory);
+    const duration = Date.now() - startTime;
+    Logger.info(`Action 실행 성공 (${duration}ms)`);
     return result;
   } catch (error) {
-    handleExecutionError(error, executionStartTime);
-    return null;
-  } finally {
-    await cleanupResources(eventHandlerFactory, serviceFactory);
+    const duration = Date.now() - startTime;
+    const errorMessage = getErrorMessage(error);
+
+    Logger.error(`Action 실행 실패 (${duration}ms)`, error);
+    Core.setFailed(errorMessage);
+
+    // GitHub Actions 어노테이션에 상세 정보 추가
+    if (error.details) {
+      Core.error(JSON.stringify(error.details, null, 2));
+    }
+
+    process.exit(1);
   }
 }
 
