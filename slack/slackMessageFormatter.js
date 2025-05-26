@@ -1,15 +1,23 @@
 const { SLACK_CONFIG } = require('../constants');
 
 /**
- * Formats messages for Slack
+ * @typedef {import('../types').SlackMessage} SlackMessage
+ * @typedef {import('../types').SlackAttachment} SlackAttachment
+ * @typedef {import('../types').SlackField} SlackField
+ * @typedef {import('../types').NotificationData} NotificationData
+ * @typedef {import('../types').DeploymentData} DeploymentData
+ */
+
+/**
+ * Slack 메시지 포맷터
  */
 class SlackMessageFormatter {
   /**
-   * Creates a Slack message object
-   * @param {string} channelId
-   * @param {string} text
-   * @param {Array} attachments
-   * @returns {Object}
+   * Slack 메시지 생성
+   * @param {string} channelId - 채널 ID
+   * @param {string} text - 메시지 텍스트
+   * @param {SlackAttachment[]} [attachments=[]] - 첨부 내용
+   * @returns {SlackMessage}
    */
   static createMessage(channelId, text, attachments = []) {
     return {
@@ -21,137 +29,133 @@ class SlackMessageFormatter {
   }
 
   /**
-   * Creates a field object for Slack message attachments
-   * @param {string} title
-   * @param {string} value
-   * @param {boolean} isShort
-   * @returns {Object}
+   * 첨부 필드 생성
+   * @param {string} title - 필드 제목
+   * @param {string} value - 필드 값
+   * @param {boolean} [isShort=false] - 짧은 필드 여부
+   * @returns {SlackField}
    */
   static createField(title, value, isShort = false) {
     return { title, value, short: isShort };
   }
 
   /**
-   * Creates an attachment object for Slack messages
-   * @param {string} color
-   * @param {string} text
-   * @param {Array} fields
-   * @returns {Object}
+   * 첨부 내용 생성
+   * @param {string} color - 색상
+   * @param {string} [text=''] - 텍스트
+   * @param {SlackField[]} [fields=[]] - 필드 목록
+   * @returns {SlackAttachment}
    */
   static createAttachment(color, text = '', fields = []) {
-    return {
-      color,
-      text,
-      fields,
-    };
+    return { color, text, fields };
   }
 
   /**
-   * Formats code comment notification data
-   * @param {Object} data
-   * @returns {Object}
+   * 코드 코멘트 메시지 포맷
+   * @param {NotificationData} data - 알림 데이터
+   * @returns {{text: string, attachment: SlackAttachment}}
    */
   static formatCodeCommentMessage(data) {
     const {
-      commentContent,
-      commentBody,
-      commentUrl,
       prUrl,
       prTitle,
-      commentAuthorSlackRealName,
-      mentionedSlackId,
+      commentUrl,
+      commentBody,
+      codeSnippet,
+      authorSlackName,
+      targetSlackId,
+      mentionsString,
     } = data;
 
-    const contentText = commentContent ? `\`\`\`${commentContent}\`\`\`\n` : '';
-    const attachmentText = `${contentText}\n*코멘트 내용:*\n${commentBody}\n\n<${commentUrl}|코멘트 보러가기>\n\n`;
+    // 코드 스니펫 포맷
+    const codeBlock = codeSnippet ? `\`\`\`${codeSnippet}\`\`\`\n` : '';
 
+    // 첨부 텍스트 구성
+    const attachmentText = `${codeBlock}\n*코멘트 내용:*\n${commentBody}\n\n<${commentUrl}|코멘트 보러가기>\n\n`;
     const attachment = this.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
 
-    // Handle both single mention and multiple mentions
-    let mentionsText = '';
-    if (mentionedSlackId) {
-      if (typeof mentionedSlackId === 'string' && mentionedSlackId.includes('<@')) {
-        // Already formatted mentions string (multiple mentions)
-        mentionsText = mentionedSlackId;
-      } else {
-        // Single mention ID
-        mentionsText = `<@${mentionedSlackId}>`;
-      }
-    }
-
-    const text = `*<${prUrl}|${prTitle}>*\n${SLACK_CONFIG.ICONS.COMMENT} *${commentAuthorSlackRealName}* 님이 코멘트를 남겼어요!! ${mentionsText}:\n`;
+    // 멘션 처리 (단일/다중 멘션 모두 지원)
+    const mentions = mentionsString || (targetSlackId ? `<@${targetSlackId}>` : '');
+    const icon = SLACK_CONFIG.ICONS.COMMENT;
+    const text = `*<${prUrl}|${prTitle}>*\n${icon} *${authorSlackName}* 님이 코멘트를 남겼어요!! ${mentions}:\n`;
 
     return { text, attachment };
   }
 
   /**
-   * Formats PR page comment notification data
-   * @param {Object} data
-   * @returns {Object}
+   * PR 페이지 코멘트 메시지 포맷
+   * @param {NotificationData} data - 알림 데이터
+   * @returns {{text: string, attachment: SlackAttachment}}
    */
   static formatPRPageCommentMessage(data) {
     const {
-      commentUrl,
       prUrl,
-      commentAuthorSlackRealName,
-      commentBody,
       prTitle,
+      commentUrl,
+      commentBody,
+      authorSlackName,
       mentionsString,
     } = data;
 
     const attachmentText = `*코멘트 내용:*\n${commentBody}\n\n<${commentUrl}|코멘트 보러가기>`;
     const attachment = this.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
-    const text = `*<${prUrl}|${prTitle}>*\n${SLACK_CONFIG.ICONS.PR_COMMENT} *${commentAuthorSlackRealName}* 님이 코멘트를 남겼어요!! ${mentionsString}`;
+
+    const icon = SLACK_CONFIG.ICONS.PR_COMMENT;
+    const text = `*<${prUrl}|${prTitle}>*\n${icon} *${authorSlackName}* 님이 코멘트를 남겼어요!! ${mentionsString}`;
 
     return { text, attachment };
   }
 
   /**
-   * Formats approval notification data
-   * @param {Object} data
-   * @returns {Object}
+   * PR 승인 메시지 포맷
+   * @param {NotificationData} data - 알림 데이터
+   * @returns {{text: string, attachment: SlackAttachment}}
    */
   static formatApprovalMessage(data) {
     const {
-      commentBody,
-      commentUrl,
       prUrl,
       prTitle,
-      commentAuthorSlackRealName,
-      mentionedSlackId,
+      commentUrl,
+      commentBody,
+      authorSlackName,
+      targetSlackId,
     } = data;
 
     const attachmentText = `${commentBody}\n\n<${commentUrl}|코멘트 보러가기>.`;
     const attachment = this.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
-    const text = `*<${prUrl}|${prTitle}>*\n${SLACK_CONFIG.ICONS.APPROVE} *${commentAuthorSlackRealName}* 님이 Approve를 했습니다!! <@${mentionedSlackId}>:\n`;
+
+    const icon = SLACK_CONFIG.ICONS.APPROVE;
+    const text = `*<${prUrl}|${prTitle}>*\n${icon} *${authorSlackName}* 님이 Approve를 했습니다!! <@${targetSlackId}>:\n`;
 
     return { text, attachment };
   }
 
   /**
-   * Formats review request notification data
-   * @param {Object} data
-   * @returns {Object}
+   * 리뷰 요청 메시지 포맷
+   * @param {NotificationData} data - 알림 데이터
+   * @returns {{text: string, attachment: SlackAttachment}}
    */
   static formatReviewRequestMessage(data) {
     const {
       prUrl,
       prTitle,
-      commentAuthorSlackRealName,
-      mentionedSlackId,
+      authorSlackName,
+      targetSlackId,
     } = data;
 
     const attachmentText = `\n<${prUrl}|PR 보러가기>.`;
     const attachment = this.createAttachment(SLACK_CONFIG.MESSAGE_COLORS.SUCCESS, attachmentText);
-    const text = `*<${prUrl}|${prTitle}>*\n${SLACK_CONFIG.ICONS.REVIEW_REQUEST} *${commentAuthorSlackRealName}* 님이 Review를 요청했습니다!! <@${mentionedSlackId}>:\n`;
+
+    const icon = SLACK_CONFIG.ICONS.REVIEW_REQUEST;
+    const text = `*<${prUrl}|${prTitle}>*\n${icon} *${authorSlackName}* 님이 Review를 요청했습니다!! <@${targetSlackId}>:\n`;
 
     return { text, attachment };
   }
 
   /**
-   * Formats scheduled review notification data
-   * @param {Object} data
-   * @returns {Object}
+   * 예약된 리뷰 알림 메시지 포맷
+   * @param {Object} data - 알림 데이터
+   * @returns {{text: string, attachment: SlackAttachment}}
    */
   static formatScheduledReviewMessage(data) {
     const { prUrl, prTitle, body } = data;
@@ -164,80 +168,86 @@ class SlackMessageFormatter {
   }
 
   /**
-   * Formats deployment notification data
-   * @param {Object} data
-   * @returns {Object}
+   * 배포 알림 메시지 포맷
+   * @param {DeploymentData} data - 배포 데이터
+   * @returns {{text: string, attachment: SlackAttachment}}
    */
   static formatDeploymentMessage(data) {
     const {
-      slackDeployResult,
-      slackStatus,
+      status,
       repoUrl,
       repoName,
       ec2Name,
-      triggerUser,
-      commitUrl,
+      triggerUsername,
       sha,
       imageTag,
-      totalRunTime,
-      actionUrl,
+      duration,
+      workflowUrl,
       workflowName,
       ref,
     } = data;
+
+    const isSuccess = status === 'success';
+    const color = isSuccess ? SLACK_CONFIG.MESSAGE_COLORS.SUCCESS : SLACK_CONFIG.MESSAGE_COLORS.DANGER;
+    const icon = isSuccess ? SLACK_CONFIG.ICONS.SUCCESS : SLACK_CONFIG.ICONS.FAILURE;
+    const statusText = isSuccess ? 'Succeeded' : 'Failed';
 
     const fields = [
       this.createField('Deploy Info', '', false),
       this.createField('Repository', `<${repoUrl}|${repoName}>`, true),
       this.createField('Deploy Server', `https://${ec2Name}`, true),
-      this.createField('Author', `<@${triggerUser}>`, true),
-      this.createField('Commit', `<${commitUrl}|${sha.slice(0, 7)}>`, true),
+      this.createField('Author', `<@${triggerUsername}>`, true),
+      this.createField('Commit', `<${repoUrl}/commit/${sha}|${sha.slice(0, 7)}>`, true),
       this.createField('Image Tag', imageTag, true),
-      this.createField('Run Time', totalRunTime, true),
-      this.createField('Workflow', `<${actionUrl}|${workflowName}>`, true),
+      this.createField('Run Time', duration, true),
+      this.createField('Workflow', `<${workflowUrl}|${workflowName}>`, true),
       this.createField('Ref', ref, true),
     ];
 
-    const attachment = this.createAttachment(slackStatus, '', fields);
-    const text = `${slackDeployResult} *GitHub Actions Deploy Notification*`;
+    const attachment = this.createAttachment(color, '', fields);
+    const text = `${icon}*${statusText}* *GitHub Actions Deploy Notification*`;
 
     return { text, attachment };
   }
 
   /**
-   * Formats build notification data
-   * @param {Object} data
-   * @returns {Object}
+   * 빌드 알림 메시지 포맷
+   * @param {Object} data - 빌드 데이터
+   * @returns {{text: string, attachment: SlackAttachment}}
    */
   static formatBuildMessage(data) {
     const {
-      slackBuildResult,
-      slackStatus,
+      status,
       repoUrl,
       repoName,
       branchName,
-      triggerUser,
-      commitUrl,
+      triggerUsername,
       sha,
       imageTag,
-      totalRunTime,
-      actionUrl,
+      duration,
+      workflowUrl,
       workflowName,
-      jobNames,
+      failedJobs,
     } = data;
+
+    const isSuccess = status === 'success';
+    const color = isSuccess ? SLACK_CONFIG.MESSAGE_COLORS.SUCCESS : SLACK_CONFIG.MESSAGE_COLORS.DANGER;
+    const icon = isSuccess ? SLACK_CONFIG.ICONS.SUCCESS : SLACK_CONFIG.ICONS.FAILURE;
+    const statusText = isSuccess ? 'Succeeded' : 'Failed';
 
     const fields = [this.createField('Build Info', '', false)];
 
-    // Add failed jobs if build failed
-    if (slackStatus === SLACK_CONFIG.MESSAGE_COLORS.DANGER && jobNames && jobNames.length > 0) {
-      const formattedJobNames = jobNames.map((job) => `\`${job}\``).join('\n');
-      fields.push(this.createField('Failed Jobs', formattedJobNames, false));
+    // 실패한 작업 표시
+    if (!isSuccess && failedJobs && failedJobs.length > 0) {
+      const jobsList = failedJobs.map((job) => `\`${job}\``).join('\n');
+      fields.push(this.createField('Failed Jobs', jobsList, false));
     }
 
     fields.push(
       this.createField('Repository', `<${repoUrl}|${repoName}>`, true),
       this.createField('Branch', branchName || 'N/A', true),
-      this.createField('Author', `<@${triggerUser}>`, true),
-      this.createField('Commit', `<${commitUrl}|${sha.slice(0, 7)}>`, true),
+      this.createField('Author', `<@${triggerUsername}>`, true),
+      this.createField('Commit', `<${repoUrl}/commit/${sha}|${sha.slice(0, 7)}>`, true),
     );
 
     if (imageTag) {
@@ -245,12 +255,12 @@ class SlackMessageFormatter {
     }
 
     fields.push(
-      this.createField('Run Time', totalRunTime, true),
-      this.createField('Workflow', `<${actionUrl}|${workflowName}>`, true),
+      this.createField('Run Time', duration, true),
+      this.createField('Workflow', `<${workflowUrl}|${workflowName}>`, true),
     );
 
-    const attachment = this.createAttachment(slackStatus, '', fields);
-    const text = `${slackBuildResult} *GitHub Actions Build Notification*`;
+    const attachment = this.createAttachment(color, '', fields);
+    const text = `${icon}*${statusText}* *GitHub Actions Build Notification*`;
 
     return { text, attachment };
   }

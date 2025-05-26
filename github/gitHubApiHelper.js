@@ -1,19 +1,28 @@
 const { GITHUB_CONFIG } = require('../constants');
 
+/**
+ * @typedef {import('@octokit/rest').Octokit} Octokit
+ * @typedef {import('../types').GitHubUser} GitHubUser
+ * @typedef {import('../types').PullRequest} PullRequest
+ * @typedef {import('../types').Review} Review
+ */
+
+/**
+ * GitHub API 헬퍼 클래스
+ * Octokit을 래핑하여 프로젝트에 필요한 GitHub API 호출을 제공
+ */
 class GitHubApiHelper {
   /**
-   * GitHubApiHelper class constructor.
-   * @param {import('@octokit/rest').Octokit} octokit - Octokit instance.
+   * @param {Octokit} octokit - Octokit 인스턴스
    */
   constructor(octokit) {
     this.octokit = octokit;
   }
 
   /**
-   * Fetches the member list of a specific GitHub team.
-   * @param {string} teamSlug - The slug of the GitHub team.
-   * @returns {Promise<Array>} A promise that resolves to team members.
-   * @throws Will throw an error if the GitHub API request fails.
+   * GitHub 팀 멤버 목록 조회
+   * @param {string} teamSlug - 팀 슬러그
+   * @returns {Promise<GitHubUser[]>} 팀 멤버 목록
    */
   async fetchTeamMembers(teamSlug) {
     try {
@@ -23,17 +32,16 @@ class GitHubApiHelper {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching member list for team slug ${teamSlug}:`, error);
+      console.error(`팀 멤버 조회 실패 (${teamSlug}):`, error);
       throw error;
     }
   }
 
   /**
-   * Retrieves the GitHub username of the author of a specific review comment.
-   * @param {string} repoName - The name of the repository.
-   * @param {number} commentId - The ID of the review comment.
-   * @returns {Promise<string>} The GitHub username of the comment author.
-   * @throws Will throw an error if the GitHub API request fails.
+   * 리뷰 코멘트 작성자 조회
+   * @param {string} repoName - 저장소 이름
+   * @param {number} commentId - 코멘트 ID
+   * @returns {Promise<string>} 작성자 GitHub 사용자명
    */
   async fetchCommentAuthor(repoName, commentId) {
     try {
@@ -44,18 +52,18 @@ class GitHubApiHelper {
       });
       return response.data.user.login;
     } catch (error) {
-      console.error(`Error fetching author of comment ID ${commentId} in repository '${repoName}':`, error);
+      console.error(`코멘트 작성자 조회 실패 (ID: ${commentId}):`, error);
       throw error;
     }
   }
 
   /**
-   * Fetches all review comments for a pull request to find thread participants.
-   * @param {string} repoName - The name of the repository.
-   * @param {number} prNumber - The number of the pull request.
-   * @param {number} currentCommentId - The ID of the current comment.
-   * @returns {Promise<Array>} Array of usernames who participated in the comment thread.
-   * @throws Will throw an error if the GitHub API request fails.
+   * 코멘트 스레드 참여자 조회
+   * 특정 코멘트가 속한 스레드의 모든 참여자를 찾음
+   * @param {string} repoName - 저장소 이름
+   * @param {number} prNumber - PR 번호
+   * @param {number} currentCommentId - 현재 코멘트 ID
+   * @returns {Promise<string[]>} 스레드 참여자 사용자명 목록
    */
   async fetchCommentThreadParticipants(repoName, prNumber, currentCommentId) {
     try {
@@ -69,70 +77,73 @@ class GitHubApiHelper {
       const currentComment = allComments.find((comment) => comment.id === currentCommentId);
 
       if (!currentComment) {
-        console.warn(`Current comment with ID ${currentCommentId} not found`);
+        console.warn(`코멘트를 찾을 수 없음 (ID: ${currentCommentId})`);
         return [];
       }
 
-      // Find the thread root (the comment that started this thread)
-      const threadRootId = this.findThreadRoot(allComments, currentComment);
+      // 스레드 루트 찾기
+      const threadRootId = this._findThreadRoot(allComments, currentComment);
 
-      // Collect all comments in this specific thread
-      const threadComments = this.collectThreadComments(allComments, threadRootId);
+      // 스레드의 모든 코멘트 수집
+      const threadComments = this._collectThreadComments(allComments, threadRootId);
 
-      // Extract unique usernames from thread participants
+      // 고유한 참여자 추출
       const participants = [...new Set(threadComments.map((comment) => comment.user.login))];
       return participants;
     } catch (error) {
-      console.error(`Error fetching comment thread participants for PR ${prNumber}:`, error);
+      console.error(`코멘트 스레드 참여자 조회 실패 (PR #${prNumber}):`, error);
       throw error;
     }
   }
 
   /**
-   * Finds the root comment of a thread by following in_reply_to_id chain.
-   * @param {Array} allComments - All comments from the PR.
-   * @param {Object} comment - The comment to find the root for.
-   * @returns {number} The ID of the root comment.
+   * 스레드의 루트 코멘트 찾기
+   * @private
+   * @param {Array} allComments - 모든 코멘트
+   * @param {Object} comment - 현재 코멘트
+   * @returns {number} 루트 코멘트 ID
    */
-  findThreadRoot(allComments, comment) {
-    let currentComment = comment;
+  _findThreadRoot(allComments, comment) {
+    let current = comment;
 
-    // Follow the reply chain to find the root
-    while (currentComment.in_reply_to_id) {
-      const parentComment = allComments.find((c) => c.id === currentComment.in_reply_to_id);
-      if (!parentComment) break;
-      currentComment = parentComment;
+    // in_reply_to_id 체인을 따라 올라가며 루트 찾기
+    while (current.in_reply_to_id) {
+      const parent = allComments.find((c) => c.id === current.in_reply_to_id);
+      if (!parent) break;
+      current = parent;
     }
 
-    return currentComment.id;
+    return current.id;
   }
 
   /**
-   * Collects all comments that belong to the same thread.
-   * @param {Array} allComments - All comments from the PR.
-   * @param {number} threadRootId - The ID of the thread root comment.
-   * @returns {Array} Array of comments in the thread.
+   * 스레드의 모든 코멘트 수집
+   * @private
+   * @param {Array} allComments - 모든 코멘트
+   * @param {number} threadRootId - 스레드 루트 ID
+   * @returns {Array} 스레드 코멘트 목록
    */
-  collectThreadComments(allComments, threadRootId) {
+  _collectThreadComments(allComments, threadRootId) {
     const threadComments = [];
     const visited = new Set();
 
-    // Add the root comment
-    const rootComment = allComments.find((c) => c.id === threadRootId);
-    if (rootComment) {
-      threadComments.push(rootComment);
-      visited.add(rootComment.id);
+    // 루트 코멘트 추가
+    const root = allComments.find((c) => c.id === threadRootId);
+    if (root) {
+      threadComments.push(root);
+      visited.add(root.id);
     }
 
-    // Find all replies to this thread (recursively)
+    // 재귀적으로 모든 답글 찾기
     const findReplies = (parentId) => {
-      const replies = allComments.filter((comment) => comment.in_reply_to_id === parentId && !visited.has(comment.id));
+      const replies = allComments.filter(
+        (comment) => comment.in_reply_to_id === parentId && !visited.has(comment.id),
+      );
 
       replies.forEach((reply) => {
         threadComments.push(reply);
         visited.add(reply.id);
-        // Recursively find replies to this reply
-        findReplies(reply.id);
+        findReplies(reply.id); // 답글의 답글 찾기
       });
     };
 
@@ -141,29 +152,25 @@ class GitHubApiHelper {
   }
 
   /**
-   * Retrieves the GitHub user's real name based on their username.
-   * @param {string} username - The GitHub username to retrieve the real name for.
-   * @returns {Promise<string>} The real name of the GitHub user or username if name is not available.
-   * @throws Will throw an error if the GitHub API request fails.
+   * GitHub 사용자의 실제 이름 조회
+   * @param {string} username - GitHub 사용자명
+   * @returns {Promise<string>} 실제 이름 또는 사용자명
    */
   async fetchUserRealName(username) {
     try {
-      const response = await this.octokit.rest.users.getByUsername({
-        username,
-      });
+      const response = await this.octokit.rest.users.getByUsername({ username });
       return response.data.name || username;
     } catch (error) {
-      console.error(`Error fetching GitHub user info for ${username}:`, error);
+      console.error(`사용자 정보 조회 실패 (${username}):`, error);
       throw error;
     }
   }
 
   /**
-   * Retrieves the reviews for a given pull request.
-   * @param {string} repoName - The name of the repository.
-   * @param {number} prNumber - The number of the pull request.
-   * @returns {Promise<Array>} A promise that resolves to review objects.
-   * @throws Will throw an error if the GitHub API request fails.
+   * PR 리뷰 목록 조회
+   * @param {string} repoName - 저장소 이름
+   * @param {number} prNumber - PR 번호
+   * @returns {Promise<Review[]>} 리뷰 목록
    */
   async fetchPullRequestReviews(repoName, prNumber) {
     try {
@@ -174,17 +181,16 @@ class GitHubApiHelper {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching PR reviews for PR number ${prNumber}:`, error);
+      console.error(`PR 리뷰 조회 실패 (PR #${prNumber}):`, error);
       throw error;
     }
   }
 
   /**
-   * Fetches the details of a pull request.
-   * @param {string} repoName - The name of the repository.
-   * @param {number} prNumber - The number of the pull request.
-   * @returns {Promise<Object>} A promise that resolves to pull request details.
-   * @throws Will throw an error if the GitHub API request fails.
+   * PR 상세 정보 조회
+   * @param {string} repoName - 저장소 이름
+   * @param {number} prNumber - PR 번호
+   * @returns {Promise<PullRequest>} PR 상세 정보
    */
   async fetchPullRequestDetails(repoName, prNumber) {
     try {
@@ -195,16 +201,15 @@ class GitHubApiHelper {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching PR details for PR number ${prNumber}:`, error);
+      console.error(`PR 상세 조회 실패 (PR #${prNumber}):`, error);
       throw error;
     }
   }
 
   /**
-   * Fetches all open pull requests for a given repository.
-   * @param {string} repoName - Repository name.
-   * @returns {Promise<Array>} A promise that resolves to open pull request objects.
-   * @throws Will throw an error if the GitHub API request fails.
+   * 열린 PR 목록 조회
+   * @param {string} repoName - 저장소 이름
+   * @returns {Promise<PullRequest[]>} 열린 PR 목록
    */
   async fetchOpenPullRequests(repoName) {
     try {
@@ -215,17 +220,16 @@ class GitHubApiHelper {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching open PRs for repo ${repoName}:`, error);
+      console.error(`열린 PR 조회 실패 (${repoName}):`, error);
       throw error;
     }
   }
 
   /**
-   * Fetches the GitHub Actions workflow run data.
-   * @param {string} repoName - The name of the GitHub repository.
-   * @param {string} runId - The ID of the workflow run.
-   * @returns {Promise<Object>} A promise containing the GitHub Actions workflow run data.
-   * @throws Will throw an error if the GitHub API request fails.
+   * 워크플로우 실행 정보 조회
+   * @param {string} repoName - 저장소 이름
+   * @param {string} runId - 실행 ID
+   * @returns {Promise<Object>} 워크플로우 실행 정보
    */
   async fetchWorkflowRunData(repoName, runId) {
     try {
@@ -236,7 +240,7 @@ class GitHubApiHelper {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching workflow run data for run ID ${runId}:`, error);
+      console.error(`워크플로우 실행 조회 실패 (ID: ${runId}):`, error);
       throw error;
     }
   }
