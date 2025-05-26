@@ -1,5 +1,12 @@
-// eslint-disable-next-line max-classes-per-file
 const { SLACK_CONFIG } = require('../constants');
+
+/**
+ * @typedef {import('../types').SlackMessage} SlackMessage
+ * @typedef {import('../types').SlackAttachment} SlackAttachment
+ * @typedef {import('../types').SlackField} SlackField
+ * @typedef {import('../types').NotificationData} NotificationData
+ * @typedef {import('../types').DeploymentData} DeploymentData
+ */
 
 /**
  * Field Builder – 체이닝 API로 Slack field 객체를 생성합니다.
@@ -50,8 +57,7 @@ class SlackFieldBuilder {
    * @returns {SlackField}
    */
   static create(title, value, isShort = false) {
-    return new SlackFieldBuilder().setTitle(title).setValue(value).setShort(isShort)
-      .build();
+    return new SlackFieldBuilder().setTitle(title).setValue(value).setShort(isShort).build();
   }
 }
 
@@ -62,6 +68,8 @@ class SlackAttachmentBuilder {
   /** @type {string} */ #color;
 
   /** @type {string} */ #text = '';
+
+  /** @type {string} */ #fallback;
 
   /** @type {SlackField[]} */ #fields = [];
 
@@ -82,6 +90,14 @@ class SlackAttachmentBuilder {
   }
 
   /**
+   * @param {string} fallback
+   */
+  setFallback(fallback) {
+    this.#fallback = fallback;
+    return this;
+  }
+
+  /**
    * @param {SlackField[]} fields
    */
   addFields(fields = []) {
@@ -93,7 +109,12 @@ class SlackAttachmentBuilder {
    * @returns {SlackAttachment}
    */
   build() {
-    return { color: this.#color, text: this.#text, fields: this.#fields };
+    return {
+      color: this.#color,
+      fallback: this.#fallback ?? this.#text ?? 'Slack Notification',
+      text: this.#text,
+      fields: this.#fields,
+    };
   }
 
   /**
@@ -101,10 +122,15 @@ class SlackAttachmentBuilder {
    * @param {string} color
    * @param {string} [text='']
    * @param {SlackField[]} [fields=[]]
+   * @param {string} [fallback]
    * @returns {SlackAttachment}
    */
-  static create(color, text = '', fields = []) {
-    return new SlackAttachmentBuilder().setColor(color).setText(text).addFields(fields)
+  static create(color, text = '', fields = [], fallback) {
+    return new SlackAttachmentBuilder()
+      .setColor(color)
+      .setText(text)
+      .setFallback(fallback ?? text)
+      .addFields(fields)
       .build();
   }
 }
@@ -171,8 +197,7 @@ class SlackMessageBuilder {
    * @returns {SlackMessage}
    */
   static create(channelId, text, attachments = []) {
-    return new SlackMessageBuilder().setChannel(channelId).setText(text).addAttachments(attachments)
-      .build();
+    return new SlackMessageBuilder().setChannel(channelId).setText(text).addAttachments(attachments).build();
   }
 }
 
