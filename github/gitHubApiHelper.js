@@ -144,6 +144,7 @@ class GitHubApiHelper {
             currentCommentId,
             isReviewComment,
             totalComments: allComments.length,
+            commentIds: allComments.map((c) => c.id),
           },
         );
       }
@@ -207,7 +208,7 @@ class GitHubApiHelper {
    * @returns {Comment|undefined}
    */
   #findCommentById(comments, commentId) {
-    return comments.find((comment) => Number(comment.id) === Number(commentId));
+    return comments.find((comment) => String(comment.id) === String(commentId));
   }
 
   /**
@@ -222,7 +223,7 @@ class GitHubApiHelper {
 
     while (current.in_reply_to_id) {
       const replyToId = current.in_reply_to_id;
-      const parent = allComments.find((c) => Number(c.id) === Number(replyToId));
+      const parent = allComments.find((c) => String(c.id) === String(replyToId));
       if (!parent) break;
       current = parent;
     }
@@ -241,21 +242,21 @@ class GitHubApiHelper {
     const threadComments = [];
     const visited = new Set();
 
-    const root = allComments.find((c) => Number(c.id) === Number(threadRootId));
+    const root = allComments.find((c) => String(c.id) === String(threadRootId));
     if (root) {
       threadComments.push(root);
-      visited.add(Number(root.id));
+      visited.add(String(root.id));
     }
 
     const findReplies = (parentId) => {
       const replies = allComments.filter(
-        (comment) => Number(comment.in_reply_to_id) === Number(parentId)
-          && !visited.has(Number(comment.id)),
+        (comment) => String(comment.in_reply_to_id) === String(parentId)
+          && !visited.has(String(comment.id)),
       );
 
       replies.forEach((reply) => {
         threadComments.push(reply);
-        visited.add(Number(reply.id));
+        visited.add(String(reply.id));
         findReplies(reply.id);
       });
     };

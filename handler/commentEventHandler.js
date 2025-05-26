@@ -44,6 +44,30 @@ class CommentEventHandler extends BaseEventHandler {
 
     await this.initialize();
 
+    const commentType = this.#determineCommentType(payload);
+
+    Logger.debug(`코멘트 타입 판단: ${commentType.isCodeComment ? '코드 리뷰' : 'PR 페이지'} 코멘트`, {
+      hasDiffHunk: Boolean(payload.comment.diff_hunk),
+      hasPullRequest: Boolean(payload.pull_request),
+      hasIssue: Boolean(payload.issue),
+      hasIssueUrl: Boolean(payload.comment.issue_url),
+      commentId: payload.comment.id,
+    });
+
+    if (commentType.isCodeComment) {
+      await this.#handleCodeComment(payload, commentType);
+    } else {
+      await this.#handlePullRequestComment(payload, commentType);
+    }
+  }
+
+  /**
+   * 코멘트 타입 결정
+   * @private
+   * @param {CommentPayload} payload
+   * @returns {{isCodeComment: boolean, prNumber: number}}
+   */
+  #determineCommentType(payload) {
     // GitHub webhook 페이로드 구조로 코멘트 타입 구분:
     // 코드 리뷰 코멘트: diff_hunk 존재, pull_request 객체 존재, issue 객체 없음
     // PR 페이지 코멘트: issue_url 존재, issue 객체 존재, pull_request 객체 없음
@@ -53,35 +77,26 @@ class CommentEventHandler extends BaseEventHandler {
       && !payload.issue,
     );
 
-    Logger.debug(`코멘트 타입 판단: ${isCodeComment ? '코드 리뷰' : 'PR 페이지'} 코멘트`, {
-      hasDiffHunk: Boolean(payload.comment.diff_hunk),
-      hasPullRequest: Boolean(payload.pull_request),
-      hasIssue: Boolean(payload.issue),
-      hasIssueUrl: Boolean(payload.comment.issue_url),
-      commentId: payload.comment.id,
-    });
+    const prNumber = payload.pull_request?.number || payload.issue?.number;
 
-    if (isCodeComment) {
-      await this.#handleCodeComment(payload);
-    } else {
-      await this.#handlePullRequestComment(payload);
-    }
+    return { isCodeComment, prNumber };
   }
 
   /**
    * 코드 리뷰 코멘트 처리
    * @private
    * @param {CommentPayload} payload
+   * @param {{isCodeComment: boolean, prNumber: number}} commentType
    */
-  async #handleCodeComment(payload) {
-    const recipients = await this.#determineCodeCommentRecipients(payload);
+  async #handleCodeComment(payload, commentType) {
+    const recipients = await this.#determineCodeCommentRecipients(payload, commentType);
 
     if (recipients.length === 0) {
       Logger.info('코드 코멘트 알림 수신자 없음');
       return;
     }
 
-    const isFirstTimeComment = CommentEventHandler.#isFirstTimeComment(
+    const isFirstTimeComment = this.#isFirstTimeComment(
       recipients,
       payload.pull_request.user.login,
     );
@@ -97,9 +112,10 @@ class CommentEventHandler extends BaseEventHandler {
    * PR 페이지 코멘트 처리
    * @private
    * @param {CommentPayload} payload
+   * @param {{isCodeComment: boolean, prNumber: number}} commentType
    */
-  async #handlePullRequestComment(payload) {
-    const recipients = await this.#determinePRCommentRecipients(payload);
+  async #handlePullRequestComment(payload, commentType) {
+    const recipients = await this.#determinePRCommentRecipients(payload, commentType);
 
     if (recipients.length === 0) {
       Logger.info('PR 페이지 코멘트 알림 수신자 없음');
@@ -112,12 +128,11 @@ class CommentEventHandler extends BaseEventHandler {
   /**
    * 첫 번째 코멘트인지 확인 (PR 작성자 1명만 수신자인 경우)
    * @private
-   * @static
    * @param {NotificationRecipient[]} recipients
    * @param {string} prAuthorLogin
    * @returns {boolean}
    */
-  static #isFirstTimeComment(recipients, prAuthorLogin) {
+  #isFirstTimeComment(recipients, prAuthorLogin) {
     return recipients.length === 1 && recipients[0].githubUsername === prAuthorLogin;
   }
 
@@ -125,18 +140,19 @@ class CommentEventHandler extends BaseEventHandler {
    * 코드 코멘트 수신자 결정
    * @private
    * @param {CommentPayload} payload
+   * @param {{isCodeComment: boolean, prNumber: number}} commentType
    * @returns {Promise<NotificationRecipient[]>}
    */
-  async #determineCodeCommentRecipients(payload) {
+  async #determineCodeCommentRecipients(payload, commentType) {
     const { repository, pull_request: pullRequest, comment } = payload;
     const commentAuthor = comment.user.login;
 
-    // 코드 코멘트이므로 isReviewComment = true
+    // 코멘트 타입에 따라 올바른 API 호출
     const threadParticipants = await this.gitHubApiHelper.fetchCommentThreadParticipants(
       repository.name,
-      pullRequest.number,
+      commentType.prNumber,
       comment.id,
-      true, // 코드 리뷰 코멘트
+      commentType.isCodeComment,
     );
 
     // 스레드 참여자가 없거나 본인뿐인 경우 PR 작성자에게 알림
@@ -158,15 +174,16 @@ class CommentEventHandler extends BaseEventHandler {
    * PR 페이지 코멘트 수신자 결정
    * @private
    * @param {CommentPayload} payload
+   * @param {{isCodeComment: boolean, prNumber: number}} commentType
    * @returns {Promise<NotificationRecipient[]>}
    */
-  async #determinePRCommentRecipients(payload) {
-    const { repository, issue, comment } = payload;
+  async #determinePRCommentRecipients(payload, commentType) {
+    const { repository, comment } = payload;
     const commentAuthor = comment.user.login;
 
     const [prDetails, allReviewers] = await Promise.all([
-      this.gitHubApiHelper.fetchPullRequestDetails(repository.name, issue.number),
-      this.#getAllReviewers(repository.name, issue.number),
+      this.gitHubApiHelper.fetchPullRequestDetails(repository.name, commentType.prNumber),
+      this.#getAllReviewers(repository.name, commentType.prNumber),
     ]);
 
     const prAuthor = prDetails.user.login;
@@ -178,7 +195,7 @@ class CommentEventHandler extends BaseEventHandler {
 
     // 리뷰어가 코멘트 → PR 작성자 + 다른 리뷰어들에게 알림
     const recipients = await this.#getRecipientsForReviewerComment(allReviewers, commentAuthor, prAuthor);
-    return CommentEventHandler.#removeDuplicateRecipients(recipients);
+    return this.#removeDuplicateRecipients(recipients);
   }
 
   /**
@@ -235,16 +252,11 @@ class CommentEventHandler extends BaseEventHandler {
    */
   async #buildNotificationData(payload, targetUsername) {
     const {
-      comment, pull_request: pullRequest, repository, issue,
+      comment, pull_request: pullRequest, repository,
     } = payload;
     const authorUsername = comment.user.login;
 
-    // 코멘트 타입 판단 (handle 메서드와 동일한 로직)
-    const isCodeComment = Boolean(
-      comment.diff_hunk
-      && pullRequest
-      && !issue,
-    );
+    const commentType = this.#determineCommentType(payload);
 
     // 실제 대상자 결정
     let actualTargetUsername = targetUsername;
@@ -254,7 +266,7 @@ class CommentEventHandler extends BaseEventHandler {
       const originalAuthor = await this.gitHubApiHelper.fetchCommentAuthor(
         repository.name,
         comment.in_reply_to_id,
-        isCodeComment, // 코멘트 타입에 따라 적절한 API 호출
+        commentType.isCodeComment,
       );
       if (originalAuthor !== authorUsername) {
         actualTargetUsername = originalAuthor;
@@ -264,7 +276,7 @@ class CommentEventHandler extends BaseEventHandler {
     // PR 데이터 처리 (코드 코멘트 vs PR 페이지 코멘트)
     const prData = pullRequest || await this.gitHubApiHelper.fetchPullRequestDetails(
       repository.name,
-      issue.number,
+      commentType.prNumber,
     );
 
     if (!actualTargetUsername) {
@@ -277,7 +289,7 @@ class CommentEventHandler extends BaseEventHandler {
     ]);
 
     return {
-      prUrl: prData.html_url || `https://github.com/${repository.full_name}/pull/${issue.number}`,
+      prUrl: prData.html_url || `https://github.com/${repository.full_name}/pull/${commentType.prNumber}`,
       prTitle: prData.title,
       commentUrl: comment.html_url,
       commentBody: comment.body,
@@ -359,11 +371,10 @@ class CommentEventHandler extends BaseEventHandler {
   /**
    * 중복 수신자 제거
    * @private
-   * @static
    * @param {NotificationRecipient[]} recipients
    * @returns {NotificationRecipient[]}
    */
-  static #removeDuplicateRecipients(recipients) {
+  #removeDuplicateRecipients(recipients) {
     const seen = new Set();
     return recipients.filter((recipient) => {
       if (seen.has(recipient.githubUsername)) {
