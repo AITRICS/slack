@@ -64,6 +64,11 @@ class SlackAttachmentBuilder {
     return this;
   }
 
+  addField(field) {
+    this.#fields.push(field);
+    return this;
+  }
+
   addFields(fields = []) {
     if (Array.isArray(fields)) {
       this.#fields.push(...fields.filter(Boolean));
@@ -73,7 +78,14 @@ class SlackAttachmentBuilder {
 
   build() {
     const fallbackPlain = this.#fallback || this.#text || 'Slack Notification'; // 빈 문자열 방지
-    return { color: this.#color, fallback: fallbackPlain, text: this.#text, fields: this.#fields };
+    return {
+      color: this.#color,
+      fallback: fallbackPlain,
+      text: this.#text,
+      fields: this.#fields,
+      mrkdwn_in: ['text', 'fields'],
+      mrkdwn: true,
+    };
   }
 
   static create(color, text = '', fields = [], fallback) {
