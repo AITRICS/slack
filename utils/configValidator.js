@@ -124,7 +124,7 @@ class ConfigValidator {
   /**
    * 페이로드 검증
    * @static
-   * @param {GitHubPushPayload} payload - GitHub 이벤트 페이로드
+   * @param {Object} payload - GitHub 이벤트 페이로드
    * @returns {void}
    * @throws {ConfigurationError} 페이로드가 유효하지 않은 경우
    */

@@ -16,7 +16,7 @@ module.exports = {
       message: '[slack-680-test] test',
       timestamp: '2025-05-27T21:13:22+09:00',
       tree_id: '8ad9cd3e3d555be66f266c9b43be12c17a54d8fc',
-      url: 'https://github.com/AITRICS/vc-monorepo/commit/95274e6c0e7c8ff2a70bcd987b27d911e81152fe'
+      url: 'https://github.com/AITRICS/vc-monorepo/commit/95274e6c0e7c8ff2a70bcd987b27d911e81152fe',
     },
     organization: {
       avatar_url: 'https://avatars.githubusercontent.com/u/29746354?v=4',
@@ -30,7 +30,7 @@ module.exports = {
       node_id: 'MDEyOk9yZ2FuaXphdGlvbjI5NzQ2MzU0',
       public_members_url: 'https://api.github.com/orgs/AITRICS/public_members{/member}',
       repos_url: 'https://api.github.com/orgs/AITRICS/repos',
-      url: 'https://api.github.com/orgs/AITRICS'
+      url: 'https://api.github.com/orgs/AITRICS',
     },
     repository: {
       keys_url: 'https://api.github.com/repos/AITRICS/vc-monorepo/keys{/key_id}',
@@ -71,8 +71,8 @@ module.exports = {
       visibility: 'private',
       watchers: 2,
       watchers_count: 2,
-      web_commit_signoff_required: false
-    }
+      web_commit_signoff_required: false,
+    },
   },
   sender: {
     avatar_url: 'https://avatars.githubusercontent.com/u/147586739?v=4',
@@ -93,7 +93,7 @@ module.exports = {
     subscriptions_url: 'https://api.github.com/users/aitrics-ray/subscriptions',
     type: 'User',
     url: 'https://api.github.com/users/aitrics-ray',
-    user_view_type: 'public'
+    user_view_type: 'public',
   },
   eventName: 'push',
   sha: '95274e6c0e7c8ff2a70bcd987b27d911e81152fe',
@@ -106,5 +106,5 @@ module.exports = {
   runId: 15274941847,
   apiUrl: 'https://api.github.com',
   serverUrl: 'https://github.com',
-  graphqlUrl: 'https://api.github.com/graphql'
+  graphqlUrl: 'https://api.github.com/graphql',
 };

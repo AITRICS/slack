@@ -122,40 +122,6 @@ class Environment {
   isDebug() {
     return this.get('logging.debug', false);
   }
-
-  /**
-   * 설정 재설정 (주로 테스트용)
-   */
-  reset() {
-    this.#config = null;
-  }
-
-  /**
-   * 토큰 마스킹
-   * @private
-   * @static
-   * @param {string} token - 마스킹할 토큰
-   * @returns {string} 마스킹된 토큰
-   */
-  static #maskToken(token) {
-    if (!token || token.length < 8) return '***';
-    return `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
-  }
-
-  /**
-   * 필수 설정 검증
-   * @returns {string[]} 누락된 설정 목록
-   */
-  validateRequiredConfig() {
-    const config = this.load();
-    const missing = [];
-
-    if (!config.slack.token) missing.push('SLACK_TOKEN');
-    if (!config.github.token) missing.push('GITHUB_TOKEN');
-    if (!config.action.type) missing.push('ACTION_TYPE');
-
-    return missing;
-  }
 }
 
 const environment = new Environment();

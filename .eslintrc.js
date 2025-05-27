@@ -9,7 +9,7 @@ module.exports = {
     'airbnb-base',
     'plugin:jest/recommended',
   ],
-  plugins: ['import', 'jest', 'custom', '@mysticatea', 'unicorn'],
+  plugins: ['import', 'jest'],
   settings: {
     'import/resolver': {
       node: {
@@ -70,5 +70,9 @@ module.exports = {
     }, {
       enforceForRenamedProperties: false,
     }],
+    'operator-linebreak': ['error', 'after'],
+    'import/no-unresolved': 'warn',
+    'import/newline-after-import': 'warn',
+    'import/extensions': 'off',
   },
 };

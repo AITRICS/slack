@@ -170,9 +170,9 @@ class CommentEventHandler extends BaseEventHandler {
       // 스레드 참여자가 없거나 본인뿐인 경우 PR 작성자에게 알림
       if (threadParticipants.length <= 1) {
         const prAuthor = pullRequest.user.login;
-        return commentAuthor !== prAuthor
-          ? [{ githubUsername: prAuthor }]
-          : [];
+        return commentAuthor !== prAuthor ?
+          [{ githubUsername: prAuthor }] :
+          [];
       }
 
       const recipients = threadParticipants
@@ -243,9 +243,9 @@ class CommentEventHandler extends BaseEventHandler {
     const notificationData = await this.#buildNotificationData(payload, recipient.githubUsername);
     const channelId = await this.slackChannelService.selectChannel(recipient.githubUsername);
 
-    const messageMethod = commentType === 'code'
-      ? 'sendCodeCommentMessage'
-      : 'sendPRPageCommentMessage';
+    const messageMethod = commentType === 'code' ?
+      'sendCodeCommentMessage' :
+      'sendPRPageCommentMessage';
 
     await this.slackMessageService[messageMethod](notificationData, channelId);
     Logger.info(`${commentType} 코멘트 알림 전송: ${recipient.githubUsername}`);
@@ -262,9 +262,9 @@ class CommentEventHandler extends BaseEventHandler {
     const recipientsByChannel = await this.#groupRecipientsByChannel(recipients);
     const baseNotificationData = await this.#buildNotificationData(payload);
 
-    const messageMethod = commentType === 'code'
-      ? 'sendCodeCommentMessage'
-      : 'sendPRPageCommentMessage';
+    const messageMethod = commentType === 'code' ?
+      'sendCodeCommentMessage' :
+      'sendPRPageCommentMessage';
 
     await Promise.all(
       Object.entries(recipientsByChannel).map(async ([channelId, channelRecipients]) => {

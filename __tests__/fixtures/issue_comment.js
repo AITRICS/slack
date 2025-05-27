@@ -5,12 +5,12 @@ module.exports = {
     body: '무슨차이일까?',
     commit_id: '6272e4a1f3217844bec4994731fc5eac0afd206f',
     created_at: '2025-05-20T04:53:57Z',
-    diff_hunk: '@@ -3,4 +3,4 @@ FROM alpine\n'
-    + ' RUN --mount=type=secret,id=github_token,target=/tmp/user \\\n'
-    + '   cat /tmp/user\n'
-    + ' \n'
-    + '-RUN echo "hihihihi"\n'
-    + '+RUN echo "hihihidddhi"',
+    diff_hunk: '@@ -3,4 +3,4 @@ FROM alpine\n' +
+    ' RUN --mount=type=secret,id=github_token,target=/tmp/user \\\n' +
+    '   cat /tmp/user\n' +
+    ' \n' +
+    '-RUN echo "hihihihi"\n' +
+    '+RUN echo "hihihidddhi"',
     html_url: 'https://github.com/AITRICS/ray-test/pull/23#discussion_r2096916332',
     id: 2096916332,
     in_reply_to_id: 2085982039,

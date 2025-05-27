@@ -194,9 +194,9 @@ class GitHubApiHelper {
       const targetIdNum = Number(commentId);
 
       // 문자열 비교와 숫자 비교 모두 시도
-      return commentIdStr === targetId
-        || commentIdNum === targetIdNum
-        || comment.id === commentId;
+      return commentIdStr === targetId ||
+        commentIdNum === targetIdNum ||
+        comment.id === commentId;
     });
   }
 
@@ -218,9 +218,9 @@ class GitHubApiHelper {
         const cIdNum = Number(c.id);
         const replyToIdNum = Number(replyToId);
 
-        return cIdStr === replyToIdStr
-          || cIdNum === replyToIdNum
-          || c.id === replyToId;
+        return cIdStr === replyToIdStr ||
+          cIdNum === replyToIdNum ||
+          c.id === replyToId;
       });
 
       if (!parent) break;
@@ -247,9 +247,9 @@ class GitHubApiHelper {
       const cIdNum = Number(c.id);
       const rootIdNum = Number(threadRootId);
 
-      return cIdStr === rootIdStr
-        || cIdNum === rootIdNum
-        || c.id === threadRootId;
+      return cIdStr === rootIdStr ||
+        cIdNum === rootIdNum ||
+        c.id === threadRootId;
     });
 
     if (root) {
@@ -266,9 +266,9 @@ class GitHubApiHelper {
         const replyToIdNum = Number(comment.in_reply_to_id);
         const commentIdStr = String(comment.id);
 
-        const isReplyToParent = replyToIdStr === parentIdStr
-          || replyToIdNum === parentIdNum
-          || comment.in_reply_to_id === parentId;
+        const isReplyToParent = replyToIdStr === parentIdStr ||
+          replyToIdNum === parentIdNum ||
+          comment.in_reply_to_id === parentId;
 
         return isReplyToParent && !visited.has(commentIdStr);
       });

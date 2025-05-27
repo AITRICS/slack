@@ -58,8 +58,8 @@ function findSlackUserProperty(slackMembers, githubRealName, property) {
     // 이름 매칭 체크 (부분 문자열 포함 관계)
     return candidateNames.some((candidateName) => {
       const normalizedCandidate = normalizeUserName(candidateName);
-      return normalizedCandidate.includes(normalizedSearchName)
-        || normalizedSearchName.includes(normalizedCandidate);
+      return normalizedCandidate.includes(normalizedSearchName) ||
+        normalizedSearchName.includes(normalizedCandidate);
     });
   });
 
