@@ -3,20 +3,21 @@ const Logger = require('../utils/logger');
 const { SlackAPIError } = require('../utils/errors');
 
 /**
- * Service for sending Slack messages
+ * Slack 메시지 전송 서비스
  */
 class SlackMessageService {
   /**
-   * @param {import('@slack/web-api').WebClient} webClient
+   * @param {import('@slack/web-api').WebClient} webClient - Slack WebClient
    */
   constructor(webClient) {
     this.webClient = webClient;
   }
 
   /**
-   * Sends a message to Slack
-   * @param {import('../types').SlackMessage} message
-   * @throws {SlackAPIError}
+   * Slack 메시지 전송
+   * @param {SlackMessage} message - 전송할 메시지
+   * @returns {Promise<void>}
+   * @throws {SlackAPIError} 메시지 전송 실패 시
    */
   async sendMessage(message) {
     try {
@@ -58,10 +59,11 @@ class SlackMessageService {
   }
 
   /**
-   * Sends a code comment notification
-   * @param {import('../types').NotificationData} data
-   * @param {string} channelId
-   * @throws {SlackAPIError}
+   * 코드 코멘트 알림 전송
+   * @param {NotificationData} data - 알림 데이터
+   * @param {string} channelId - 채널 ID
+   * @returns {Promise<void>}
+   * @throws {SlackAPIError} 전송 실패 시
    */
   async sendCodeCommentMessage(data, channelId) {
     try {
@@ -80,10 +82,11 @@ class SlackMessageService {
   }
 
   /**
-   * Sends a PR page comment notification
-   * @param {import('../types').NotificationData} data
-   * @param {string} channelId
-   * @throws {SlackAPIError}
+   * PR 페이지 코멘트 알림 전송
+   * @param {NotificationData} data - 알림 데이터
+   * @param {string} channelId - 채널 ID
+   * @returns {Promise<void>}
+   * @throws {SlackAPIError} 전송 실패 시
    */
   async sendPRPageCommentMessage(data, channelId) {
     try {
@@ -102,10 +105,11 @@ class SlackMessageService {
   }
 
   /**
-   * Sends an approval notification
-   * @param {import('../types').NotificationData} data
-   * @param {string} channelId
-   * @throws {SlackAPIError}
+   * 승인 알림 전송
+   * @param {NotificationData} data - 알림 데이터
+   * @param {string} channelId - 채널 ID
+   * @returns {Promise<void>}
+   * @throws {SlackAPIError} 전송 실패 시
    */
   async sendApprovalMessage(data, channelId) {
     try {
@@ -124,10 +128,11 @@ class SlackMessageService {
   }
 
   /**
-   * Sends a review request notification
-   * @param {import('../types').NotificationData} data
-   * @param {string} channelId
-   * @throws {SlackAPIError}
+   * 리뷰 요청 알림 전송
+   * @param {NotificationData} data - 알림 데이터
+   * @param {string} channelId - 채널 ID
+   * @returns {Promise<void>}
+   * @throws {SlackAPIError} 전송 실패 시
    */
   async sendReviewRequestMessage(data, channelId) {
     try {
@@ -146,10 +151,11 @@ class SlackMessageService {
   }
 
   /**
-   * Sends a scheduled review notification
-   * @param {Object} data
-   * @param {string} channelId
-   * @throws {SlackAPIError}
+   * 예약된 리뷰 알림 전송
+   * @param {ScheduledReviewMessageData} data - 알림 데이터
+   * @param {string} channelId - 채널 ID
+   * @returns {Promise<void>}
+   * @throws {SlackAPIError} 전송 실패 시
    */
   async sendScheduledReviewMessage(data, channelId) {
     try {
@@ -168,10 +174,11 @@ class SlackMessageService {
   }
 
   /**
-   * Sends a deployment notification
-   * @param {import('../types').DeploymentData} data
-   * @param {string} channelId
-   * @throws {SlackAPIError}
+   * 배포 알림 전송
+   * @param {DeploymentData} data - 배포 데이터
+   * @param {string} channelId - 채널 ID
+   * @returns {Promise<void>}
+   * @throws {SlackAPIError} 전송 실패 시
    */
   async sendDeploymentMessage(data, channelId) {
     try {
@@ -190,10 +197,11 @@ class SlackMessageService {
   }
 
   /**
-   * Sends a build notification
-   * @param {import('../types').DeploymentData} data
-   * @param {string} channelId
-   * @throws {SlackAPIError}
+   * 빌드 알림 전송
+   * @param {DeploymentData} data - 빌드 데이터
+   * @param {string} channelId - 채널 ID
+   * @returns {Promise<void>}
+   * @throws {SlackAPIError} 전송 실패 시
    */
   async sendBuildMessage(data, channelId) {
     try {

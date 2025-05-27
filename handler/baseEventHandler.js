@@ -1,14 +1,5 @@
 const Logger = require('../utils/logger');
 const { PayloadValidationError } = require('../utils/errors');
-
-/**
- * @typedef {Object} EventHandlerServices
- * @property {import('../github/gitHubApiHelper')} gitHubApiHelper
- * @property {import('../slack/slackUserService')} slackUserService
- * @property {import('../slack/slackChannelService')} slackChannelService
- * @property {import('../slack/slackMessageService')} slackMessageService
- */
-
 /**
  * 이벤트 핸들러 기본 클래스
  */
@@ -54,9 +45,9 @@ class BaseEventHandler {
   /**
    * 페이로드 검증
    * @protected
+   * @static
    * @param {Object} payload - GitHub webhook 페이로드
    * @throws {PayloadValidationError} 페이로드가 유효하지 않은 경우
-   * @returns {void}
    */
   static validatePayload(payload) {
     if (!payload) {
@@ -71,7 +62,8 @@ class BaseEventHandler {
   /**
    * 저장소 정보 추출
    * @protected
-   * @param {Object} repository - GitHub repository 객체
+   * @static
+   * @param {GitHubRepository} repository - GitHub repository 객체
    * @returns {{name: string, fullName: string, url: string}} 저장소 정보
    */
   static extractRepoData(repository) {

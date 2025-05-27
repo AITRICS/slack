@@ -9,20 +9,6 @@ const { ACTION_TYPES } = require('./constants');
 const { SlackNotificationError, ConfigurationError } = require('./utils/errors');
 
 /**
- * @typedef {Object} ActionConfig
- * @property {Object} action
- * @property {Object} action.deploy
- * @property {string} action.deploy.ec2Name
- * @property {string} action.deploy.imageTag
- * @property {string} action.deploy.jobStatus
- * @property {Object} action.ci
- * @property {string} action.ci.branchName
- * @property {string} action.ci.imageTag
- * @property {string} action.ci.jobName
- * @property {string} action.ci.jobStatus
- */
-
-/**
  * 에러 타입에 따른 메시지 생성
  * @param {Error} error - 발생한 에러
  * @returns {string} 에러 메시지
@@ -42,8 +28,8 @@ function getErrorMessage(error) {
 /**
  * 액션 타입에 따른 이벤트 처리
  * @param {EventHandlerFactory} handlerFactory - 핸들러 팩토리
- * @param {string} actionType - 액션 타입
- * @param {Object} context - GitHub context
+ * @param {ActionType} actionType - 액션 타입
+ * @param {GitHubContext} context - GitHub context
  * @param {ActionConfig} config - 액션 설정
  * @returns {Promise<any>} 처리 결과
  */

@@ -24,7 +24,7 @@ class ConfigValidator {
 
   /**
    * 액션 타입 검증
-   * @param {string} actionType - 검증할 액션 타입
+   * @param {ActionType} actionType - 검증할 액션 타입
    * @throws {ConfigurationError} 유효하지 않은 액션 타입인 경우
    */
   static validateActionType(actionType) {
@@ -40,7 +40,7 @@ class ConfigValidator {
 
   /**
    * 액션별 추가 설정 검증
-   * @param {string} actionType - 액션 타입
+   * @param {ActionType} actionType - 액션 타입
    * @throws {ConfigurationError} 필수 설정이 누락된 경우
    */
   static validateActionSpecificConfig(actionType) {
@@ -64,8 +64,10 @@ class ConfigValidator {
 
   /**
    * 토큰 형식 검증
+   * @static
    * @param {string} token - 검증할 토큰
-   * @param {string} tokenType - 토큰 타입 (SLACK_TOKEN, GITHUB_TOKEN)
+   * @param {string} tokenType - 토큰 타입
+   * @returns {void}
    * @throws {ConfigurationError} 토큰 형식이 잘못된 경우
    */
   static validateTokenFormat(token, tokenType) {
@@ -95,7 +97,7 @@ class ConfigValidator {
 
   /**
    * 전체 설정 검증
-   * @returns {{slackToken: string, githubToken: string, actionType: string}}
+   * @returns {{slackToken: string, githubToken: string, actionType: ActionType}}
    * @throws {ConfigurationError} 검증 실패 시
    */
   static validateAll() {
@@ -121,7 +123,9 @@ class ConfigValidator {
 
   /**
    * 페이로드 검증
-   * @param {Object} payload - GitHub 이벤트 페이로드
+   * @static
+   * @param {GitHubPushPayload} payload - GitHub 이벤트 페이로드
+   * @returns {void}
    * @throws {ConfigurationError} 페이로드가 유효하지 않은 경우
    */
   static validatePayload(payload) {

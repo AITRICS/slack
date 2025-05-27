@@ -37,7 +37,7 @@ class ServiceFactory {
 
   /**
    * Octokit getter
-   * * @returns {import('@octokit/plugin-paginate-rest').PaginateInterface
+   * @returns {import('@octokit/plugin-paginate-rest').PaginateInterface
    *          & import('@octokit/rest').RestEndpointMethods
    *          & import('@octokit/rest').Api
    *          & import('@octokit/rest').Octokit}
@@ -87,9 +87,10 @@ class ServiceFactory {
   }
 
   /**
-     * API 클라이언트 생성
-     * @private
-     */
+   * API 클라이언트 생성
+   * @private
+   * @throws {Error} 서비스 생성 실패 시
+   */
   #createApiClients() {
     if (this.#webClient && this.#octokit) {
       return;

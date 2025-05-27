@@ -17,7 +17,7 @@ class GitHubApiHelper {
   /**
    * GitHub 팀 멤버 목록 조회
    * @param {string} teamSlug
-   * @returns {Promise<import('../types').GitHubUser[]>}
+   * @returns {Promise<GitHubUser[]>}
    * @throws {GitHubAPIError}
    */
   async fetchTeamMembers(teamSlug) {
@@ -156,7 +156,7 @@ class GitHubApiHelper {
    * @param {string} repoName
    * @param {number} prNumber
    * @param {boolean} isReviewComment
-   * @returns {Promise<import('../types').GitHubComment[]>}
+   * @returns {Promise<GitHubComment[]>}
    */
   async #fetchAllComments(repoName, prNumber, isReviewComment) {
     const commonOpts = {
@@ -181,9 +181,9 @@ class GitHubApiHelper {
   /**
    * ID로 코멘트 찾기
    * @private
-   * @param {import('../types').GitHubComment[]} comments
+   * @param {GitHubComment[]} comments
    * @param {number} commentId
-   * @returns {import('../types').GitHubComment|undefined}
+   * @returns {GitHubComment|undefined}
    */
   #findCommentById(comments, commentId) {
     // 숫자와 문자열 모두 비교하여 타입 변환 문제 해결
@@ -203,8 +203,8 @@ class GitHubApiHelper {
   /**
    * 스레드의 루트 코멘트 찾기 (개선된 타입 비교)
    * @private
-   * @param {import('../types').GitHubComment[]} allComments
-   * @param {import('../types').GitHubComment} comment
+   * @param {GitHubComment[]} allComments
+   * @param {GitHubComment} comment
    * @returns {number}
    */
   #findThreadRoot(allComments, comment) {
@@ -233,9 +233,9 @@ class GitHubApiHelper {
   /**
    * 스레드의 모든 코멘트 수집 (개선된 타입 비교)
    * @private
-   * @param {import('../types').GitHubComment[]} allComments
+   * @param {GitHubComment[]} allComments
    * @param {number} threadRootId
-   * @returns {import('../types').GitHubComment[]}
+   * @returns {GitHubComment[]}
    */
   #collectThreadComments(allComments, threadRootId) {
     const threadComments = [];
@@ -313,7 +313,7 @@ class GitHubApiHelper {
    * PR 리뷰 목록 조회
    * @param {string} repoName
    * @param {number} prNumber
-   * @returns {Promise<import('../types').GitHubReview[]>}
+   * @returns {Promise<GitHubReview[]>}
    * @throws {GitHubAPIError}
    */
   async fetchPullRequestReviews(repoName, prNumber) {

@@ -3,7 +3,7 @@ const Logger = require('../utils/logger');
 
 /**
  * Slack 채널 선택 서비스
- * 단순히 한 번 로드하고 재사용
+ * 싱글톤
  */
 class SlackChannelService {
   /**
@@ -39,7 +39,7 @@ class SlackChannelService {
   /**
    * 사용자가 속한 팀 찾기
    * @param {string} githubUsername - GitHub 사용자명
-   * @returns {Promise<string|null>} 팀 슬러그 또는 null
+   * @returns {Promise<TeamSlug|null>} 팀 슬러그 또는 null
    */
   async findUserTeamSlug(githubUsername) {
     await this.#loadTeamMembers();
@@ -76,6 +76,7 @@ class SlackChannelService {
    * 모든 팀의 멤버 정보 가져오기
    * @private
    * @returns {Promise<void>}
+   * @throws {Error} 팀 멤버 정보를 가져올 수 없는 경우
    */
   async #fetchAllTeamMembers() {
     try {

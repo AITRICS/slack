@@ -14,9 +14,9 @@ function normalizeUserName(rawName = '') {
 
 /**
  * Slack 사용자 객체에서 지정된 속성 추출
- * @param {Object} slackUser
- * @param {'id'|'realName'} property
- * @returns {string}
+ * @param {SlackUser} slackUser - Slack 사용자 객체
+ * @param {'id'|'realName'} property - 추출할 속성
+ * @returns {string} 추출된 속성값
  */
 function getSlackUserProperty(slackUser, property) {
   const propertyExtractors = {
@@ -30,7 +30,7 @@ function getSlackUserProperty(slackUser, property) {
 
 /**
  * GitHub 실명으로 Slack 사용자 속성 조회
- * @param {Array} slackMembers - Slack 사용자 목록
+ * @param {SlackUser[]} slackMembers - Slack 사용자 목록
  * @param {string} githubRealName - GitHub 실명
  * @param {'id'|'realName'} property - 조회할 속성
  * @returns {string} 조회된 속성값 또는 원본 이름

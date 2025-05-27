@@ -9,10 +9,12 @@ const Logger = require('../utils/logger');
 class DeploymentEventHandler extends BaseEventHandler {
   /**
    * 배포 이벤트 처리
-   * @param {Object} context - GitHub context
+   * @param {GitHubContext} context - GitHub context
    * @param {string} ec2Name - EC2 instance name
    * @param {string} imageTag - Docker image tag
    * @param {string} jobStatus - Job status (success/failure)
+   * @returns {Promise<void>}
+   * @throws {Error} 배포 이벤트 처리 실패 시
    */
   async handleDeploy(context, ec2Name, imageTag, jobStatus) {
     try {
@@ -35,11 +37,13 @@ class DeploymentEventHandler extends BaseEventHandler {
 
   /**
    * 빌드 이벤트 처리
-   * @param {Object} context - GitHub context
+   * @param {GitHubContext} context - GitHub context
    * @param {string} branchName - Branch name
    * @param {string} imageTag - Docker image tag
    * @param {string} jobName - Job name(s) (comma-separated)
    * @param {string} jobStatus - Job status (success/failure)
+   * @returns {Promise<void>}
+   * @throws {Error} 빌드 이벤트 처리 실패 시
    */
   async handleBuild(context, branchName, imageTag, jobName, jobStatus) {
     try {
@@ -63,11 +67,11 @@ class DeploymentEventHandler extends BaseEventHandler {
   /**
    * 배포 데이터 준비
    * @private
-   * @param {Object} context - GitHub context
+   * @param {GitHubContext} context - GitHub context
    * @param {string} ec2Name - EC2 instance name
    * @param {string} imageTag - Docker image tag
    * @param {string} jobStatus - Job status
-   * @returns {Promise<Object>} 배포 데이터
+   * @returns {Promise<PreparedDeployData>} 배포 데이터
    */
   async #prepareDeployData(context, ec2Name, imageTag, jobStatus) {
     const repoData = BaseEventHandler.extractRepoData(context.payload.repository);
@@ -100,12 +104,12 @@ class DeploymentEventHandler extends BaseEventHandler {
   /**
    * 빌드 데이터 준비
    * @private
-   * @param {Object} context - GitHub context
+   * @param {GitHubContext} context - GitHub context
    * @param {string} branchName - Branch name
    * @param {string} imageTag - Docker image tag
    * @param {string} jobName - Job name(s)
    * @param {string} jobStatus - Job status
-   * @returns {Promise<Object>} 빌드 데이터
+   * @returns {Promise<PreparedBuildData>} 빌드 데이터
    */
   async #prepareBuildData(context, branchName, imageTag, jobName, jobStatus) {
     const repoData = BaseEventHandler.extractRepoData(context.payload.repository);
@@ -139,8 +143,9 @@ class DeploymentEventHandler extends BaseEventHandler {
   /**
    * 배포 알림 데이터 포맷
    * @private
-   * @param {Object} deployData - 배포 데이터
-   * @returns {Object} 포맷된 알림 데이터
+   * @static
+   * @param {PreparedDeployData} deployData - 배포 데이터
+   * @returns {DeploymentData} 포맷된 알림 데이터
    */
   static #formatDeploymentNotificationData(deployData) {
     const {
@@ -173,8 +178,9 @@ class DeploymentEventHandler extends BaseEventHandler {
   /**
    * 빌드 알림 데이터 포맷
    * @private
-   * @param {Object} buildData - 빌드 데이터
-   * @returns {Object} 포맷된 알림 데이터
+   * @static
+   * @param {PreparedBuildData} buildData - 빌드 데이터
+   * @returns {DeploymentData} 포맷된 알림 데이터
    */
   static #formatBuildNotificationData(buildData) {
     const {

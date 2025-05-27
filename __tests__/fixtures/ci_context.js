@@ -1,38 +1,39 @@
 module.exports = {
   payload: {
     after: '95274e6c0e7c8ff2a70bcd987b27d911e81152fe',
-      base_ref: null,
-      before: 'c613f76e41fc1b20fc6d7c67d48c6d9002b5a501',
-      commits: [ [Object] ],
-      compare: 'https://github.com/AITRICS/vc-monorepo/compare/c613f76e41fc...95274e6c0e7c',
-      created: false,
-      deleted: false,
-      forced: false,
-      head_commit: {
-      author: [Object],
-        committer: [Object],
-        distinct: true,
-        id: '95274e6c0e7c8ff2a70bcd987b27d911e81152fe',
-        message: '[slack-680-test] test',
-        timestamp: '2025-05-27T21:13:22+09:00',
-        tree_id: '8ad9cd3e3d555be66f266c9b43be12c17a54d8fc',
-        url: 'https://github.com/AITRICS/vc-monorepo/commit/95274e6c0e7c8ff2a70bcd987b27d911e81152fe'
+    base_ref: null,
+    before: 'c613f76e41fc1b20fc6d7c67d48c6d9002b5a501',
+    commits: [], // [Object]를 빈 배열로 수정
+    compare: 'https://github.com/AITRICS/vc-monorepo/compare/c613f76e41fc...95274e6c0e7c',
+    created: false,
+    deleted: false,
+    forced: false,
+    head_commit: {
+      author: {}, // [Object]를 빈 객체로 수정
+      committer: {}, // [Object]를 빈 객체로 수정
+      distinct: true,
+      id: '95274e6c0e7c8ff2a70bcd987b27d911e81152fe',
+      message: '[slack-680-test] test',
+      timestamp: '2025-05-27T21:13:22+09:00',
+      tree_id: '8ad9cd3e3d555be66f266c9b43be12c17a54d8fc',
+      url: 'https://github.com/AITRICS/vc-monorepo/commit/95274e6c0e7c8ff2a70bcd987b27d911e81152fe'
     },
     organization: {
       avatar_url: 'https://avatars.githubusercontent.com/u/29746354?v=4',
-        description: '',
-        events_url: 'https://api.github.com/orgs/AITRICS/events',
-        hooks_url: 'https://api.github.com/orgs/AITRICS/hooks',
-        id: 29746354,
-        issues_url: 'https://api.github.com/orgs/AITRICS/issues',
-        login: 'AITRICS',
-        members_url: 'https://api.github.com/orgs/AITRICS/members{/member}',
-        node_id: 'MDEyOk9yZ2FuaXphdGlvbjI5NzQ2MzU0',
-        public_members_url: 'https://api.github.com/orgs/AITRICS/public_members{/member}',
-        repos_url: 'https://api.github.com/orgs/AITRICS/repos',
-        url: 'https://api.github.com/orgs/AITRICS'
+      description: '',
+      events_url: 'https://api.github.com/orgs/AITRICS/events',
+      hooks_url: 'https://api.github.com/orgs/AITRICS/hooks',
+      id: 29746354,
+      issues_url: 'https://api.github.com/orgs/AITRICS/issues',
+      login: 'AITRICS',
+      members_url: 'https://api.github.com/orgs/AITRICS/members{/member}',
+      node_id: 'MDEyOk9yZ2FuaXphdGlvbjI5NzQ2MzU0',
+      public_members_url: 'https://api.github.com/orgs/AITRICS/public_members{/member}',
+      repos_url: 'https://api.github.com/orgs/AITRICS/repos',
+      url: 'https://api.github.com/orgs/AITRICS'
     },
-    keys_url: 'https://api.github.com/repos/AITRICS/vc-monorepo/keys{/key_id}',
+    repository: {
+      keys_url: 'https://api.github.com/repos/AITRICS/vc-monorepo/keys{/key_id}',
       labels_url: 'https://api.github.com/repos/AITRICS/vc-monorepo/labels{/name}',
       language: 'TypeScript',
       languages_url: 'https://api.github.com/repos/AITRICS/vc-monorepo/languages',
@@ -47,7 +48,7 @@ module.exports = {
       open_issues: 28,
       open_issues_count: 28,
       organization: 'AITRICS',
-      owner: [Object],
+      owner: {}, // [Object]를 빈 객체로 수정
       private: true,
       pulls_url: 'https://api.github.com/repos/AITRICS/vc-monorepo/pulls{/number}',
       pushed_at: 1748348004,
@@ -71,28 +72,28 @@ module.exports = {
       watchers: 2,
       watchers_count: 2,
       web_commit_signoff_required: false
+    }
   },
   sender: {
     avatar_url: 'https://avatars.githubusercontent.com/u/147586739?v=4',
-      events_url: 'https://api.github.com/users/aitrics-ray/events{/privacy}',
-      followers_url: 'https://api.github.com/users/aitrics-ray/followers',
-      following_url: 'https://api.github.com/users/aitrics-ray/following{/other_user}',
-      gists_url: 'https://api.github.com/users/aitrics-ray/gists{/gist_id}',
-      gravatar_id: '',
-      html_url: 'https://github.com/aitrics-ray',
-      id: 147586739,
-      login: 'aitrics-ray',
-      node_id: 'U_kgDOCMv-sw',
-      organizations_url: 'https://api.github.com/users/aitrics-ray/orgs',
-      received_events_url: 'https://api.github.com/users/aitrics-ray/received_events',
-      repos_url: 'https://api.github.com/users/aitrics-ray/repos',
-      site_admin: false,
-      starred_url: 'https://api.github.com/users/aitrics-ray/starred{/owner}{/repo}',
-      subscriptions_url: 'https://api.github.com/users/aitrics-ray/subscriptions',
-      type: 'User',
-      url: 'https://api.github.com/users/aitrics-ray',
-      user_view_type: 'public'
-    }
+    events_url: 'https://api.github.com/users/aitrics-ray/events{/privacy}',
+    followers_url: 'https://api.github.com/users/aitrics-ray/followers',
+    following_url: 'https://api.github.com/users/aitrics-ray/following{/other_user}',
+    gists_url: 'https://api.github.com/users/aitrics-ray/gists{/gist_id}',
+    gravatar_id: '',
+    html_url: 'https://github.com/aitrics-ray',
+    id: 147586739,
+    login: 'aitrics-ray',
+    node_id: 'U_kgDOCMv-sw',
+    organizations_url: 'https://api.github.com/users/aitrics-ray/orgs',
+    received_events_url: 'https://api.github.com/users/aitrics-ray/received_events',
+    repos_url: 'https://api.github.com/users/aitrics-ray/repos',
+    site_admin: false,
+    starred_url: 'https://api.github.com/users/aitrics-ray/starred{/owner}{/repo}',
+    subscriptions_url: 'https://api.github.com/users/aitrics-ray/subscriptions',
+    type: 'User',
+    url: 'https://api.github.com/users/aitrics-ray',
+    user_view_type: 'public'
   },
   eventName: 'push',
   sha: '95274e6c0e7c8ff2a70bcd987b27d911e81152fe',
@@ -106,4 +107,4 @@ module.exports = {
   apiUrl: 'https://api.github.com',
   serverUrl: 'https://github.com',
   graphqlUrl: 'https://api.github.com/graphql'
-}
+};

@@ -8,7 +8,9 @@ const Logger = require('../utils/logger');
 class ReviewEventHandler extends BaseEventHandler {
   /**
    * 승인 이벤트 처리
-   * @param {ReviewPayload} payload GitHub webhook payload
+   * @param {ReviewPayload} payload - GitHub webhook payload
+   * @returns {Promise<void>}
+   * @throws {PayloadValidationError} 페이로드 검증 실패 시
    */
   async handleApprovalEvent(payload) {
     BaseEventHandler.validatePayload(payload);
@@ -29,8 +31,9 @@ class ReviewEventHandler extends BaseEventHandler {
 
   /**
    * 리뷰 요청 이벤트 처리
-   * @param {ReviewRequestPayload} payload GitHub webhook payload
+   * @param {ReviewPayload} payload - GitHub webhook payload
    * @returns {Promise<void>}
+   * @throws {PayloadValidationError} 페이로드 검증 실패 시
    */
   async handleReviewRequestEvent(payload) {
     BaseEventHandler.validatePayload(payload);
@@ -51,7 +54,8 @@ class ReviewEventHandler extends BaseEventHandler {
 
   /**
    * 예약된 리뷰 알림 처리 (크론 트리거)
-   * @param {Object} payload 저장소 정보를 포함한 페이로드
+   * @param {Object} payload - 저장소 정보를 포함한 페이로드
+   * @param {GitHubRepository} payload.repository - 저장소 정보
    * @returns {Promise<void>}
    */
   async handleScheduledReview(payload) {
@@ -73,10 +77,10 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * Slack 데이터로 알림 정보 보강
    * @private
-   * @param {Object} params
-   * @param {string} params.targetGh GitHub 사용자명 (멘션 대상)
-   * @param {string} params.authorGh GitHub 사용자명 (이벤트 발생자)
-   * @returns {Promise<{targetSlackId:string,authorSlackName:string}>}
+   * @param {Object} params - 매개변수
+   * @param {string} params.targetGh - GitHub 사용자명 (멘션 대상)
+   * @param {string} params.authorGh - GitHub 사용자명 (이벤트 발생자)
+   * @returns {Promise<EnrichedSlackData>} 보강된 Slack 데이터
    */
   async #enrichWithSlackData({ targetGh, authorGh }) {
     const usernames = [targetGh, authorGh];
@@ -91,8 +95,8 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * Slack ID 및 실명 맵 병렬 조회
    * @private
-   * @param {string[]} ghUsernames GitHub 사용자명 목록
-   * @returns {Promise<[Map<string,string>,Map<string,string>]>}
+   * @param {string[]} ghUsernames - GitHub 사용자명 목록
+   * @returns {Promise<[Map<string,string>,Map<string,string>]>} [ID 맵, 실명 맵]
    */
   async #fetchSlackMaps(ghUsernames) {
     return Promise.all([
@@ -104,9 +108,10 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * Slack 맵에서 값 조회 (폴백 포함)
    * @private
-   * @param {Map<string,string>} map Slack 매핑
-   * @param {string} ghUsername GitHub 사용자명
-   * @returns {string}
+   * @static
+   * @param {Map<string,string>} map - Slack 매핑
+   * @param {string} ghUsername - GitHub 사용자명
+   * @returns {string} Slack 값 또는 폴백값
    */
   static #getSlackMapValue(map, ghUsername) {
     return map.get(ghUsername) || ghUsername;
@@ -115,8 +120,9 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * 승인 알림 데이터 생성
    * @private
-   * @param {ReviewPayload} payload
-   * @returns {Object}
+   * @static
+   * @param {ReviewPayload} payload - 리뷰 페이로드
+   * @returns {ApprovalNotificationData} 승인 알림 데이터
    */
   static #buildApprovalNotificationData(payload) {
     return {
@@ -132,8 +138,9 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * 리뷰 요청 알림 데이터 생성
    * @private
-   * @param {ReviewRequestPayload} payload
-   * @returns {Object}
+   * @static
+   * @param {ReviewPayload} payload - 리뷰 요청 페이로드
+   * @returns {ReviewRequestNotificationData} 리뷰 요청 알림 데이터
    */
   static #buildReviewRequestNotificationData(payload) {
     return {
@@ -147,9 +154,9 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * PR 목록에 리뷰 상태 정보 추가
    * @private
-   * @param {Array} pullRequests PR 목록
-   * @param {string} repoName 저장소명
-   * @returns {Promise<Array>}
+   * @param {GitHubPullRequest[]} pullRequests - PR 목록
+   * @param {string} repoName - 저장소명
+   * @returns {Promise<EnrichedPullRequest[]>} 보강된 PR 목록
    */
   async #enrichPRsWithReviewStatus(pullRequests, repoName) {
     return Promise.all(
@@ -166,9 +173,9 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * PR의 리뷰어 상태 조회
    * @private
-   * @param {string} repoName 저장소명
-   * @param {number} prNumber PR 번호
-   * @returns {Promise<Object>}
+   * @param {string} repoName - 저장소명
+   * @param {number} prNumber - PR 번호
+   * @returns {Promise<Object<string, string>>} 리뷰어별 상태 맵
    */
   async #getReviewersWithStatus(repoName, prNumber) {
     const [reviews, prDetails] = await Promise.all([
@@ -202,8 +209,9 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * 리뷰어 상태 문자열 포맷
    * @private
-   * @param {Object} statusMap 상태 맵
-   * @returns {string}
+   * @static
+   * @param {Object<string, string>} statusMap - 상태 맵 (SlackID -> 상태)
+   * @returns {string} 포맷된 상태 문자열
    */
   static #formatReviewersStatusString(statusMap) {
     return Object.entries(statusMap)
@@ -214,8 +222,9 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * 팀별 PR 그룹화
    * @private
-   * @param {Array} prs PR 목록
-   * @returns {Object}
+   * @static
+   * @param {EnrichedPullRequest[]} prs - PR 목록
+   * @returns {TeamGroupedPRs} 팀별 그룹화된 PR 목록
    */
   static #groupPullRequestsByTeam(prs) {
     return GITHUB_CONFIG.TEAM_SLUGS.reduce((acc, slug) => ({
@@ -227,7 +236,7 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * 예약된 알림 전송
    * @private
-   * @param {Object} groupedPrs 팀별 그룹화된 PR 목록
+   * @param {TeamGroupedPRs} groupedPrs - 팀별 그룹화된 PR 목록
    * @returns {Promise<void>}
    */
   async #sendScheduledNotifications(groupedPrs) {
@@ -243,8 +252,8 @@ class ReviewEventHandler extends BaseEventHandler {
   /**
    * 단일 PR 알림 전송
    * @private
-   * @param {Object} pr PR 정보
-   * @param {string} channelId 채널 ID
+   * @param {EnrichedPullRequest} pr - PR 정보
+   * @param {string} channelId - 채널 ID
    * @returns {Promise<void>}
    */
   async #sendSinglePRNotification(pr, channelId) {

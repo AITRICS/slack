@@ -9,8 +9,8 @@ class SlackMessageFormatter {
    * @static
    * @param {string} channelId - 채널 ID
    * @param {string} text - 메시지 텍스트
-   * @param {import('../types').SlackAttachment[]} [attachments=[]] - 첨부 내용
-   * @returns {import('../types').SlackMessage}
+   * @param {SlackAttachment[]} [attachments=[]] - 첨부 내용
+   * @returns {SlackMessage} Slack 메시지 객체
    */
   static createMessage(channelId, text, attachments = []) {
     return {
@@ -27,7 +27,7 @@ class SlackMessageFormatter {
    * @param {string} title - 필드 제목
    * @param {string} value - 필드 값
    * @param {boolean} [isShort=false] - 짧은 필드 여부
-   * @returns {import('../types').SlackField}
+   * @returns {SlackField} Slack 필드 객체
    */
   static createField(title, value, isShort = false) {
     return { title, value, short: isShort };
@@ -36,10 +36,10 @@ class SlackMessageFormatter {
   /**
    * 첨부 내용 생성
    * @static
-   * @param {string} color - 색상
+   * @param {MessageColor} color - 색상
    * @param {string} [text=''] - 텍스트
-   * @param {import('../types').SlackField[]} [fields=[]] - 필드 목록
-   * @returns {import('../types').SlackAttachment}
+   * @param {SlackField[]} [fields=[]] - 필드 목록
+   * @returns {SlackAttachment} Slack 첨부 객체
    */
   static createAttachment(color, text = '', fields = []) {
     return { color, text, fields };
@@ -79,7 +79,7 @@ class SlackMessageFormatter {
    * @param {string} authorName - 작성자 이름
    * @param {string} action - 액션 설명
    * @param {string} mentions - 멘션 문자열
-   * @returns {string}
+   * @returns {string} 포맷된 메시지 헤더
    */
   static #createMessageHeader(prUrl, prTitle, icon, authorName, action, mentions) {
     const mentionPart = mentions ? ` ${mentions}` : '';
@@ -90,8 +90,8 @@ class SlackMessageFormatter {
   /**
    * 코드 코멘트 메시지 포맷
    * @static
-   * @param {import('../types').NotificationData} data - 알림 데이터
-   * @returns {{text: string, attachment: import('../types').SlackAttachment}}
+   * @param {NotificationData} data - 알림 데이터
+   * @returns {FormattedMessageResult} 포맷된 메시지
    */
   static formatCodeCommentMessage(data) {
     const {
@@ -137,8 +137,8 @@ class SlackMessageFormatter {
   /**
    * PR 페이지 코멘트 메시지 포맷
    * @static
-   * @param {import('../types').NotificationData} data - 알림 데이터
-   * @returns {{text: string, attachment: import('../types').SlackAttachment}}
+   * @param {NotificationData} data - 알림 데이터
+   * @returns {FormattedMessageResult} 포맷된 메시지
    */
   static formatPRPageCommentMessage(data) {
     const {
@@ -176,8 +176,8 @@ class SlackMessageFormatter {
   /**
    * PR 승인 메시지 포맷
    * @static
-   * @param {import('../types').NotificationData} data - 알림 데이터
-   * @returns {{text: string, attachment: import('../types').SlackAttachment}}
+   * @param {NotificationData} data - 알림 데이터
+   * @returns {FormattedMessageResult} 포맷된 메시지
    */
   static formatApprovalMessage(data) {
     const {
@@ -215,8 +215,8 @@ class SlackMessageFormatter {
   /**
    * 리뷰 요청 메시지 포맷
    * @static
-   * @param {import('../types').NotificationData} data - 알림 데이터
-   * @returns {{text: string, attachment: import('../types').SlackAttachment}}
+   * @param {NotificationData} data - 알림 데이터
+   * @returns {FormattedMessageResult} 포맷된 메시지
    */
   static formatReviewRequestMessage(data) {
     const {
@@ -248,8 +248,8 @@ class SlackMessageFormatter {
   /**
    * 예약된 리뷰 알림 메시지 포맷
    * @static
-   * @param {Object} data - 알림 데이터
-   * @returns {{text: string, attachment: import('../types').SlackAttachment}}
+   * @param {ScheduledReviewMessageData} data - 알림 데이터
+   * @returns {FormattedMessageResult} 포맷된 메시지
    */
   static formatScheduledReviewMessage(data) {
     const { prUrl = '', prTitle = '', body = '' } = data;
@@ -268,8 +268,8 @@ class SlackMessageFormatter {
   /**
    * 배포 알림 메시지 포맷
    * @static
-   * @param {import('../types').DeploymentData} data - 배포 데이터
-   * @returns {{text: string, attachment: import('../types').SlackAttachment}}
+   * @param {DeploymentData} data - 배포 데이터
+   * @returns {FormattedMessageResult} 포맷된 메시지
    */
   static formatDeploymentMessage(data) {
     const {
@@ -312,8 +312,8 @@ class SlackMessageFormatter {
   /**
    * 빌드 알림 메시지 포맷
    * @static
-   * @param {import('../types').DeploymentData} data - 빌드 데이터
-   * @returns {{text: string, attachment: import('../types').SlackAttachment}}
+   * @param {DeploymentData} data - 빌드 데이터
+   * @returns {FormattedMessageResult} 포맷된 메시지
    */
   static formatBuildMessage(data) {
     const {

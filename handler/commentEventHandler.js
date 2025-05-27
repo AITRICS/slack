@@ -32,8 +32,9 @@ class CommentEventHandler extends BaseEventHandler {
   /**
    * 코멘트 타입 결정
    * @private
-   * @param {CommentPayload} payload
-   * @returns {CommentTypeInfo}
+   * @param {CommentPayload} payload - 코멘트 페이로드
+   * @returns {CommentTypeInfo} 코멘트 타입 정보
+   * @throws {Error} PR 번호를 찾을 수 없는 경우
    */
   #determineCommentType(payload) {
     const hasIssue = Boolean(payload.issue);
@@ -385,8 +386,8 @@ class CommentEventHandler extends BaseEventHandler {
   /**
    * 수신자를 채널별로 그룹화
    * @private
-   * @param {UserMappingResult[]} recipients
-   * @returns {Promise<Object<string, UserMappingResult>>}
+   * @param {UserMappingResult[]} recipients - 수신자 목록
+   * @returns {Promise<ChannelGroupedRecipients>} 채널별 그룹화된 수신자
    */
   async #groupRecipientsByChannel(recipients) {
     const groups = {};

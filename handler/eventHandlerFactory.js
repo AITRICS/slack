@@ -11,7 +11,8 @@ const { SlackNotificationError } = require('../utils/errors');
  */
 class EventHandlerFactory {
   /**
-   * @param {import('../services/serviceFactory')} serviceFactory
+   * 이벤트 핸들러 팩토리
+   * @param {import('../services/serviceFactory')} serviceFactory - 서비스 팩토리
    */
   constructor(serviceFactory) {
     this.services = serviceFactory.createServices();
@@ -47,10 +48,61 @@ class EventHandlerFactory {
   }
 
   /**
-   * 이벤트 처리
-   * @param {string} actionType - 액션 타입
+   * 이벤트 처리 (코멘트)
+   * @param {'comment'} actionType - 코멘트 액션 타입
+   * @param {CommentPayload} payload - 코멘트 페이로드
+   * @returns {Promise<void>}
+   */
+
+  /**
+   * 이벤트 처리 (승인)
+   * @param {'approve'} actionType - 승인 액션 타입
+   * @param {ReviewPayload} payload - 리뷰 페이로드
+   * @returns {Promise<void>}
+   */
+
+  /**
+   * 이벤트 처리 (리뷰 요청)
+   * @param {'review_requested'|'changes_requested'} actionType - 리뷰 요청 액션 타입
+   * @param {ReviewPayload} payload - 리뷰 페이로드
+   * @returns {Promise<void>}
+   */
+
+  /**
+   * 이벤트 처리 (예약된 리뷰)
+   * @param {'schedule'} actionType - 스케줄 액션 타입
+   * @param {Object} payload - 저장소 페이로드
+   * @param {GitHubRepository} payload.repository - 저장소 정보
+   * @returns {Promise<void>}
+   */
+
+  /**
+   * 이벤트 처리 (배포)
+   * @param {'deploy'} actionType - 배포 액션 타입
+   * @param {GitHubContext} context - GitHub context
+   * @param {string} ec2Name - EC2 인스턴스 이름
+   * @param {string} imageTag - 이미지 태그
+   * @param {string} jobStatus - 작업 상태
+   * @returns {Promise<void>}
+   */
+
+  /**
+   * 이벤트 처리 (CI/빌드)
+   * @param {'ci'} actionType - CI 액션 타입
+   * @param {GitHubContext} context - GitHub context
+   * @param {string} branchName - 브랜치 이름
+   * @param {string} imageTag - 이미지 태그
+   * @param {string} jobName - 작업 이름들 (쉼표로 구분)
+   * @param {string} jobStatus - 작업 상태
+   * @returns {Promise<void>}
+   */
+
+  /**
+   * 이벤트 처리 (통합)
+   * @param {ActionType} actionType - 액션 타입
    * @param {...any} args - 핸들러에 전달할 인수들
    * @returns {Promise<void>}
+   * @throws {SlackNotificationError} 알 수 없는 액션 타입이거나 처리 실패 시
    */
   async handleEvent(actionType, ...args) {
     Logger.info(`이벤트 처리 시작: ${actionType}`);
