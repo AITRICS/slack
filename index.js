@@ -93,6 +93,8 @@ async function run() {
 
     // GitHub 컨텍스트 검증
     const { context } = Github;
+    // test
+    console.log(context);
     ConfigValidator.validatePayload(context.payload);
 
     // 서비스 및 핸들러 생성
