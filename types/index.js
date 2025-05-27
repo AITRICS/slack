@@ -142,7 +142,7 @@
  * @property {string} workflowUrl - 워크플로우 URL
  * @property {string} workflowName - 워크플로우 이름
  * @property {string} [ref] - Git 참조 (배포용)
- * @property {string[]} [failedJobs] - 실패한 작업 목록 (빌드용)
+ * @property {string[]} [jobNames] - CI 작업 목록 (빌드용)
  */
 
 /**

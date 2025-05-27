@@ -51,7 +51,7 @@ const SLACK_CONFIG = Object.freeze({
     // 필드 제목
     DEPLOY_INFO: 'Deploy Info',
     BUILD_INFO: 'Build Info',
-    FAILED_JOBS: 'Failed Jobs',
+    JOB_NAMES: 'Job name list',
     REPOSITORY: 'Repository',
     DEPLOY_SERVER: 'Deploy Server',
     AUTHOR: 'Author',

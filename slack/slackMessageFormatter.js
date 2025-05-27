@@ -327,7 +327,7 @@ class SlackMessageFormatter {
       duration = '',
       workflowUrl = '',
       workflowName = '',
-      failedJobs = [],
+      jobNames = [],
     } = data;
 
     const isSuccess = status === 'success';
@@ -337,10 +337,10 @@ class SlackMessageFormatter {
 
     const fields = [SlackMessageFormatter.createField(SLACK_CONFIG.MESSAGE_TEMPLATES.BUILD_INFO, '', false)];
 
-    // 실패한 작업 표시
-    if (!isSuccess && failedJobs && failedJobs.length > 0) {
-      const jobsList = failedJobs.map((job) => `\`${job}\``).join('\n');
-      fields.push(SlackMessageFormatter.createField(SLACK_CONFIG.MESSAGE_TEMPLATES.FAILED_JOBS, jobsList, false));
+    // 작업 표시
+    if (jobNames && jobNames.length > 0) {
+      const jobsList = jobNames.map((job) => `\`${job}\``).join('\n');
+      fields.push(SlackMessageFormatter.createField(SLACK_CONFIG.MESSAGE_TEMPLATES.JOB_NAMES, jobsList, false));
     }
 
     fields.push(
