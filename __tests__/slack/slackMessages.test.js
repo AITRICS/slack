@@ -1,5 +1,3 @@
-// __tests__/slack/slackMessages.test.js
-
 const SlackMessages = require('../../slack/slackMessages');
 
 describe('SlackMessages', () => {
@@ -25,7 +23,7 @@ describe('SlackMessages', () => {
         mentionedSlackId: 'U12345',
       };
 
-      await slackMessages.sendSlackMessageToComment(notificationData, 'C12345');
+      await slackMessages.sendCodeCommentMessage(notificationData, 'C12345');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         attachments: expect.arrayContaining([
@@ -46,7 +44,7 @@ describe('SlackMessages', () => {
         mentionedSlackId: 'U67890',
       };
 
-      await slackMessages.sendSlackMessageToComment(notificationData, 'C67890');
+      await slackMessages.sendCodeCommentMessage(notificationData, 'C67890');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         attachments: expect.arrayContaining([
@@ -68,7 +66,7 @@ describe('SlackMessages', () => {
         mentionsString: '<@U12345>, <@U67890>',
       };
 
-      await slackMessages.sendSlackMessageToPRPageComment(notificationData, 'C12345');
+      await slackMessages.sendPRPageCommentMessage(notificationData, 'C12345');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         text: expect.stringContaining('<@U12345>, <@U67890>'),
@@ -86,7 +84,7 @@ describe('SlackMessages', () => {
         mentionedSlackId: 'U54321',
       };
 
-      await slackMessages.sendSlackMessageToApprove(notificationData, 'C54321');
+      await slackMessages.sendApprovalMessage(notificationData, 'C54321');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         text: expect.stringContaining(':white_check_mark:'),
@@ -104,7 +102,7 @@ describe('SlackMessages', () => {
         mentionedSlackId: 'U12345',
       };
 
-      await slackMessages.sendSlackMessageToReviewRequested(notificationData, 'C12345');
+      await slackMessages.sendReviewRequestMessage(notificationData, 'C12345');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         text: expect.stringContaining(':eyes:'),
@@ -119,7 +117,7 @@ describe('SlackMessages', () => {
         body: '<@U12345> (AWAITING), <@U67890> (APPROVED)',
       };
 
-      await slackMessages.sendSlackMessageToSchedule(notificationData, 'C12345');
+      await slackMessages.sendScheduledReviewMessage(notificationData, 'C12345');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         text: expect.stringContaining('리뷰를 기다리고 있습니다'),
@@ -143,7 +141,7 @@ describe('SlackMessages', () => {
         ref: 'refs/heads/main',
       };
 
-      await slackMessages.sendSlackMessageToDeploy(notificationData, 'C12345');
+      await slackMessages.sendDeploymentMessage(notificationData, 'C12345');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         text: expect.stringContaining(':white_check_mark:*Succeeded*'),
@@ -175,7 +173,7 @@ describe('SlackMessages', () => {
         jobNames: ['lint', 'test', 'build'],
       };
 
-      await slackMessages.sendSlackMessageToBuild(notificationData, 'C12345');
+      await slackMessages.sendBuildMessage(notificationData, 'C12345');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         attachments: expect.arrayContaining([
@@ -207,7 +205,7 @@ describe('SlackMessages', () => {
         workflowName: 'CI',
       };
 
-      await slackMessages.sendSlackMessageToBuild(notificationData, 'C12345');
+      await slackMessages.sendBuildMessage(notificationData, 'C12345');
 
       expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
         attachments: expect.arrayContaining([
@@ -238,7 +236,7 @@ describe('SlackMessages', () => {
       };
 
       await expect(
-        errorSlackMessages.sendSlackMessageToComment(notificationData, 'C12345'),
+        errorSlackMessages.sendCodeCommentMessage(notificationData, 'C12345'),
       ).rejects.toThrow('Slack API Error');
     });
   });

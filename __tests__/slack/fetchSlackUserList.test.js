@@ -1,5 +1,3 @@
-// __tests__/slack/fetchSlackUserList.test.js
-
 const fetchSlackUserList = require('../../slack/fetchSlackUserList');
 
 describe('fetchSlackUserList', () => {

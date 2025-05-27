@@ -1,76 +1,139 @@
-const { WebClient } = require('@slack/web-api');
-const { Octokit } = require('@octokit/rest');
 const Core = require('@actions/core');
 const Github = require('@actions/github');
-const EventHandler = require('./handler/eventHandler');
-
-const SLACK_TOKEN = Core.getInput('SLACK_TOKEN');
-const GITHUB_TOKEN = Core.getInput('GITHUB_TOKEN');
-const ACTION_TYPE = Core.getInput('ACTION_TYPE');
+const ServiceFactory = require('./services/serviceFactory');
+const EventHandlerFactory = require('./handler/eventHandlerFactory');
+const Logger = require('./utils/logger');
+const ConfigValidator = require('./utils/configValidator');
+const environment = require('./config/environment');
+const { ACTION_TYPES } = require('./constants');
+const { SlackNotificationError, ConfigurationError } = require('./utils/errors');
 
 /**
- * The main function to run the GitHub Action.
- * It initializes the Slack and GitHub clients, and handles different types of GitHub events.
- *
- * @throws Will throw an error and exit the process if there is an issue with the payload or the action type.
+ * 에러 타입에 따른 메시지 생성
+ * @param {Error} error - 발생한 에러
+ * @returns {string} 에러 메시지
  */
-async function run() {
-  const web = new WebClient(SLACK_TOKEN);
-  const octokit = new Octokit({ auth: GITHUB_TOKEN });
-  const handler = new EventHandler(octokit, web);
-
-  // Github.context provides the payload of the GitHub event that triggered the action.
-  // The structure of the payload object depends on the type of event that triggered the workflow.
-  // For instance, for a pull request event, it will contain details about the pull request.
-  // FYI: https://docs.github.com/ko/actions/learn-github-actions/contexts
-  const { context } = Github;
-
-  if (!context.payload) {
-    console.error('Invalid payload');
-    process.exit(1);
+function getErrorMessage(error) {
+  if (error instanceof ConfigurationError) {
+    return `설정 오류: ${error.message}`;
   }
 
-  try {
-    console.log(context.payload);
-    switch (ACTION_TYPE) {
-      case 'schedule':
-        await handler.handleSchedule(context.payload);
-        break;
-      case 'approve':
-        await handler.handleApprove(context.payload);
-        break;
-      case 'comment':
-        await handler.handleComment(context.payload);
-        break;
-      case 'review_requested':
-      case 'changes_requested':
-        await handler.handleReviewRequested(context.payload);
-        break;
-      case 'deploy': {
-        const ec2Name = Core.getInput('EC2_NAME');
-        const imageTag = Core.getInput('IMAGE_TAG');
-        const jobStatus = Core.getInput('JOB_STATUS');
-        await handler.handleDeploy(context, ec2Name, imageTag, jobStatus);
-        break;
-      }
-      case 'ci': {
-        const branchName = Core.getInput('BRANCH_NAME');
-        const imageTag = Core.getInput('IMAGE_TAG');
-        const jobName = Core.getInput('JOB_NAME');
-        const jobStatus = Core.getInput('JOB_STATUS');
-        await handler.handleBuild(context, branchName, imageTag, jobName, jobStatus);
-        break;
-      }
-      default:
-        console.error('Unknown action type:', ACTION_TYPE);
-        process.exit(1);
-    }
-  } catch (error) {
-    console.error('Error executing action:', error);
-    process.exit(1);
+  if (error instanceof SlackNotificationError) {
+    return `처리 오류: ${error.message}`;
   }
 
-  console.log('Message sent to Slack!');
+  return `예기치 않은 오류: ${error.message}`;
 }
 
-run();
+/**
+ * 액션 타입에 따른 이벤트 처리
+ * @param {EventHandlerFactory} handlerFactory - 핸들러 팩토리
+ * @param {ActionType} actionType - 액션 타입
+ * @param {Context} context - GitHub context
+ * @param {ActionConfig} config - 액션 설정
+ * @returns {Promise<any>} 처리 결과
+ */
+async function processActionEvent(handlerFactory, actionType, context, config) {
+  Logger.info(`${actionType} 이벤트 처리 중`);
+
+  switch (actionType) {
+    case ACTION_TYPES.DEPLOY:
+      return handlerFactory.handleEvent(
+        ACTION_TYPES.DEPLOY,
+        context,
+        config.action.deploy.ec2Name,
+        config.action.deploy.imageTag,
+        config.action.deploy.jobStatus,
+      );
+
+    case ACTION_TYPES.CI:
+      return handlerFactory.handleEvent(
+        ACTION_TYPES.CI,
+        context,
+        config.action.ci.branchName,
+        config.action.ci.imageTag,
+        config.action.ci.jobName,
+        config.action.ci.jobStatus,
+      );
+
+    default:
+      return handlerFactory.handleEvent(actionType, context.payload);
+  }
+}
+
+/**
+ * GitHub Action 메인 실행 함수
+ * @returns {Promise<any>} 실행 결과
+ */
+// eslint-disable-next-line consistent-return
+async function run() {
+  const startTime = Date.now();
+
+  try {
+    // 환경 설정 로드 및 검증
+    const config = environment.load();
+    const { actionType } = ConfigValidator.validateAll();
+
+    Logger.info('Slack Notification Action 시작');
+    Logger.info(`액션 타입: ${actionType}`);
+
+    // GitHub 컨텍스트 검증
+    const { context } = Github;
+    // test
+    console.log(context);
+    ConfigValidator.validatePayload(context.payload);
+
+    // 서비스 및 핸들러 생성
+    const serviceFactory = ServiceFactory.getInstance();
+    const eventHandlerFactory = new EventHandlerFactory(serviceFactory);
+
+    // 이벤트 처리
+    const result = await processActionEvent(eventHandlerFactory, actionType, context, config);
+
+    const duration = Date.now() - startTime;
+    Logger.info(`Action 실행 성공 (${duration}ms)`);
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMessage = getErrorMessage(error);
+
+    Logger.error(`Action 실행 실패 (${duration}ms)`, error);
+    Core.setFailed(errorMessage);
+
+    // GitHub Actions 어노테이션에 상세 정보 추가
+    if (error.details) {
+      Core.error(JSON.stringify(error.details, null, 2));
+    }
+
+    process.exit(1);
+  }
+}
+
+/**
+ * 처리되지 않은 Promise 거부 핸들러
+ */
+process.on('unhandledRejection', (reason) => {
+  Logger.error('처리되지 않은 Promise 거부:', reason);
+  Core.setFailed(`처리되지 않은 오류: ${reason}`);
+  process.exit(1);
+});
+
+/**
+ * 처리되지 않은 예외 핸들러
+ */
+process.on('uncaughtException', (error) => {
+  Logger.error('처리되지 않은 예외:', error);
+  Core.setFailed(`처리되지 않은 예외: ${error.message}`);
+  process.exit(1);
+});
+
+// 메인 함수 실행
+if (require.main === module) {
+  run().catch((error) => {
+    Logger.error('Action 실행 실패:', error);
+    Core.setFailed(error.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { run };

@@ -1,5 +1,3 @@
-// __tests__/mocks/commonMocks.js
-
 const mockSlackMembers = [
   {
     id: 'U12345',
@@ -74,7 +72,7 @@ const createMockSlackWeb = () => {
   return {
     chat: { postMessage: mockPostMessage },
     users: { list: mockUsersList },
-    _mockFunctions: { mockPostMessage, mockUsersList }, // 테스트에서 접근용
+    _mockFunctions: { mockPostMessage, mockUsersList },
   };
 };
 

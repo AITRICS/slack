@@ -3,13 +3,24 @@ module.exports = {
     browser: true,
     es2021: true,
     node: true,
-    jest: true, // 일반적인 Jest 환경 활성화 방식
+    jest: true,
   },
   extends: [
     'airbnb-base',
-    'plugin:jest/recommended', // Jest 권장 설정 포함
+    'plugin:jest/recommended',
   ],
-  plugins: ['jest'],
+  plugins: ['import', 'jest'],
+  settings: {
+    'import/resolver': {
+      node: {
+        extensions: ['.js', '.json', '.mjs', '.cjs'],
+      },
+    },
+    'import/core-modules': [
+      '@octokit/plugin-retry',
+      '@octokit/plugin-paginate-rest',
+    ],
+  },
   overrides: [
     {
       env: {
@@ -20,12 +31,19 @@ module.exports = {
       ],
       parserOptions: {
         sourceType: 'script',
+        ecmaVersion: 2024,
       },
     },
     {
       files: ['**/*.test.js', '**/*.spec.js', '**/__tests__/**/*.js'],
       env: {
-        jest: true, // 테스트 파일에 대해 명시적으로 설정
+        jest: true,
+      },
+      rules: {
+        // 테스트 파일에서는 더 유연한 규칙 적용
+        'no-unused-expressions': 'off',
+        'import/no-extraneous-dependencies': ['error', { devDependencies: true }],
+        'max-len': 'off', // 테스트에서는 긴 문자열 허용
       },
     },
   ],
@@ -35,6 +53,30 @@ module.exports = {
   },
   rules: {
     'max-len': ['error', { code: 140 }],
+    'no-param-reassign': ['error', { props: true }],
+    'consistent-return': 'error',
     'no-console': 'off',
+    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    'prefer-const': 'error',
+    'no-var': 'error',
+    'object-shorthand': 'error',
+    'prefer-template': 'error',
+    'no-underscore-dangle': 'off',
+    'import/prefer-default-export': 'off',
+    'import/no-cycle': 'error',
+    'no-throw-literal': 'error',
+    'prefer-promise-reject-errors': 'error',
+    'class-methods-use-this': 'off',
+    'no-useless-constructor': 'error',
+    'prefer-destructuring': ['error', {
+      array: true,
+      object: true,
+    }, {
+      enforceForRenamedProperties: false,
+    }],
+    'operator-linebreak': ['error', 'after'],
+    'import/no-unresolved': 'warn',
+    'import/newline-after-import': 'warn',
+    'import/extensions': 'off',
   },
 };
