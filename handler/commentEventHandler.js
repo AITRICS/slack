@@ -1,13 +1,6 @@
 const BaseEventHandler = require('./baseEventHandler');
 const Logger = require('../utils/logger');
 
-
-/**
- @typedef {import('../types').UserMappingResult[]} recipients
- @typedef {import('../types').CommentPayload} payload
- @typedef {import('../types').CommentTypeInfo} commentTypeInfo
- */
-
 /**
  * GitHub 코멘트 이벤트 처리
  */
@@ -40,7 +33,7 @@ class CommentEventHandler extends BaseEventHandler {
    * 코멘트 타입 결정
    * @private
    * @param {CommentPayload} payload
-   * @returns {commentTypeInfo}
+   * @returns {CommentTypeInfo}
    */
   #determineCommentType(payload) {
     const hasIssue = Boolean(payload.issue);
@@ -143,7 +136,7 @@ class CommentEventHandler extends BaseEventHandler {
    * 코드 코멘트 수신자 결정 (개선된 에러 처리)
    * @private
    * @param {CommentPayload} payload
-   * @param {commentTypeInfo} commentTypeInfo
+   * @param {CommentTypeInfo} commentTypeInfo
    * @returns {Promise<UserMappingResult[]>}
    */
   async #determineCodeCommentRecipients(payload, commentTypeInfo) {
@@ -214,7 +207,7 @@ class CommentEventHandler extends BaseEventHandler {
    * PR 페이지 코멘트 수신자 결정
    * @private
    * @param {CommentPayload} payload
-   * @param {commentTypeInfo} commentTypeInfo
+   * @param {CommentTypeInfo} commentTypeInfo
    * @returns {Promise<UserMappingResult[]>}
    */
   async #determinePRCommentRecipients(payload, commentTypeInfo) {

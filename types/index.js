@@ -159,5 +159,4 @@
  * @property {'pr_page'|'code_review'} commentType
  */
 
-// 타입들을 export (실제로는 JSDoc에서만 사용됨)
 module.exports = {};

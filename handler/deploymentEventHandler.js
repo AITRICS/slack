@@ -121,12 +121,10 @@ class DeploymentEventHandler extends BaseEventHandler {
 
     const jobNames = jobName ? jobName.split(',').map((name) => name.trim()).filter(Boolean) : [];
     const isSuccess = jobStatus === 'success';
-    const failedJobs = isSuccess ? [] : jobNames;
 
     return {
       branchName: branchName || context.ref.replace('refs/heads/', ''),
       jobNames,
-      failedJobs,
       imageTag,
       repoData,
       sha: context.sha,
@@ -188,7 +186,7 @@ class DeploymentEventHandler extends BaseEventHandler {
       totalRunTime,
       triggerUser,
       workflowData,
-      failedJobs,
+      jobNames,
     } = buildData;
 
     return {
@@ -202,7 +200,7 @@ class DeploymentEventHandler extends BaseEventHandler {
       duration: totalRunTime,
       workflowName: workflowData.name,
       workflowUrl: workflowData.html_url,
-      failedJobs,
+      jobNames,
     };
   }
 }
