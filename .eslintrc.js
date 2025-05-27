@@ -16,6 +16,10 @@ module.exports = {
         extensions: ['.js', '.json', '.mjs', '.cjs'],
       },
     },
+    'import/core-modules': [
+      '@octokit/plugin-retry',
+      '@octokit/plugin-paginate-rest',
+    ],
   },
   overrides: [
     {
