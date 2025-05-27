@@ -103,7 +103,7 @@ class SlackUserService {
 
   /**
    * 수신자 목록에 Slack ID 추가
-   * @param {UserMappingResult[]} recipients - 수신자 입력 목록
+   * @param {{githubUsername: string}[]} recipients - 수신자 입력 목록
    * @returns {Promise<UserMappingResult[]>} Slack ID가 추가된 사용자 매핑 결과
    */
   async addSlackIdsToRecipients(recipients) {

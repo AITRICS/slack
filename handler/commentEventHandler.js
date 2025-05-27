@@ -9,7 +9,7 @@ class CommentEventHandler extends BaseEventHandler {
    * 코멘트 이벤트 처리
    * @param {CommentPayload} payload
    */
-  async handle(payload) {
+  async handleCommentEvent(payload) {
     BaseEventHandler.validatePayload(payload);
 
     await this.initialize();
@@ -72,7 +72,7 @@ class CommentEventHandler extends BaseEventHandler {
    * 코드 리뷰 코멘트 처리
    * @private
    * @param {CommentPayload} payload
-   * @param {commentTypeInfo} commentTypeInfo
+   * @param {CommentTypeInfo} commentTypeInfo
    */
   async #handleCodeComment(payload, commentTypeInfo) {
     try {
@@ -109,7 +109,7 @@ class CommentEventHandler extends BaseEventHandler {
    * PR 페이지 코멘트 처리
    * @private
    * @param {CommentPayload} payload
-   * @param {commentTypeInfo} commentTypeInfo
+   * @param {CommentTypeInfo} commentTypeInfo
    */
   async #handlePullRequestComment(payload, commentTypeInfo) {
     const recipients = await this.#determinePRCommentRecipients(payload, commentTypeInfo);

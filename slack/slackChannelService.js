@@ -3,7 +3,6 @@ const Logger = require('../utils/logger');
 
 /**
  * Slack 채널 선택 서비스
- * 싱글톤
  */
 class SlackChannelService {
   /**

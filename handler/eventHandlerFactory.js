@@ -36,7 +36,7 @@ class EventHandlerFactory {
     const deploymentHandler = new DeploymentEventHandler(this.services);
 
     // 액션 타입과 핸들러 메서드 매핑
-    this.handlerRegistry.set(ACTION_TYPES.COMMENT, { handler: commentHandler, method: 'handle' });
+    this.handlerRegistry.set(ACTION_TYPES.COMMENT, { handler: commentHandler, method: 'handleCommentEvent' });
     this.handlerRegistry.set(ACTION_TYPES.APPROVE, { handler: reviewHandler, method: 'handleApprovalEvent' });
     this.handlerRegistry.set(ACTION_TYPES.REVIEW_REQUESTED, { handler: reviewHandler, method: 'handleReviewRequestEvent' });
     this.handlerRegistry.set(ACTION_TYPES.CHANGES_REQUESTED, { handler: reviewHandler, method: 'handleReviewRequestEvent' });

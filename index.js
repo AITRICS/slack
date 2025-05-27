@@ -29,7 +29,7 @@ function getErrorMessage(error) {
  * 액션 타입에 따른 이벤트 처리
  * @param {EventHandlerFactory} handlerFactory - 핸들러 팩토리
  * @param {ActionType} actionType - 액션 타입
- * @param {GitHubContext} context - GitHub context
+ * @param {Context} context - GitHub context
  * @param {ActionConfig} config - 액션 설정
  * @returns {Promise<any>} 처리 결과
  */
