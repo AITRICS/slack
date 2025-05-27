@@ -3,44 +3,12 @@ const { REVIEW_STATES, GITHUB_CONFIG, SLACK_CHANNELS } = require('../constants')
 const Logger = require('../utils/logger');
 
 /**
- * @typedef {Object} ReviewPayload
- * @property {Object} review
- * @property {string} review.html_url
- * @property {string} review.state
- * @property {string} review.body
- * @property {Object} review.user
- * @property {string} review.user.login
- * @property {Object} pull_request
- * @property {string} pull_request.html_url
- * @property {string} pull_request.title
- * @property {number} pull_request.number
- * @property {Object} pull_request.user
- * @property {string} pull_request.user.login
- * @property {Object} repository
- * @property {string} repository.name
- */
-
-/**
- * @typedef {Object} ReviewRequestPayload
- * @property {Object} requested_reviewer
- * @property {string} requested_reviewer.login
- * @property {Object} pull_request
- * @property {string} pull_request.html_url
- * @property {string} pull_request.title
- * @property {Object} pull_request.user
- * @property {string} pull_request.user.login
- * @property {Object} repository
- * @property {string} repository.name
- */
-
-/**
  * 리뷰 이벤트 처리
  */
 class ReviewEventHandler extends BaseEventHandler {
   /**
    * 승인 이벤트 처리
    * @param {ReviewPayload} payload GitHub webhook payload
-   * @returns {Promise<void>}
    */
   async handleApprovalEvent(payload) {
     BaseEventHandler.validatePayload(payload);

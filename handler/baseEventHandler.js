@@ -39,6 +39,7 @@ class BaseEventHandler {
   /**
    * 핸들러 초기화 (필요시 오버라이드)
    * @protected
+   * @returns {Promise<void>}
    */
   async initialize() {
     if (this.initialized) {
@@ -55,6 +56,7 @@ class BaseEventHandler {
    * @protected
    * @param {Object} payload - GitHub webhook 페이로드
    * @throws {PayloadValidationError} 페이로드가 유효하지 않은 경우
+   * @returns {void}
    */
   static validatePayload(payload) {
     if (!payload) {

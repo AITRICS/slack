@@ -2,26 +2,6 @@ const Logger = require('../utils/logger');
 const { findSlackUserProperty } = require('../utils/nameUtils');
 
 /**
- * @typedef {Object} SlackUser
- * @property {string} id
- * @property {string} real_name
- * @property {boolean} deleted
- * @property {Object} profile
- * @property {string} profile.display_name
- */
-
-/**
- * @typedef {Object} RecipientInput
- * @property {string} githubUsername
- */
-
-/**
- * @typedef {Object} UserMappingResult
- * @property {string} githubUsername
- * @property {string} slackId
- */
-
-/**
  * Slack 사용자 관리 서비스
  * 단순히 한 번 로드하고 재사용
  */
@@ -39,7 +19,7 @@ class SlackUserService {
 
   /**
    * Slack 사용자 목록 로드 (한 번만)
-   * @returns {Promise<SlackUser[]>}
+   * @returns {Promise<import('../types').SlackUser[]>}
    */
   async #loadSlackUsers() {
     if (this.slackUsers) {
@@ -58,7 +38,7 @@ class SlackUserService {
   /**
    * Slack API에서 사용자 목록 가져오기
    * @private
-   * @returns {Promise<SlackUser[]>}
+   * @returns {Promise<import('../types').SlackUser[]>}
    */
   async #fetchSlackUsers() {
     try {
@@ -121,7 +101,7 @@ class SlackUserService {
 
   /**
    * 수신자 목록에 Slack ID 추가
-   * @param {RecipientInput[]} recipients - 수신자 입력 목록
+   * @param {Array<{githubUsername: string}>} recipients - 수신자 입력 목록
    * @returns {Promise<UserMappingResult[]>} Slack ID가 추가된 사용자 매핑 결과
    */
   async addSlackIdsToRecipients(recipients) {

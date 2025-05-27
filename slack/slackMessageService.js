@@ -15,7 +15,7 @@ class SlackMessageService {
 
   /**
    * Sends a message to Slack
-   * @param {import('@slack/web-api').ChatPostMessageArguments} message
+   * @param {import('../types').SlackMessage} message
    * @throws {SlackAPIError}
    */
   async sendMessage(message) {
@@ -59,7 +59,7 @@ class SlackMessageService {
 
   /**
    * Sends a code comment notification
-   * @param {Object} data
+   * @param {import('../types').NotificationData} data
    * @param {string} channelId
    * @throws {SlackAPIError}
    */
@@ -81,7 +81,7 @@ class SlackMessageService {
 
   /**
    * Sends a PR page comment notification
-   * @param {Object} data
+   * @param {import('../types').NotificationData} data
    * @param {string} channelId
    * @throws {SlackAPIError}
    */
@@ -103,7 +103,7 @@ class SlackMessageService {
 
   /**
    * Sends an approval notification
-   * @param {Object} data
+   * @param {import('../types').NotificationData} data
    * @param {string} channelId
    * @throws {SlackAPIError}
    */
@@ -125,7 +125,7 @@ class SlackMessageService {
 
   /**
    * Sends a review request notification
-   * @param {Object} data
+   * @param {import('../types').NotificationData} data
    * @param {string} channelId
    * @throws {SlackAPIError}
    */
@@ -169,7 +169,7 @@ class SlackMessageService {
 
   /**
    * Sends a deployment notification
-   * @param {Object} data
+   * @param {import('../types').DeploymentData} data
    * @param {string} channelId
    * @throws {SlackAPIError}
    */
@@ -191,7 +191,7 @@ class SlackMessageService {
 
   /**
    * Sends a build notification
-   * @param {Object} data
+   * @param {import('../types').DeploymentData} data
    * @param {string} channelId
    * @throws {SlackAPIError}
    */

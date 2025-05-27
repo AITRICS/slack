@@ -16,12 +16,14 @@ const SLACK_CHANNELS = Object.freeze({
 // Slack 메시지 설정
 const SLACK_CONFIG = Object.freeze({
   SKIP_USERS: Object.freeze(['john (이주호)']), // 알림 제외 사용자
+
   MESSAGE_COLORS: Object.freeze({
     SUCCESS: 'good',
     DANGER: 'danger',
     WARNING: 'warning',
     INFO: '#439FE0',
   }),
+
   ICONS: Object.freeze({
     COMMENT: ':pencil:',
     PR_COMMENT: ':speech_balloon:',
@@ -31,6 +33,38 @@ const SLACK_CONFIG = Object.freeze({
     FAILURE: ':x:',
     WARNING: ':warning:',
     INFO: ':information_source:',
+  }),
+
+  MESSAGE_TEMPLATES: Object.freeze({
+    // 액션 메시지
+    CODE_COMMENT: '님이 코멘트를 남겼어요!!',
+    PR_COMMENT: '님이 코멘트를 남겼어요!!',
+    APPROVE: '님이 Approve를 했습니다!!',
+    REVIEW_REQUEST: '님이 Review를 요청했습니다!!',
+    SCHEDULE_REVIEW: '에서 리뷰를 기다리고 있습니다.',
+
+    // Attachment 텍스트
+    COMMENT_CONTENT: '*코멘트 내용:*',
+    VIEW_COMMENT: '코멘트 보러가기',
+    VIEW_PR: 'PR 보러가기',
+
+    // 필드 제목
+    DEPLOY_INFO: 'Deploy Info',
+    BUILD_INFO: 'Build Info',
+    FAILED_JOBS: 'Failed Jobs',
+    REPOSITORY: 'Repository',
+    DEPLOY_SERVER: 'Deploy Server',
+    AUTHOR: 'Author',
+    COMMIT: 'Commit',
+    IMAGE_TAG: 'Image Tag',
+    RUN_TIME: 'Run Time',
+    WORKFLOW: 'Workflow',
+    REF: 'Ref',
+    BRANCH: 'Branch',
+
+    // 알림 제목
+    DEPLOY_NOTIFICATION: '*GitHub Actions Deploy Notification*',
+    BUILD_NOTIFICATION: '*GitHub Actions Build Notification*',
   }),
 });
 

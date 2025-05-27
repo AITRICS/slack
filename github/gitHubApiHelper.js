@@ -3,50 +3,12 @@ const Logger = require('../utils/logger');
 const { GitHubAPIError } = require('../utils/errors');
 
 /**
- * @typedef {import('@octokit/rest').Octokit} Octokit
- * @typedef {Object} GitHubUser
- * @property {string} login
- * @property {number} id
- * @property {string} html_url
- * @property {string} [name]
- */
-
-/**
- * @typedef {Object} PullRequest
- * @property {number} number
- * @property {string} title
- * @property {string} html_url
- * @property {GitHubUser} user
- * @property {boolean} draft
- * @property {GitHubUser[]} [requested_reviewers]
- */
-
-/**
- * @typedef {Object} Review
- * @property {number} id
- * @property {string} state
- * @property {string} body
- * @property {string} html_url
- * @property {GitHubUser} user
- */
-
-/**
- * @typedef {Object} Comment
- * @property {number} id
- * @property {string} body
- * @property {string} html_url
- * @property {GitHubUser} user
- * @property {number} [in_reply_to_id]
- * @property {string} [diff_hunk]
- */
-
-/**
  * GitHub API 헬퍼 클래스
  * Octokit을 래핑하여 프로젝트에 필요한 GitHub API 호출을 제공
  */
 class GitHubApiHelper {
   /**
-   * @param {Octokit} octokit
+   * @param {import('@octokit/rest').Octokit} octokit
    */
   constructor(octokit) {
     this.octokit = octokit;
@@ -55,7 +17,7 @@ class GitHubApiHelper {
   /**
    * GitHub 팀 멤버 목록 조회
    * @param {string} teamSlug
-   * @returns {Promise<GitHubUser[]>}
+   * @returns {Promise<import('../types').GitHubUser[]>}
    * @throws {GitHubAPIError}
    */
   async fetchTeamMembers(teamSlug) {
@@ -194,7 +156,7 @@ class GitHubApiHelper {
    * @param {string} repoName
    * @param {number} prNumber
    * @param {boolean} isReviewComment
-   * @returns {Promise<Comment[]>}
+   * @returns {Promise<import('../types').GitHubComment[]>}
    */
   async #fetchAllComments(repoName, prNumber, isReviewComment) {
     const commonOpts = {
@@ -219,9 +181,9 @@ class GitHubApiHelper {
   /**
    * ID로 코멘트 찾기
    * @private
-   * @param {Comment[]} comments
+   * @param {import('../types').GitHubComment[]} comments
    * @param {number} commentId
-   * @returns {Comment|undefined}
+   * @returns {import('../types').GitHubComment|undefined}
    */
   #findCommentById(comments, commentId) {
     // 숫자와 문자열 모두 비교하여 타입 변환 문제 해결
@@ -241,8 +203,8 @@ class GitHubApiHelper {
   /**
    * 스레드의 루트 코멘트 찾기 (개선된 타입 비교)
    * @private
-   * @param {Comment[]} allComments
-   * @param {Comment} comment
+   * @param {import('../types').GitHubComment[]} allComments
+   * @param {import('../types').GitHubComment} comment
    * @returns {number}
    */
   #findThreadRoot(allComments, comment) {
@@ -271,9 +233,9 @@ class GitHubApiHelper {
   /**
    * 스레드의 모든 코멘트 수집 (개선된 타입 비교)
    * @private
-   * @param {Comment[]} allComments
+   * @param {import('../types').GitHubComment[]} allComments
    * @param {number} threadRootId
-   * @returns {Comment[]}
+   * @returns {import('../types').GitHubComment[]}
    */
   #collectThreadComments(allComments, threadRootId) {
     const threadComments = [];
@@ -351,7 +313,7 @@ class GitHubApiHelper {
    * PR 리뷰 목록 조회
    * @param {string} repoName
    * @param {number} prNumber
-   * @returns {Promise<Review[]>}
+   * @returns {Promise<import('../types').GitHubReview[]>}
    * @throws {GitHubAPIError}
    */
   async fetchPullRequestReviews(repoName, prNumber) {
@@ -380,7 +342,7 @@ class GitHubApiHelper {
    * PR 상세 정보 조회
    * @param {string} repoName
    * @param {number} prNumber
-   * @returns {Promise<PullRequest>}
+   * @returns {Promise<import('../types').GitHubPullRequest>}
    * @throws {GitHubAPIError}
    */
   async fetchPullRequestDetails(repoName, prNumber) {
@@ -408,7 +370,7 @@ class GitHubApiHelper {
   /**
    * 열린 PR 목록 조회
    * @param {string} repoName
-   * @returns {Promise<PullRequest[]>}
+   * @returns {Promise<import('../types').GitHubPullRequest[]>}
    * @throws {GitHubAPIError}
    */
   async fetchOpenPullRequests(repoName) {
@@ -437,7 +399,7 @@ class GitHubApiHelper {
    * 워크플로우 실행 정보 조회
    * @param {string} repoName
    * @param {string} runId
-   * @returns {Promise<Object>}
+   * @returns {Promise<import('../types').GitHubWorkflowRun>}
    * @throws {GitHubAPIError}
    */
   async fetchWorkflowRunData(repoName, runId) {
