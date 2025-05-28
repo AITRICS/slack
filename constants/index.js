@@ -112,6 +112,13 @@ const LOG_LEVELS = Object.freeze({
   ERROR: 'error',
 });
 
+const RATE_LIMIT_CONFIG = Object.freeze({
+  MAX_CONCURRENT_REQUESTS: 10,
+  RATE_LIMIT_BUFFER: 100,
+  RATE_LIMIT_MAX_WAIT_MS: 60000,
+  SLOT_WAIT_MS: 100,
+});
+
 module.exports = {
   GITHUB_CONFIG,
   SLACK_CHANNELS,
@@ -121,4 +128,5 @@ module.exports = {
   ACTION_TYPES,
   API_CONFIG,
   LOG_LEVELS,
+  RATE_LIMIT_CONFIG,
 };

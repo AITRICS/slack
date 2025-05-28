@@ -459,4 +459,94 @@
  * @property {string} [targetGithubUsername] - 대상 GitHub 사용자명
  */
 
+/**
+* @typedef {import('@octokit/rest').Octokit} Octokit
+*/
+
+/**
+ * @typedef {Object} GitHubUser
+ * @property {string} login
+ * @property {number} id
+ * @property {string} html_url
+ * @property {string} [name]
+ */
+
+/**
+ * @typedef {Object} PullRequest
+ * @property {number} number
+ * @property {string} title
+ * @property {string} html_url
+ * @property {GitHubUser} user
+ * @property {boolean} draft
+ * @property {GitHubUser[]} [requested_reviewers]
+ */
+
+/**
+ * @typedef {Object} Review
+ * @property {number} id
+ * @property {string} state
+ * @property {string} body
+ * @property {string} html_url
+ * @property {GitHubUser} user
+ */
+
+/**
+ * @typedef {Object} Comment
+ * @property {number} id
+ * @property {string} body
+ * @property {string} html_url
+ * @property {GitHubUser} user
+ * @property {number} [in_reply_to_id]
+ * @property {string} [diff_hunk]
+ */
+
+/**
+ * @typedef {Object} SlackMessage
+ * @property {string} channel
+ * @property {string} text
+ * @property {SlackAttachment[]} [attachments]
+ * @property {boolean} [mrkdwn]
+ */
+
+/**
+ * @typedef {Object} SlackAttachment
+ * @property {string} color
+ * @property {string} [text]
+ * @property {SlackField[]} [fields]
+ */
+
+/**
+ * @typedef {Object} SlackField
+ * @property {string} title
+ * @property {string} value
+ * @property {boolean} [short]
+ */
+
+/**
+ * @typedef {Object} NotificationData
+ * @property {string} prUrl
+ * @property {string} prTitle
+ * @property {string} commentUrl
+ * @property {string} commentBody
+ * @property {string} [codeSnippet]
+ * @property {string} authorSlackName
+ * @property {string} targetSlackId
+ * @property {string} [mentionsString]
+ */
+
+/**
+ * @typedef {Object} DeploymentData
+ * @property {string} status
+ * @property {string} repoUrl
+ * @property {string} repoName
+ * @property {string} ec2Name
+ * @property {string} triggerUsername
+ * @property {string} sha
+ * @property {string} imageTag
+ * @property {string} duration
+ * @property {string} workflowUrl
+ * @property {string} workflowName
+ * @property {string} ref
+ */
+
 module.exports = {};

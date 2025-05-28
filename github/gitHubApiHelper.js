@@ -2,16 +2,80 @@ const { GITHUB_CONFIG } = require('../constants');
 const Logger = require('../utils/logger');
 const { GitHubAPIError } = require('../utils/errors');
 
-/**
- * GitHub API 헬퍼 클래스
- * Octokit을 래핑하여 프로젝트에 필요한 GitHub API 호출을 제공
- */
 class GitHubApiHelper {
   /**
-   * @param {import('@octokit/rest').Octokit} octokit
+   * @param {Octokit} octokit
    */
   constructor(octokit) {
     this.octokit = octokit;
+    this.userCache = new Map(); // 사용자 정보 캐시
+    this.teamMembersCache = new Map(); // 팀 멤버 캐시
+    this.concurrentRequests = 0; // 현재 진행 중인 요청 수
+    this.maxConcurrentRequests = GITHUB_CONFIG.MAX_CONCURRENT_REQUESTS;
+  }
+
+  /**
+   * Rate limit 상태 확인
+   * @private
+   * @returns {Promise<boolean>} Rate limit 여유가 있으면 true
+   */
+  async #checkRateLimit() {
+    try {
+      const { data } = await this.octokit.rest.rateLimit.get();
+      const { remaining } = data.rate;
+      const resetTime = new Date(data.rate.reset * 1000);
+
+      Logger.debug(`Rate limit 상태: ${remaining}/${data.rate.limit}, 리셋: ${resetTime.toISOString()}`);
+
+      // 남은 요청이 버퍼 이하면 대기
+      if (remaining < GITHUB_CONFIG.RATE_LIMIT_BUFFER) {
+        const waitTime = Math.max(0, resetTime.getTime() - Date.now());
+        if (waitTime > 0) {
+          Logger.warn(`Rate limit 부족. ${waitTime}ms 대기 중...`);
+          await this.#sleep(Math.min(waitTime, GITHUB_CONFIG.RATE_LIMIT_MAX_WAIT_MS));
+        }
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      Logger.warn('Rate limit 확인 실패', error);
+      return true; // 확인 실패 시 계속 진행
+    }
+  }
+
+  /**
+   * 동시 요청 수 제한
+   * @private
+   * @returns {Promise<void>}
+   */
+  async #waitForSlot() {
+    while (this.concurrentRequests >= this.maxConcurrentRequests) {
+      Logger.debug(`동시 요청 대기 중... (현재: ${this.concurrentRequests}/${this.maxConcurrentRequests})`);
+      // eslint-disable-next-line no-await-in-loop
+      await this.#sleep(GITHUB_CONFIG.SLOT_WAIT_MS);
+    }
+    this.concurrentRequests += 1;
+    Logger.debug(`API 슬롯 점유 (현재: ${this.concurrentRequests}/${this.maxConcurrentRequests})`);
+  }
+
+  /**
+   * 요청 완료 처리
+   * @private
+   */
+  #releaseSlot() {
+    this.concurrentRequests = Math.max(0, this.concurrentRequests - 1);
+    Logger.debug(`API 슬롯 해제 (현재: ${this.concurrentRequests}/${this.maxConcurrentRequests})`);
+  }
+
+  /**
+   * 지연 함수
+   * @private
+   * @param {number} ms - 대기 시간 (밀리초)
+   * @returns {Promise<void>}
+   */
+  #sleep(ms) {
+    return new Promise((resolve) => { setTimeout(resolve, ms); });
   }
 
   /**
@@ -21,23 +85,96 @@ class GitHubApiHelper {
    * @throws {GitHubAPIError}
    */
   async fetchTeamMembers(teamSlug) {
+    // 캐시 확인
+    if (this.teamMembersCache.has(teamSlug)) {
+      Logger.debug(`팀 멤버 캐시 사용: ${teamSlug}`);
+      return this.teamMembersCache.get(teamSlug);
+    }
+
+    await this.#waitForSlot();
+
     try {
       Logger.debug(`팀 멤버 조회 시작: ${teamSlug}`);
 
-      const response = await this.octokit.teams.listMembersInOrg({
+      await this.#checkRateLimit();
+
+      const response = await this.octokit.rest.teams.listMembersInOrg({
         org: GITHUB_CONFIG.ORGANIZATION,
         team_slug: teamSlug,
       });
 
-      Logger.debug(`팀 멤버 조회 완료: ${teamSlug} (${response.data.length}명)`);
-      return response.data;
+      const members = response.data;
+      this.teamMembersCache.set(teamSlug, members);
+
+      Logger.debug(`팀 멤버 조회 완료: ${teamSlug} (${members.length}명)`);
+      return members;
     } catch (error) {
+      if (error.status === 403 || error.status === 429) {
+        Logger.warn(`팀 멤버 조회 rate limit: ${teamSlug}`);
+        // Rate limit 에러 시 빈 배열 반환
+        const emptyResult = [];
+        this.teamMembersCache.set(teamSlug, emptyResult);
+        return emptyResult;
+      }
+
       Logger.error(`팀 멤버 조회 실패 (${teamSlug})`, error);
       throw new GitHubAPIError(
         `팀 멤버 조회 실패: ${teamSlug}`,
         { teamSlug, originalError: error.message },
         { cause: error },
       );
+    } finally {
+      this.#releaseSlot();
+    }
+  }
+
+  /**
+   * GitHub 사용자의 실제 이름 조회 (캐시 적용)
+   * @param {string} username
+   * @returns {Promise<string>}
+   */
+  async fetchUserRealName(username) {
+    // 캐시 확인
+    if (this.userCache.has(username)) {
+      Logger.debug(`사용자 캐시 사용: ${username}`);
+      return this.userCache.get(username);
+    }
+
+    await this.#waitForSlot();
+
+    try {
+      Logger.debug(`사용자 실명 조회: ${username}`);
+
+      await this.#checkRateLimit();
+
+      const response = await this.octokit.rest.users.getByUsername({ username });
+      const realName = response.data.name || username;
+
+      this.userCache.set(username, realName);
+
+      Logger.debug(`사용자 실명 조회 완료: ${username} → ${realName}`);
+      return realName;
+    } catch (error) {
+      if (error.status === 403 || error.status === 429) {
+        Logger.warn(`사용자 조회 rate limit: ${username}`);
+        // Rate limit 에러 시 원본 username 반환 및 캐시
+        this.userCache.set(username, username);
+        return username;
+      }
+
+      if (error.status === 404) {
+        Logger.warn(`사용자를 찾을 수 없음: ${username}`);
+        // 404 에러 시 원본 username 반환 및 캐시
+        this.userCache.set(username, username);
+        return username;
+      }
+
+      Logger.error(`사용자 정보 조회 실패 (${username})`, error);
+      // 에러 시에도 원본 username 반환하여 처리 계속
+      this.userCache.set(username, username);
+      return username;
+    } finally {
+      this.#releaseSlot();
     }
   }
 
@@ -50,8 +187,12 @@ class GitHubApiHelper {
    * @throws {GitHubAPIError}
    */
   async fetchCommentAuthor(repoName, commentId, isReviewComment = true) {
+    await this.#waitForSlot();
+
     try {
       Logger.debug(`코멘트 작성자 조회: ${repoName}#${commentId} (리뷰코멘트: ${isReviewComment})`);
+
+      await this.#checkRateLimit();
 
       let response;
       if (isReviewComment) {
@@ -80,6 +221,8 @@ class GitHubApiHelper {
         },
         { cause: error },
       );
+    } finally {
+      this.#releaseSlot();
     }
   }
 
@@ -156,34 +299,45 @@ class GitHubApiHelper {
    * @param {string} repoName
    * @param {number} prNumber
    * @param {boolean} isReviewComment
-   * @returns {Promise<GitHubComment[]>}
+   * @returns {Promise<Comment[]>}
    */
   async #fetchAllComments(repoName, prNumber, isReviewComment) {
-    const commonOpts = {
-      owner: GITHUB_CONFIG.ORGANIZATION,
-      repo: repoName,
-      per_page: 100, // 최댓값
-    };
+    await this.#waitForSlot();
 
-    if (isReviewComment) {
-      return this.octokit.paginate(
-        this.octokit.rest.pulls.listReviewComments,
-        { ...commonOpts, pull_number: prNumber },
-      );
+    try {
+      await this.#checkRateLimit();
+
+      const commonOpts = {
+        owner: GITHUB_CONFIG.ORGANIZATION,
+        repo: repoName,
+        per_page: 100, // 최댓값
+      };
+
+      let comments;
+      if (isReviewComment) {
+        comments = await this.octokit.paginate(
+          this.octokit.rest.pulls.listReviewComments,
+          { ...commonOpts, pull_number: prNumber },
+        );
+      } else {
+        comments = await this.octokit.paginate(
+          this.octokit.rest.issues.listComments,
+          { ...commonOpts, issue_number: prNumber },
+        );
+      }
+
+      return comments;
+    } finally {
+      this.#releaseSlot();
     }
-
-    return this.octokit.paginate(
-      this.octokit.rest.issues.listComments,
-      { ...commonOpts, issue_number: prNumber },
-    );
   }
 
   /**
    * ID로 코멘트 찾기
    * @private
-   * @param {GitHubComment[]} comments
+   * @param {Comment[]} comments
    * @param {number} commentId
-   * @returns {GitHubComment|undefined}
+   * @returns {Comment|undefined}
    */
   #findCommentById(comments, commentId) {
     // 숫자와 문자열 모두 비교하여 타입 변환 문제 해결
@@ -203,8 +357,8 @@ class GitHubApiHelper {
   /**
    * 스레드의 루트 코멘트 찾기 (개선된 타입 비교)
    * @private
-   * @param {GitHubComment[]} allComments
-   * @param {GitHubComment} comment
+   * @param {Comment[]} allComments
+   * @param {Comment} comment
    * @returns {number}
    */
   #findThreadRoot(allComments, comment) {
@@ -233,9 +387,9 @@ class GitHubApiHelper {
   /**
    * 스레드의 모든 코멘트 수집 (개선된 타입 비교)
    * @private
-   * @param {GitHubComment[]} allComments
+   * @param {Comment[]} allComments
    * @param {number} threadRootId
-   * @returns {GitHubComment[]}
+   * @returns {Comment[]}
    */
   #collectThreadComments(allComments, threadRootId) {
     const threadComments = [];
@@ -285,40 +439,19 @@ class GitHubApiHelper {
   }
 
   /**
-   * GitHub 사용자의 실제 이름 조회
-   * @param {string} username
-   * @returns {Promise<string>}
-   * @throws {GitHubAPIError}
-   */
-  async fetchUserRealName(username) {
-    try {
-      Logger.debug(`사용자 실명 조회: ${username}`);
-
-      const response = await this.octokit.rest.users.getByUsername({ username });
-      const realName = response.data.name || username;
-
-      Logger.debug(`사용자 실명 조회 완료: ${username} → ${realName}`);
-      return realName;
-    } catch (error) {
-      Logger.error(`사용자 정보 조회 실패 (${username})`, error);
-      throw new GitHubAPIError(
-        `사용자 정보 조회 실패: ${username}`,
-        { username, originalError: error.message },
-        { cause: error },
-      );
-    }
-  }
-
-  /**
    * PR 리뷰 목록 조회
    * @param {string} repoName
    * @param {number} prNumber
-   * @returns {Promise<GitHubReview[]>}
+   * @returns {Promise<Review[]>}
    * @throws {GitHubAPIError}
    */
   async fetchPullRequestReviews(repoName, prNumber) {
+    await this.#waitForSlot();
+
     try {
       Logger.debug(`PR 리뷰 목록 조회: ${repoName}#${prNumber}`);
+
+      await this.#checkRateLimit();
 
       const response = await this.octokit.rest.pulls.listReviews({
         owner: GITHUB_CONFIG.ORGANIZATION,
@@ -335,6 +468,8 @@ class GitHubApiHelper {
         { repoName, prNumber, originalError: error.message },
         { cause: error },
       );
+    } finally {
+      this.#releaseSlot();
     }
   }
 
@@ -342,12 +477,16 @@ class GitHubApiHelper {
    * PR 상세 정보 조회
    * @param {string} repoName
    * @param {number} prNumber
-   * @returns {Promise<import('../types').GitHubPullRequest>}
+   * @returns {Promise<PullRequest>}
    * @throws {GitHubAPIError}
    */
   async fetchPullRequestDetails(repoName, prNumber) {
+    await this.#waitForSlot();
+
     try {
       Logger.debug(`PR 상세 정보 조회: ${repoName}#${prNumber}`);
+
+      await this.#checkRateLimit();
 
       const response = await this.octokit.rest.pulls.get({
         owner: GITHUB_CONFIG.ORGANIZATION,
@@ -364,18 +503,24 @@ class GitHubApiHelper {
         { repoName, prNumber, originalError: error.message },
         { cause: error },
       );
+    } finally {
+      this.#releaseSlot();
     }
   }
 
   /**
    * 열린 PR 목록 조회
    * @param {string} repoName
-   * @returns {Promise<import('../types').GitHubPullRequest[]>}
+   * @returns {Promise<PullRequest[]>}
    * @throws {GitHubAPIError}
    */
   async fetchOpenPullRequests(repoName) {
+    await this.#waitForSlot();
+
     try {
       Logger.debug(`열린 PR 목록 조회: ${repoName}`);
+
+      await this.#checkRateLimit();
 
       const response = await this.octokit.rest.pulls.list({
         owner: GITHUB_CONFIG.ORGANIZATION,
@@ -392,6 +537,8 @@ class GitHubApiHelper {
         { repoName, originalError: error.message },
         { cause: error },
       );
+    } finally {
+      this.#releaseSlot();
     }
   }
 
@@ -399,12 +546,16 @@ class GitHubApiHelper {
    * 워크플로우 실행 정보 조회
    * @param {string} repoName
    * @param {string} runId
-   * @returns {Promise<import('../types').GitHubWorkflowRun>}
+   * @returns {Promise<Object>}
    * @throws {GitHubAPIError}
    */
   async fetchWorkflowRunData(repoName, runId) {
+    await this.#waitForSlot();
+
     try {
       Logger.debug(`워크플로우 실행 정보 조회: ${repoName}, Run ID: ${runId}`);
+
+      await this.#checkRateLimit();
 
       const response = await this.octokit.actions.getWorkflowRun({
         owner: GITHUB_CONFIG.ORGANIZATION,
@@ -421,6 +572,8 @@ class GitHubApiHelper {
         { repoName, runId, originalError: error.message },
         { cause: error },
       );
+    } finally {
+      this.#releaseSlot();
     }
   }
 }
