@@ -13,6 +13,10 @@ const SLACK_CHANNELS = Object.freeze({
   deploy: 'C06CMU2S6JY',
 });
 
+const USER_PRIORITY_MAPPING = Object.freeze({
+  김희연: '김희연 A',
+});
+
 // Slack 메시지 설정
 const SLACK_CONFIG = Object.freeze({
   SKIP_USERS: Object.freeze(['john (이주호)']), // 알림 제외 사용자
@@ -114,6 +118,7 @@ const LOG_LEVELS = Object.freeze({
 
 module.exports = {
   GITHUB_CONFIG,
+  USER_PRIORITY_MAPPING,
   SLACK_CHANNELS,
   SLACK_CONFIG,
   REVIEW_STATES,
