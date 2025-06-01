@@ -7,17 +7,26 @@ const Logger = require('./logger');
  * @returns {string}
  */
 function normalizeUserName(rawName = '') {
-  // null, undefined 체크 추가
-  if (!rawName || typeof rawName !== 'string') {
-    return '';
+  if (!rawName || typeof rawName !== 'string') return '';
+
+  const cleaned = rawName
+    .trim()
+    .replace(/\s*\(.*?\)$/, '') // 괄호 제거
+    .replace(/_.*$/, '') // 밑줄 뒤 제거
+    .replace(/\s+/g, ''); // 공백 제거
+
+  // 한글이 있으면 한글만 추출
+  if (/[가-힣]/.test(cleaned)) {
+    return (cleaned.match(/[가-힣]+/g) || []).join('');
   }
 
-  return rawName
-    .trim()
-    .replace(/\s*\(.*?\)$/, '') // 괄호와 괄호 안 내용 제거 (공백 있든 없든)
-    .replace(/_.*$/, '') // 밑줄(_) 뒤의 모든 내용 제거 (별명 처리)
-    .replace(/\s+/g, '') // 모든 공백 제거 (한국어 이름에서 공백 있을 수 있음)
-    .toLowerCase();
+  // 영문자가 있으면 영문자만 추출하고 소문자로 변환
+  if (/[a-zA-Z]/.test(cleaned)) {
+    return (cleaned.match(/[a-zA-Z]+/g) || []).join('').toLowerCase();
+  }
+
+  // 숫자만 있으면 빈 문자열 반환
+  return '';
 }
 
 /**
@@ -27,13 +36,16 @@ function normalizeUserName(rawName = '') {
  * @returns {string}
  */
 function getSlackUserProperty(slackUser, property) {
-  const propertyExtractors = {
-    id: () => slackUser.id,
-    realName: () => slackUser.profile?.display_name || slackUser.real_name,
-  };
+  const normalizedProperty = property ? property.toLowerCase() : '';
 
-  const extractor = propertyExtractors[property];
-  return extractor ? extractor() : slackUser.real_name;
+  switch (normalizedProperty) {
+    case 'id':
+      return slackUser.id;
+    case 'realname':
+      return slackUser.profile?.display_name || slackUser.real_name;
+    default:
+      return slackUser.real_name;
+  }
 }
 
 /**
@@ -48,31 +60,18 @@ function shouldSkipUser(slackUser, skipUsers = null) {
     slackUser.profile?.display_name,
   ].filter(Boolean);
 
-  // 테스트용 파라미터가 있으면 사용, 없으면 constants에서 가져오기
   const actualSkipUsers = skipUsers || SLACK_CONFIG.SKIP_USERS;
 
   if (!actualSkipUsers || !Array.isArray(actualSkipUsers)) {
     return false;
   }
 
-  // 원본 이름으로도 체크하고, 정규화된 이름으로도 체크
-  return candidateNames.some((name) => {
-    // 1. 원본 이름 그대로 스킵 리스트에 있는지 확인
-    if (actualSkipUsers.includes(name)) {
-      return true;
-    }
-
-    // 2. 정규화된 이름끼리 완전 일치 확인
-    const normalizedName = normalizeUserName(name);
-    return actualSkipUsers.some((skipName) => {
-      const normalizedSkipName = normalizeUserName(skipName);
-      return normalizedName === normalizedSkipName;
-    });
-  });
+  // 원본 이름으로 정확히 매칭되는 경우에만 스킵
+  return candidateNames.some((name) => actualSkipUsers.includes(name));
 }
 
 /**
- * 단일 사용자에 대한 매칭 후보 생성
+ * 단일 사용자에 대한 매칭 후보 생성 (완전 일치만)
  * @param {Object} slackUser
  * @param {string} normalizedSearchName
  * @returns {Array} 매칭 후보 배열
@@ -91,7 +90,12 @@ function createMatchCandidates(slackUser, normalizedSearchName) {
     .map((candidateName) => {
       const normalizedCandidate = normalizeUserName(candidateName);
 
-      // 완전 일치 확인
+      // 빈 문자열이면 매칭하지 않음
+      if (!normalizedCandidate || !normalizedSearchName) {
+        return null;
+      }
+
+      // 완전 일치만 허용
       if (normalizedCandidate === normalizedSearchName) {
         return {
           user: slackUser,
@@ -100,26 +104,16 @@ function createMatchCandidates(slackUser, normalizedSearchName) {
         };
       }
 
-      // 시작 부분 일치 확인 (최소 2글자 이상)
-      if (normalizedCandidate.startsWith(normalizedSearchName) &&
-        normalizedSearchName.length >= 2) {
-        return {
-          user: slackUser,
-          matchedName: candidateName,
-          matchType: 'startsWith',
-        };
-      }
-
-      return null;
+      return null; // 완전 일치가 아니면 매칭하지 않음
     })
     .filter(Boolean);
 }
 
 /**
- * 모든 Slack 사용자에서 매칭 후보 수집
+ * 모든 Slack 사용자에서 매칭 후보 수집 (완전 일치만)
  * @param {Array} slackMembers
  * @param {string} normalizedSearchName
- * @returns {Object} {exactMatches: Array, startsWithMatches: Array}
+ * @returns {Object} {exactMatches: Array}
  */
 function collectAllMatches(slackMembers, normalizedSearchName) {
   const allCandidates = slackMembers.flatMap(
@@ -127,52 +121,54 @@ function collectAllMatches(slackMembers, normalizedSearchName) {
   );
 
   const exactMatches = allCandidates.filter((candidate) => candidate.matchType === 'exact');
-  const startsWithMatches = allCandidates.filter((candidate) => candidate.matchType === 'startsWith');
 
-  return { exactMatches, startsWithMatches };
+  return { exactMatches };
 }
 
 /**
  * 우선순위 매핑을 적용하여 매칭 선택
- * @param {Array} startsWithMatches
  * @param {string} githubRealName
- * @returns {Object|null} 선택된 매칭 또는 null
+ * @param {Array} slackMembers
+ * @param {'id'|'realName'} property
+ * @returns {string|null} 우선순위 매핑 결과 또는 null
  */
-function applyPriorityMapping(startsWithMatches, githubRealName) {
+function checkPriorityMapping(githubRealName, slackMembers, property) {
   const prioritySlackName = USER_PRIORITY_MAPPING[githubRealName];
 
   if (!prioritySlackName) {
-    // 우선순위 매핑이 없을 때 한 번만 경고
-    Logger.warn('여러 시작 부분 일치 발견, 우선순위 매핑 없음', {
-      githubRealName,
-      matches: startsWithMatches.map((m) => ({
-        id: m.user.id,
-        name: m.matchedName,
-        normalized: normalizeUserName(m.matchedName),
-      })),
-      suggestion: `USER_PRIORITY_MAPPING에 '${githubRealName}': '선호하는_Slack_이름' 추가 고려`,
-    });
     return null;
   }
 
-  const priorityMatch = startsWithMatches.find((match) => match.matchedName === prioritySlackName);
+  // 우선순위 매핑된 사용자 찾기 (정규화 없이 원본 이름으로 비교)
+  const priorityUser = slackMembers.find((slackUser) => {
+    if (slackUser.deleted || shouldSkipUser(slackUser)) {
+      return false;
+    }
 
-  if (!priorityMatch) {
-    Logger.warn('우선순위 매핑된 사용자를 찾을 수 없음', {
-      githubRealName,
-      prioritySlackName,
-      availableMatches: startsWithMatches.map((m) => m.matchedName),
-    });
-    return null;
-  }
+    const candidateNames = [
+      slackUser.real_name,
+      slackUser.profile?.display_name,
+    ].filter(Boolean);
 
-  Logger.info('우선순위 매핑 적용', {
-    githubRealName,
-    prioritySlackName,
-    selectedUserId: priorityMatch.user.id,
+    return candidateNames.includes(prioritySlackName);
   });
 
-  return priorityMatch;
+  if (priorityUser) {
+    Logger.info('우선순위 매핑 적용', {
+      githubRealName,
+      prioritySlackName,
+      selectedUserId: priorityUser.id,
+    });
+
+    return getSlackUserProperty(priorityUser, property);
+  }
+
+  Logger.warn('우선순위 매핑된 사용자를 찾을 수 없음', {
+    githubRealName,
+    prioritySlackName,
+  });
+
+  return null;
 }
 
 /**
@@ -182,29 +178,24 @@ function applyPriorityMapping(startsWithMatches, githubRealName) {
  * @returns {Object|null} 선택된 매칭 또는 null
  */
 function selectBestMatch(matches, githubRealName) {
-  const { exactMatches, startsWithMatches } = matches;
+  const { exactMatches } = matches;
 
-  // 완전 일치 우선
   if (exactMatches.length > 0) {
     if (exactMatches.length > 1) {
       Logger.warn('여러 완전 일치 발견, 첫 번째 사용', {
         githubRealName,
-        matches: exactMatches.map((m) => ({ id: m.user.id, name: m.matchedName })),
+        matches: exactMatches.map((m) => ({
+          id: m.user.id,
+          name: m.matchedName,
+          realName: m.user.real_name,
+          displayName: m.user.profile?.display_name,
+        })),
       });
     }
     return exactMatches[0];
   }
 
-  // 시작 부분 일치 처리
-  if (startsWithMatches.length === 1) {
-    // 단일 매칭일 때는 우선순위 매핑 로그를 출력하지 않음
-    return startsWithMatches[0];
-  }
-
-  if (startsWithMatches.length > 1) {
-    return applyPriorityMapping(startsWithMatches, githubRealName);
-  }
-
+  // startsWithMatches 관련 로직 완전히 제거!
   return null;
 }
 
@@ -216,26 +207,52 @@ function selectBestMatch(matches, githubRealName) {
  * @returns {string} 조회된 속성값 또는 원본 이름
  */
 function findSlackUserProperty(slackMembers, githubRealName, property) {
-  const normalizedSearchName = normalizeUserName(githubRealName);
-
   Logger.debug('사용자 매칭 시작', {
     githubRealName,
-    normalizedSearchName,
     property,
   });
 
-  // 1. 매칭 후보 수집
+  // 0. 검색하려는 이름 자체가 skip 대상인지 확인
+  const actualSkipUsers = SLACK_CONFIG.SKIP_USERS || [];
+  if (actualSkipUsers.includes(githubRealName)) {
+    Logger.warn('검색 대상이 스킵 사용자', {
+      githubRealName,
+    });
+    return githubRealName;
+  }
+
+  // 1. 우선순위 매핑 확인 (정규화 없이)
+  const priorityResult = checkPriorityMapping(githubRealName, slackMembers, property);
+  if (priorityResult) {
+    return priorityResult;
+  }
+
+  // 2. 일반 매칭 진행
+  const normalizedSearchName = normalizeUserName(githubRealName);
+
+  // 정규화된 이름이 빈 문자열이면 원본 반환
+  if (!normalizedSearchName) {
+    Logger.warn('정규화된 이름이 빈 문자열', {
+      githubRealName,
+    });
+    return githubRealName;
+  }
+
+  Logger.debug('정규화된 검색명', {
+    githubRealName,
+    normalizedSearchName,
+  });
+
+  // 3. 매칭 후보 수집
   const matches = collectAllMatches(slackMembers, normalizedSearchName);
 
   Logger.debug('매칭 결과', {
     githubRealName,
     exactMatches: matches.exactMatches.length,
-    startsWithMatches: matches.startsWithMatches.length,
     exactUsers: matches.exactMatches.map((m) => ({ id: m.user.id, name: m.matchedName })),
-    startsWithUsers: matches.startsWithMatches.map((m) => ({ id: m.user.id, name: m.matchedName })),
   });
 
-  // 2. 최적 매칭 선택
+  // 4. 최적 매칭 선택
   const selectedMatch = selectBestMatch(matches, githubRealName);
 
   if (!selectedMatch) {
@@ -248,18 +265,12 @@ function findSlackUserProperty(slackMembers, githubRealName, property) {
 
   const result = getSlackUserProperty(selectedMatch.user, property);
 
-  // 성공 로그는 우선순위 매핑이 실제로 사용된 경우에만 상세 정보 포함
-  const priorityMappingUsed = selectedMatch.matchType === 'startsWith' &&
-    matches.startsWithMatches.length > 1 &&
-    USER_PRIORITY_MAPPING[githubRealName];
-
   Logger.info('사용자 매칭 완료', {
     githubRealName,
     slackUserId: selectedMatch.user.id,
     slackRealName: selectedMatch.user.real_name,
     matchedName: selectedMatch.matchedName,
     matchType: selectedMatch.matchType,
-    priorityMappingUsed,
     property,
     result,
   });

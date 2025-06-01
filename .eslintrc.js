@@ -44,6 +44,7 @@ module.exports = {
         'no-unused-expressions': 'off',
         'import/no-extraneous-dependencies': ['error', { devDependencies: true }],
         'max-len': 'off', // 테스트에서는 긴 문자열 허용
+        'global-require': 'off',
       },
     },
   ],
