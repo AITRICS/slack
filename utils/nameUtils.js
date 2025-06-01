@@ -195,7 +195,6 @@ function selectBestMatch(matches, githubRealName) {
     return exactMatches[0];
   }
 
-  // startsWithMatches 관련 로직 완전히 제거!
   return null;
 }
 
@@ -279,7 +278,8 @@ function findSlackUserProperty(slackMembers, githubRealName, property) {
 }
 
 module.exports = {
-  normalizeUserName,
   findSlackUserProperty,
-  shouldSkipUser, // 디버깅을 위해 export 추가
+  // 두개의 함수는 테스트 코드를 위한 exports.
+  normalizeUserName,
+  shouldSkipUser,
 };
