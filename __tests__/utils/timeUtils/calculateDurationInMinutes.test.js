@@ -123,11 +123,9 @@ describe('timeUtils.calculateDurationInMinutes', () => {
     });
 
     test('null 입력 처리 (특별 케이스)', () => {
-      // new Date(null)은 new Date(0)과 같아서 1970-01-01 00:00:00 UTC가 됨
       const result1 = calculateDurationInMinutes(null, '2024-01-01T10:00:00Z');
       const result2 = calculateDurationInMinutes('2024-01-01T10:00:00Z', null);
 
-      // null은 1970년으로 변환되므로 실제 숫자가 나옴
       expect(typeof result1).toBe('number');
       expect(typeof result2).toBe('number');
       expect(result1).not.toBeNaN();

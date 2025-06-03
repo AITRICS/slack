@@ -55,12 +55,10 @@ describe('timeUtils.formatDuration', () => {
 
   describe('60초 버그 수정 확인', () => {
     test('59.999분은 이제 "60분 0초"로 올바르게 포맷됨', () => {
-      // 60초 버그가 수정되어 올바르게 동작
       expect(formatDuration(59.999)).toBe('60분 0초');
     });
 
     test('1.9916667분 (1분 59.5초)는 이제 "2분 0초"로 올바르게 포맷됨', () => {
-      // 반올림으로 인한 60초가 1분으로 올라감
       expect(formatDuration(1.9916667)).toBe('2분 0초');
     });
 
@@ -125,7 +123,7 @@ describe('timeUtils.formatDuration', () => {
 
   describe('실제 사용 사례', () => {
     test('GitHub Actions 워크플로우 시간 (5분 23초)', () => {
-      const duration = 5.383333; // calculateDurationInMinutes 결과
+      const duration = 5.383333;
       expect(formatDuration(duration)).toBe('5분 23초');
     });
 
@@ -197,7 +195,6 @@ describe('timeUtils.formatDuration', () => {
 
   describe('60초 처리 엣지 케이스', () => {
     test('정확히 60초가 되는 케이스들', () => {
-      // 반올림으로 정확히 60초가 되는 값들
       expect(formatDuration(0.999)).toBe('1분 0초');
       expect(formatDuration(1.999)).toBe('2분 0초');
       expect(formatDuration(2.999)).toBe('3분 0초');

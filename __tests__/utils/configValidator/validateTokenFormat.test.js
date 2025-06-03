@@ -30,7 +30,6 @@ describe('ConfigValidator.validateTokenFormat', () => {
       ['bearer-token', ['SLACK_TOKEN'], 'Slack 토큰 형식이 올바르지 않습니다. xoxb- 또는 xoxp-로 시작해야 합니다', 'Bearer 토큰'],
       ['XOXB-1234567890', ['SLACK_TOKEN'], 'Slack 토큰 형식이 올바르지 않습니다. xoxb- 또는 xoxp-로 시작해야 합니다', '대문자'],
       ['xoxb', ['SLACK_TOKEN'], 'Slack 토큰 형식이 올바르지 않습니다. xoxb- 또는 xoxp-로 시작해야 합니다', '접두사만'],
-      // 'xoxb-'와 'xoxb- '는 실제로는 유효하므로 제거
     ])('유효하지 않은 Slack 토큰: "%s" → %j (%s)', (token, expectedMissingFields, expectedMessage, _description) => {
       expectErrorWithDetails(
         () => ConfigValidator.validateTokenFormat(token, 'SLACK_TOKEN'),
