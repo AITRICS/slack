@@ -11,13 +11,19 @@ function calculateDurationInMinutes(startTime, endTime) {
 }
 
 /**
- * 분 단위 지속 시간을 한국어 형식으로 포맷
+ * 분 단위 지속 시간을 한국어 형식으로 포맷 (60초 버그 수정)
  * @param {number} totalMinutes - 전체 분 수
  * @returns {string} 포맷된 지속 시간 문자열
  */
 function formatDuration(totalMinutes) {
   const minutes = Math.floor(totalMinutes);
   const seconds = Math.round((totalMinutes - minutes) * 60);
+
+  // 60초 처리: 1분으로 올림
+  if (seconds === 60) {
+    return `${minutes + 1}분 0초`;
+  }
+
   return `${minutes}분 ${seconds}초`;
 }
 
