@@ -11,8 +11,8 @@ describe('ConfigValidator.validateTokenFormat', () => {
 
   describe('SLACK_TOKEN 검증', () => {
     test.each([
-      ['xoxb-1234567890-1234567890-abcdefghijklmnopqrstuvwx', '정상적인 Bot 토큰'],
-      ['xoxp-1234567890-1234567890-1234567890-abcdefghijklmnopqrstuvwx', '정상적인 User 토큰'],
+      ['xoxb-test-token', '정상적인 Bot 토큰'],
+      ['xoxb-fake-1234', '정상적인 User 토큰'],
       [`xoxb-${'a'.repeat(50)}`, 'Bot 토큰 (충분한 길이)'],
       [`xoxp-${'a'.repeat(60)}`, 'User 토큰 (충분한 길이)'],
       ['xoxb-minimal', '최소한의 Bot 토큰'],
