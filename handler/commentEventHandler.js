@@ -1,5 +1,4 @@
 const BaseEventHandler = require('./baseEventHandler');
-const MentionUtils = require('../utils/mentionUtils');
 const Logger = require('../utils/logger');
 
 /**
@@ -279,7 +278,7 @@ class CommentEventHandler extends BaseEventHandler {
   }
 
   /**
-   * 알림 데이터 생성 (GitHub 멘션을 Slack 멘션으로 변환 추가)
+   * 알림 데이터 생성
    * @private
    * @param {CommentPayload} payload
    * @param {string} [targetUsername]
@@ -327,15 +326,11 @@ class CommentEventHandler extends BaseEventHandler {
       this.slackUserService.getSlackProperty(actualTargetUsername, 'id'),
     ]);
 
-    // GitHub 멘션을 Slack 멘션으로 변환
-    const slackIdResolver = (usernames, property) => this.slackUserService.getSlackProperties(usernames, property);
-    const convertedCommentBody = await MentionUtils.convertCommentMentions(comment.body, slackIdResolver);
-
     return {
       prUrl: prData.html_url || `https://github.com/${repository.full_name}/pull/${commentType.prNumber}`,
       prTitle: prData.title,
       commentUrl: comment.html_url,
-      commentBody: convertedCommentBody, // 변환된 코멘트 본문 사용
+      commentBody: comment.body,
       codeSnippet: comment.diff_hunk,
       authorUsername,
       authorSlackName: authorSlackInfo,

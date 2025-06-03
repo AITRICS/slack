@@ -14,9 +14,7 @@ class ConfigValidator {
   static validateRequired() {
     const required = ['SLACK_TOKEN', 'GITHUB_TOKEN', 'ACTION_TYPE'];
     const inputs = required.map((k) => ({ k, v: Core.getInput(k) }));
-    const missingKeys = inputs.filter(
-      ({ v }) => v == null || (typeof v === 'string' && v.trim() === ''),
-    ).map(({ k }) => k);
+    const missingKeys = inputs.filter(({ v }) => !v).map(({ k }) => k);
 
     if (missingKeys.length) {
       throw new ConfigurationError(`필수 설정 누락: ${missingKeys.join(', ')}`, missingKeys);
@@ -33,16 +31,8 @@ class ConfigValidator {
     const validTypes = Object.values(ACTION_TYPES);
 
     if (!validTypes.includes(actionType)) {
-      let typeStr = '';
-      try {
-        typeStr = typeof actionType === 'symbol' ?
-          actionType.toString() :
-          String(actionType);
-      } catch {
-        typeStr = '[변환 불가능한 타입]';
-      }
       throw new ConfigurationError(
-        `유효하지 않은 액션 타입: ${typeStr}. 가능한 값: ${validTypes.join(', ')}`,
+        `유효하지 않은 액션 타입: ${actionType}. 가능한 값: ${validTypes.join(', ')}`,
         ['ACTION_TYPE'],
       );
     }
@@ -139,16 +129,11 @@ class ConfigValidator {
    * @throws {ConfigurationError} 페이로드가 유효하지 않은 경우
    */
   static validatePayload(payload) {
-    if (
-      !payload ||
-      typeof payload !== 'object' ||
-      Array.isArray(payload) ||
-      payload instanceof Date
-    ) {
+    if (!payload || typeof payload !== 'object') {
       throw new ConfigurationError('유효하지 않은 페이로드', ['payload']);
     }
 
-    if (!('repository' in payload) || payload.repository == null) {
+    if (!payload.repository) {
       throw new ConfigurationError('페이로드에 repository 정보가 없습니다', ['payload.repository']);
     }
   }
