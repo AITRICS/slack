@@ -1,6 +1,4 @@
-// __tests__/utils/configValidator/validateTokenFormat.test.js
-
-const { expectErrorWithDetails } = require('@test/utils/configValidator/helpers');
+const { expectErrorWithDetails } = require('@test/helpers');
 
 describe('ConfigValidator.validateTokenFormat', () => {
   let ConfigValidator;
@@ -101,7 +99,7 @@ describe('ConfigValidator.validateTokenFormat', () => {
     });
   });
 
-  describe('동시성 테스트 (수정된 시나리오)', () => {
+  describe('동시성 테스트', () => {
     test('여러 토큰을 동시에 검증해도 안전', async () => {
       const validations = [
         () => ConfigValidator.validateTokenFormat('invalid-slack', 'SLACK_TOKEN'), // 실패
@@ -113,7 +111,6 @@ describe('ConfigValidator.validateTokenFormat', () => {
         validations.map((validation) => Promise.resolve().then(validation)),
       );
 
-      // 처음 두 개는 실패, 마지막은 성공
       expect(results[0].status).toBe('rejected');
       expect(results[1].status).toBe('rejected');
       expect(results[2].status).toBe('fulfilled');
@@ -130,7 +127,6 @@ describe('ConfigValidator.validateTokenFormat', () => {
       });
       const duration = Date.now() - start;
 
-      // 완화된 기준: 100개 검증에 50ms 이내
       expect(duration).toBeLessThan(50);
     });
   });

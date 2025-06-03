@@ -1,5 +1,3 @@
-// __tests__/utils/configValidator/helpers/index.js
-
 /**
  * 예외와 예외 내용을 함께 검증하는 헬퍼
  * @param {Function} fn - 실행할 함수

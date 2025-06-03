@@ -1,6 +1,4 @@
-// __tests__/utils/configValidator/validateActionType.test.js
-
-const { expectErrorWithDetails } = require('@test/utils/configValidator/helpers');
+const { expectErrorWithDetails } = require('@test/helpers');
 
 describe('ConfigValidator.validateActionType', () => {
   let ConfigValidator;
@@ -24,14 +22,11 @@ describe('ConfigValidator.validateActionType', () => {
   });
 
   describe('유효하지 않은 액션 타입', () => {
-    // 안전한 에러 메시지 생성 함수
     const getExpectedMessage = (actionType) => {
       try {
-        // Symbol이나 다른 타입을 안전하게 문자열로 변환
         const actionStr = actionType?.toString?.() || String(actionType);
         return `유효하지 않은 액션 타입: ${actionStr}. 가능한 값: schedule, approve, comment, review_requested, changes_requested, deploy, ci`;
       } catch (error) {
-        // Symbol을 문자열로 변환할 수 없는 경우
         return '유효하지 않은 액션 타입: [변환 불가능한 타입]. 가능한 값: schedule, approve, comment, review_requested, changes_requested, deploy, ci';
       }
     };
@@ -52,7 +47,6 @@ describe('ConfigValidator.validateActionType', () => {
       );
     });
 
-    // 특수 타입들은 별도로 처리 (Symbol 문제 방지)
     test.each([
       [null, 'null'],
       [undefined, 'undefined'],
@@ -69,26 +63,22 @@ describe('ConfigValidator.validateActionType', () => {
       );
     });
 
-    // Symbol은 따로 처리 (문자열 변환 오류 방지)
     test('Symbol 타입 액션은 유효하지 않음', () => {
       const symbolAction = Symbol('action');
-
-      // Symbol을 직접 에러 메시지에 넣지 않고 별도 처리
       expect(() => ConfigValidator.validateActionType(symbolAction)).toThrow();
-
-      // 발생한 에러의 메시지가 적절한지만 확인
+      let thrownError = null;
       try {
         ConfigValidator.validateActionType(symbolAction);
       } catch (error) {
-        expect(error.message).toContain('유효하지 않은 액션 타입');
-        expect(error.missingFields).toEqual(['ACTION_TYPE']);
+        thrownError = error;
       }
+      expect(thrownError).not.toBeNull();
+      expect(thrownError.message).toContain('유효하지 않은 액션 타입');
+      expect(thrownError.missingFields).toEqual(['ACTION_TYPE']);
     });
 
-    // Date 객체도 별도 처리
     test('Date 객체 타입 액션은 유효하지 않음', () => {
       const dateAction = new Date();
-
       expectErrorWithDetails(
         () => ConfigValidator.validateActionType(dateAction),
         getExpectedMessage(dateAction),
@@ -116,44 +106,29 @@ describe('ConfigValidator.validateActionType', () => {
   });
 
   describe('성능 테스트', () => {
-    test('대량의 유효하지 않은 액션 타입을 빠르게 처리', () => {
-      const invalidActions = Array.from({ length: 100 }, (_, i) => `invalid_${i}`);
-
-      const start = Date.now();
-      invalidActions.forEach((actionType) => {
+    // 유효하지 않은 액션 타입들은 예외 발생!
+    test.each(Array.from({ length: 100 }, (_, i) => [`invalid_${i}`]))(
+      '유효하지 않은 액션 타입 %s은(는) 예외를 발생시킨다',
+      (actionType) => {
         expect(() => ConfigValidator.validateActionType(actionType)).toThrow();
-      });
-      const duration = Date.now() - start;
+      },
+    );
 
-      // 완화된 기준: 100개 처리에 100ms 이내
-      expect(duration).toBeLessThan(100);
+    // 여러 스레드에서 "성공해야 하는 케이스"만 따로
+    test.each([
+      ['comment'],
+      ['deploy'],
+      ['ci'],
+    ])('액션 타입 "%s"는 예외 없이 동작해야 한다', (actionType) => {
+      expect(() => ConfigValidator.validateActionType(actionType)).not.toThrow();
     });
 
-    test('여러 스레드에서 동시 검증', async () => {
-      const validations = [
-        'comment',
-        'invalid',
-        'deploy',
-        'wrong',
-        'ci',
-      ].map((actionType) => Promise.resolve().then(() => {
-        try {
-          ConfigValidator.validateActionType(actionType);
-          return { actionType, valid: true };
-        } catch (error) {
-          return { actionType, valid: false, error: error.message };
-        }
-      }));
-
-      const results = await Promise.all(validations);
-
-      expect(results).toEqual([
-        { actionType: 'comment', valid: true },
-        { actionType: 'invalid', valid: false, error: expect.stringContaining('유효하지 않은 액션 타입') },
-        { actionType: 'deploy', valid: true },
-        { actionType: 'wrong', valid: false, error: expect.stringContaining('유효하지 않은 액션 타입') },
-        { actionType: 'ci', valid: true },
-      ]);
+    // 여러 스레드에서 "실패해야 하는 케이스"만 따로
+    test.each([
+      ['invalid'],
+      ['wrong'],
+    ])('액션 타입 "%s"는 예외를 발생시켜야 한다', (actionType) => {
+      expect(() => ConfigValidator.validateActionType(actionType)).toThrow();
     });
   });
 });

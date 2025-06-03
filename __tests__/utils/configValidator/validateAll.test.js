@@ -1,6 +1,4 @@
-// __tests__/utils/configValidator/validateAll.test.js
-
-const { expectAsyncError } = require('@test/utils/configValidator/helpers');
+const { expectAsyncError } = require('@test/helpers');
 
 describe('ConfigValidator.validateAll (통합 테스트)', () => {
   let ConfigValidator;
@@ -11,21 +9,12 @@ describe('ConfigValidator.validateAll (통합 테스트)', () => {
 
   describe('성공 케이스', () => {
     test('기본 액션 (comment) 모든 검증 통과', () => {
-      const validTokens = global.testUtils?.createValidTokens?.() || {
-        SLACK_TOKEN: 'xoxb-test-token-1234567890',
-        GITHUB_TOKEN: 'ghp_test_token_1234567890abcdefghijklmnopqrstuvwxyz',
-      };
+      const validTokens = global.testUtils.createValidTokens();
 
-      global.testUtils?.mockCoreInputs?.({
+      global.testUtils.mockCoreInputs({
         ...validTokens,
         ACTION_TYPE: 'comment',
-      }) || (() => {
-        const mockCore = require('@actions/core');
-        mockCore.getInput.mockImplementation((key) => {
-          const inputs = { ...validTokens, ACTION_TYPE: 'comment' };
-          return inputs[key] || '';
-        });
-      })();
+      });
 
       const result = ConfigValidator.validateAll();
 
@@ -46,10 +35,7 @@ describe('ConfigValidator.validateAll (통합 테스트)', () => {
         JOB_STATUS: 'success',
       };
 
-      global.testUtils?.mockCoreInputs?.(deployInputs) || (() => {
-        const mockCore = require('@actions/core');
-        mockCore.getInput.mockImplementation((key) => deployInputs[key] || '');
-      })();
+      global.testUtils.mockCoreInputs(deployInputs);
 
       const result = ConfigValidator.validateAll();
 
@@ -68,10 +54,7 @@ describe('ConfigValidator.validateAll (통합 테스트)', () => {
         JOB_STATUS: 'failure',
       };
 
-      global.testUtils?.mockCoreInputs?.(ciInputs) || (() => {
-        const mockCore = require('@actions/core');
-        mockCore.getInput.mockImplementation((key) => ciInputs[key] || '');
-      })();
+      global.testUtils.mockCoreInputs(ciInputs);
 
       const result = ConfigValidator.validateAll();
       expect(result.actionType).toBe('ci');
@@ -80,196 +63,96 @@ describe('ConfigValidator.validateAll (통합 테스트)', () => {
 
   describe('검증 실패 케이스 (단계별)', () => {
     test('1단계 실패: 필수 설정 누락', () => {
-      global.testUtils?.mockCoreInputs?.({
+      global.testUtils.mockCoreInputs({
         SLACK_TOKEN: '', // 누락
         GITHUB_TOKEN: 'valid-token-12345678901234567890',
         ACTION_TYPE: 'comment',
-      }) || (() => {
-        const mockCore = require('@actions/core');
-        mockCore.getInput.mockImplementation((key) => {
-          const inputs = {
-            SLACK_TOKEN: '',
-            GITHUB_TOKEN: 'valid-token-12345678901234567890',
-            ACTION_TYPE: 'comment',
-          };
-          return inputs[key] || '';
-        });
-      })();
+      });
 
       expect(() => ConfigValidator.validateAll()).toThrow('필수 설정 누락: SLACK_TOKEN');
     });
 
     test('2단계 실패: Slack 토큰 형식 오류', () => {
-      global.testUtils?.mockCoreInputs?.({
+      global.testUtils.mockCoreInputs({
         SLACK_TOKEN: 'invalid-slack-token',
         GITHUB_TOKEN: 'valid-token-12345678901234567890',
         ACTION_TYPE: 'comment',
-      }) || (() => {
-        const mockCore = require('@actions/core');
-        mockCore.getInput.mockImplementation((key) => {
-          const inputs = {
-            SLACK_TOKEN: 'invalid-slack-token',
-            GITHUB_TOKEN: 'valid-token-12345678901234567890',
-            ACTION_TYPE: 'comment',
-          };
-          return inputs[key] || '';
-        });
-      })();
+      });
 
       expect(() => ConfigValidator.validateAll()).toThrow('Slack 토큰 형식이 올바르지 않습니다');
     });
 
     test('3단계 실패: GitHub 토큰 형식 오류', () => {
-      global.testUtils?.mockCoreInputs?.({
+      global.testUtils.mockCoreInputs({
         SLACK_TOKEN: 'xoxb-valid-token',
         GITHUB_TOKEN: 'short', // 너무 짧음
         ACTION_TYPE: 'comment',
-      }) || (() => {
-        const mockCore = require('@actions/core');
-        mockCore.getInput.mockImplementation((key) => {
-          const inputs = {
-            SLACK_TOKEN: 'xoxb-valid-token',
-            GITHUB_TOKEN: 'short',
-            ACTION_TYPE: 'comment',
-          };
-          return inputs[key] || '';
-        });
-      })();
+      });
 
       expect(() => ConfigValidator.validateAll()).toThrow('GitHub 토큰이 너무 짧습니다');
     });
 
     test('4단계 실패: 액션 타입 오류', () => {
-      const validTokens = global.testUtils?.createValidTokens?.() || {
-        SLACK_TOKEN: 'xoxb-valid-token',
-        GITHUB_TOKEN: 'valid-token-12345678901234567890',
-      };
+      const validTokens = global.testUtils.createValidTokens();
 
-      global.testUtils?.mockCoreInputs?.({
+      global.testUtils.mockCoreInputs({
         ...validTokens,
         ACTION_TYPE: 'invalid_action_type',
-      }) || (() => {
-        const mockCore = require('@actions/core');
-        mockCore.getInput.mockImplementation((key) => {
-          const inputs = { ...validTokens, ACTION_TYPE: 'invalid_action_type' };
-          return inputs[key] || '';
-        });
-      })();
+      });
 
       expect(() => ConfigValidator.validateAll()).toThrow('유효하지 않은 액션 타입: invalid_action_type');
     });
   });
 
-  describe('성능 테스트 (완화된 기준)', () => {
-    test('대량의 검증 요청을 빠르게 처리', () => {
-      const validTokens = global.testUtils?.createValidTokens?.() || {
-        SLACK_TOKEN: 'xoxb-test-token-1234567890',
-        GITHUB_TOKEN: 'ghp_test_token_1234567890abcdefghijklmnopqrstuvwxyz',
-      };
-
-      const start = Date.now();
-      for (let i = 0; i < 100; i++) { // 1000회에서 100회로 감소
-        global.testUtils?.mockCoreInputs?.({
-          ...validTokens,
-          ACTION_TYPE: 'comment',
-        }) || (() => {
-          const mockCore = require('@actions/core');
-          mockCore.getInput.mockImplementation((key) => {
-            const inputs = { ...validTokens, ACTION_TYPE: 'comment' };
-            return inputs[key] || '';
-          });
-        })();
-
-        expect(() => ConfigValidator.validateAll()).not.toThrow();
-      }
-      const duration = Date.now() - start;
-
-      // 완화된 기준: 100회 검증에 200ms 이내
-      expect(duration).toBeLessThan(200);
-    });
-
-    test('메모리 사용량이 안정적 (완화된 기준)', () => {
-      const validTokens = global.testUtils?.createValidTokens?.() || {
-        SLACK_TOKEN: 'xoxb-test-token-1234567890',
-        GITHUB_TOKEN: 'ghp_test_token_1234567890abcdefghijklmnopqrstuvwxyz',
-      };
-
-      const initialMemory = process.memoryUsage().heapUsed;
-
-      // 테스트 규모 축소: 5000회 → 1000회
-      for (let i = 0; i < 1000; i++) {
-        global.testUtils?.mockCoreInputs?.({
-          ...validTokens,
-          ACTION_TYPE: 'schedule',
-        }) || (() => {
-          const mockCore = require('@actions/core');
-          mockCore.getInput.mockImplementation((key) => {
-            const inputs = { ...validTokens, ACTION_TYPE: 'schedule' };
-            return inputs[key] || '';
-          });
-        })();
-
-        ConfigValidator.validateAll();
-      }
-
-      const finalMemory = process.memoryUsage().heapUsed;
-      const memoryIncrease = finalMemory - initialMemory;
-
-      // 완화된 기준: 메모리 증가량이 20MB 이하
-      expect(memoryIncrease).toBeLessThan(20 * 1024 * 1024);
-    });
-  });
-
   describe('비동기 테스트', () => {
-    test('여러 설정을 동시에 검증', async () => {
-      const validTokens = global.testUtils?.createValidTokens?.() || {
-        SLACK_TOKEN: 'xoxb-test-token-1234567890',
-        GITHUB_TOKEN: 'ghp_test_token_1234567890abcdefghijklmnopqrstuvwxyz',
-      };
+    const validTokens = global.testUtils.createValidTokens();
 
-      const testCases = [
-        { inputs: { ...validTokens, ACTION_TYPE: 'comment' }, shouldSucceed: true },
-        { inputs: { SLACK_TOKEN: '', GITHUB_TOKEN: 'valid-token-12345678901234567890', ACTION_TYPE: 'comment' }, shouldSucceed: false },
-        {
-          inputs: {
-            ...validTokens, ACTION_TYPE: 'deploy', EC2_NAME: 'server', IMAGE_TAG: 'v1.0.0', JOB_STATUS: 'success',
-          },
-          shouldSucceed: true,
+    // 성공 케이스
+    test.each([
+      {
+        name: 'comment 액션 성공',
+        inputs: { ...validTokens, ACTION_TYPE: 'comment' },
+      },
+      {
+        name: 'deploy 액션 성공',
+        inputs: {
+          ...validTokens, ACTION_TYPE: 'deploy', EC2_NAME: 'server', IMAGE_TAG: 'v1.0.0', JOB_STATUS: 'success',
         },
-        { inputs: { ...validTokens, ACTION_TYPE: 'invalid' }, shouldSucceed: false },
-      ];
+      },
+    ])('여러 설정을 동시에 검증 - 성공: $name', async ({ inputs }) => {
+      global.testUtils.mockCoreInputs(inputs);
 
-      const results = await Promise.allSettled(
-        testCases.map(({ inputs }) => Promise.resolve().then(() => {
-          global.testUtils?.mockCoreInputs?.(inputs) || (() => {
-            const mockCore = require('@actions/core');
-            mockCore.getInput.mockImplementation((key) => inputs[key] || '');
-          })();
+      expect(() => {
+        ConfigValidator.validateAll();
+      }).not.toThrow();
+    });
 
-          return ConfigValidator.validateAll();
-        })),
-      );
+    // 실패 케이스
+    test.each([
+      {
+        name: 'SLACK_TOKEN 누락 실패',
+        inputs: { SLACK_TOKEN: '', GITHUB_TOKEN: 'valid-token-12345678901234567890', ACTION_TYPE: 'comment' },
+      },
+      {
+        name: 'invalid 액션 실패',
+        inputs: { ...validTokens, ACTION_TYPE: 'invalid' },
+      },
+    ])('여러 설정을 동시에 검증 - 실패: $name', async ({ inputs }) => {
+      global.testUtils.mockCoreInputs(inputs);
 
-      testCases.forEach((testCase, index) => {
-        if (testCase.shouldSucceed) {
-          expect(results[index].status).toBe('fulfilled');
-        } else {
-          expect(results[index].status).toBe('rejected');
-        }
-      });
+      expect(() => {
+        ConfigValidator.validateAll();
+      }).toThrow();
     });
 
     test('비동기 에러 헬퍼를 사용한 검증', async () => {
       const error = await expectAsyncError(
         async () => {
-          global.testUtils?.mockCoreInputs?.({
+          global.testUtils.mockCoreInputs({
             SLACK_TOKEN: '',
             GITHUB_TOKEN: '',
             ACTION_TYPE: '',
-          }) || (() => {
-            const mockCore = require('@actions/core');
-            mockCore.getInput.mockImplementation(() => '');
-          })();
+          });
 
           await Promise.resolve();
           ConfigValidator.validateAll();

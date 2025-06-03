@@ -14,7 +14,9 @@ class ConfigValidator {
   static validateRequired() {
     const required = ['SLACK_TOKEN', 'GITHUB_TOKEN', 'ACTION_TYPE'];
     const inputs = required.map((k) => ({ k, v: Core.getInput(k) }));
-    const missingKeys = inputs.filter(({ v }) => !v).map(({ k }) => k);
+    const missingKeys = inputs.filter(
+      ({ v }) => v == null || (typeof v === 'string' && v.trim() === ''),
+    ).map(({ k }) => k);
 
     if (missingKeys.length) {
       throw new ConfigurationError(`필수 설정 누락: ${missingKeys.join(', ')}`, missingKeys);

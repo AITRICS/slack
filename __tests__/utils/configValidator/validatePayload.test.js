@@ -1,6 +1,4 @@
-// __tests__/utils/configValidator/validatePayload.test.js
-
-const { expectErrorWithDetails, expectAsyncError } = require('@test/utils/configValidator/helpers');
+const { expectErrorWithDetails } = require('@test/helpers');
 
 describe('ConfigValidator.validatePayload', () => {
   let ConfigValidator;
@@ -11,7 +9,7 @@ describe('ConfigValidator.validatePayload', () => {
 
   describe('유효한 페이로드', () => {
     test('완전한 페이로드', () => {
-      const validPayload = global.testUtils?.createMockPayload?.({
+      const validPayload = global.testUtils.createMockPayload({
         action: 'opened',
         pull_request: {
           number: 1,
@@ -20,32 +18,18 @@ describe('ConfigValidator.validatePayload', () => {
         sender: {
           login: 'testuser',
         },
-      }) || {
-        repository: {
-          name: 'test-repo',
-          full_name: 'owner/test-repo',
-        },
-        action: 'opened',
-      };
+      });
 
       expect(() => ConfigValidator.validatePayload(validPayload)).not.toThrow();
     });
 
     test('최소한의 유효한 페이로드', () => {
-      const minimalPayload = {
-        repository: {},
-      };
-
+      const minimalPayload = { repository: {} };
       expect(() => ConfigValidator.validatePayload(minimalPayload)).not.toThrow();
     });
 
     test('repository만 있는 페이로드', () => {
-      const repoOnlyPayload = {
-        repository: {
-          name: 'test',
-        },
-      };
-
+      const repoOnlyPayload = { repository: { name: 'test' } };
       expect(() => ConfigValidator.validatePayload(repoOnlyPayload)).not.toThrow();
     });
   });
@@ -72,7 +56,6 @@ describe('ConfigValidator.validatePayload', () => {
       [new Date(), ['payload'], '유효하지 않은 페이로드', 'Date 객체'],
       ['문자열', ['payload'], '유효하지 않은 페이로드', '문자열'],
       [123, ['payload'], '유효하지 않은 페이로드', '숫자'],
-      // plain object에서 repository 없는 것만 아래처럼 남겨둠
       [{ action: 'opened' }, ['payload.repository'], '페이로드에 repository 정보가 없습니다', 'repository 정보 누락'],
       [{ repository: null }, ['payload.repository'], '페이로드에 repository 정보가 없습니다', 'repository가 null'],
       [{}, ['payload.repository'], '페이로드에 repository 정보가 없습니다', '빈 객체'],
