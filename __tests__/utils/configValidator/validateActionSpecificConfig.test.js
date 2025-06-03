@@ -130,11 +130,9 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
         JOB_STATUS: '',
       });
 
-      // 핵심: 에러 발생 자체는 toThrow로
       expect(() => ConfigValidator.validateActionSpecificConfig('deploy'))
         .toThrow(/deploy 액션에 필요한 설정이 누락되었습니다/);
 
-      // 추가: missingFields 타입 검증은 조건문 없이 always expect (fail-safe)
       let thrownError = null;
       try {
         ConfigValidator.validateActionSpecificConfig('deploy');

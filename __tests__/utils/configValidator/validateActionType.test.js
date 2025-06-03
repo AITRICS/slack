@@ -106,7 +106,6 @@ describe('ConfigValidator.validateActionType', () => {
   });
 
   describe('성능 테스트', () => {
-    // 유효하지 않은 액션 타입들은 예외 발생!
     test.each(Array.from({ length: 100 }, (_, i) => [`invalid_${i}`]))(
       '유효하지 않은 액션 타입 %s은(는) 예외를 발생시킨다',
       (actionType) => {
@@ -114,7 +113,7 @@ describe('ConfigValidator.validateActionType', () => {
       },
     );
 
-    // 여러 스레드에서 "성공해야 하는 케이스"만 따로
+    // 성공 케이스
     test.each([
       ['comment'],
       ['deploy'],
@@ -123,7 +122,7 @@ describe('ConfigValidator.validateActionType', () => {
       expect(() => ConfigValidator.validateActionType(actionType)).not.toThrow();
     });
 
-    // 여러 스레드에서 "실패해야 하는 케이스"만 따로
+    // 실패 케이스
     test.each([
       ['invalid'],
       ['wrong'],
