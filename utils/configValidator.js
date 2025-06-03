@@ -31,8 +31,16 @@ class ConfigValidator {
     const validTypes = Object.values(ACTION_TYPES);
 
     if (!validTypes.includes(actionType)) {
+      let typeStr = '';
+      try {
+        typeStr = typeof actionType === 'symbol' ?
+          actionType.toString() :
+          String(actionType);
+      } catch {
+        typeStr = '[변환 불가능한 타입]';
+      }
       throw new ConfigurationError(
-        `유효하지 않은 액션 타입: ${actionType}. 가능한 값: ${validTypes.join(', ')}`,
+        `유효하지 않은 액션 타입: ${typeStr}. 가능한 값: ${validTypes.join(', ')}`,
         ['ACTION_TYPE'],
       );
     }
@@ -129,11 +137,16 @@ class ConfigValidator {
    * @throws {ConfigurationError} 페이로드가 유효하지 않은 경우
    */
   static validatePayload(payload) {
-    if (!payload || typeof payload !== 'object') {
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      Array.isArray(payload) ||
+      payload instanceof Date
+    ) {
       throw new ConfigurationError('유효하지 않은 페이로드', ['payload']);
     }
 
-    if (!payload.repository) {
+    if (!('repository' in payload) || payload.repository == null) {
       throw new ConfigurationError('페이로드에 repository 정보가 없습니다', ['payload.repository']);
     }
   }
