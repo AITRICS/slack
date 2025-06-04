@@ -6,28 +6,52 @@ const Logger = require('./logger');
 class ImageUtils {
   /**
    * HTML 이미지 태그에서 이미지 URL 추출
+   * @private
    * @static
    * @param {string} text - 분석할 텍스트
-   * @returns {string[]} 이미지 URL 목록
+   * @returns {Object[]} 이미지 정보 배열 [{url, match}]
    */
-  static extractImageUrls(text) {
-    if (!text || typeof text !== 'string') {
-      return [];
-    }
-
-    // HTML img 태그에서 src 속성 추출 (다양한 형태 지원)
+  static #extractImageInfoFromHtml(text) {
     const imgTagPattern = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-    const urls = [];
+    const imageInfos = [];
     let match;
 
     while ((match = imgTagPattern.exec(text)) !== null) {
       const url = match[1];
       if (url && url.trim()) {
-        urls.push(url.trim());
+        imageInfos.push({
+          url: url.trim(),
+          match: match[0], // 전체 매치 문자열
+        });
       }
     }
 
-    return [...new Set(urls)]; // 중복 제거
+    return imageInfos;
+  }
+
+  /**
+   * Markdown 이미지 문법에서 이미지 URL 추출
+   * @private
+   * @static
+   * @param {string} text - 분석할 텍스트
+   * @returns {Object[]} 이미지 정보 배열 [{url, match}]
+   */
+  static #extractImageInfoFromMarkdown(text) {
+    const markdownPattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    const imageInfos = [];
+    let match;
+
+    while ((match = markdownPattern.exec(text)) !== null) {
+      const url = match[2];
+      if (url && url.trim()) {
+        imageInfos.push({
+          url: url.trim(),
+          match: match[0], // 전체 매치 문자열
+        });
+      }
+    }
+
+    return imageInfos;
   }
 
   /**
@@ -48,29 +72,41 @@ class ImageUtils {
   }
 
   /**
-   * HTML 이미지 태그를 Slack 포맷으로 변환
+   * 이미지 태그/문법을 Slack 링크 형태로 변환
    * @static
    * @param {string} text - 변환할 텍스트
    * @returns {string} 변환된 텍스트
    */
-  static convertImagesToSlackFormat(text) {
+  static convertImagesToSlackLinks(text) {
     if (!text || typeof text !== 'string') {
       return text;
     }
 
-    const imgTagPattern = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+    let convertedText = text;
     let conversionCount = 0;
 
-    const convertedText = text.replace(imgTagPattern, (match, src) => {
-      if (ImageUtils.#isValidGitHubImageUrl(src)) {
+    // HTML img 태그 변환
+    const htmlImageInfos = ImageUtils.#extractImageInfoFromHtml(text);
+    htmlImageInfos.forEach((imageInfo) => {
+      if (ImageUtils.#isValidGitHubImageUrl(imageInfo.url)) {
+        const slackLink = `<${imageInfo.url}|[첨부이미지]>`;
+        convertedText = convertedText.replace(imageInfo.match, slackLink);
         conversionCount += 1;
-        return `\n📷 *첨부 이미지:* ${src}`;
       }
-      return match; // GitHub 이미지가 아닌 경우 원본 유지
+    });
+
+    // Markdown 이미지 문법 변환
+    const markdownImageInfos = ImageUtils.#extractImageInfoFromMarkdown(convertedText);
+    markdownImageInfos.forEach((imageInfo) => {
+      if (ImageUtils.#isValidGitHubImageUrl(imageInfo.url)) {
+        const slackLink = `<${imageInfo.url}|[첨부이미지]>`;
+        convertedText = convertedText.replace(imageInfo.match, slackLink);
+        conversionCount += 1;
+      }
     });
 
     if (conversionCount > 0) {
-      Logger.debug(`이미지 태그 변환 완료: ${conversionCount}개`, {
+      Logger.debug(`이미지를 Slack 링크로 변환 완료: ${conversionCount}개`, {
         originalLength: text.length,
         convertedLength: convertedText.length,
       });
@@ -80,64 +116,65 @@ class ImageUtils {
   }
 
   /**
-   * 이미지 URL들을 Slack attachment 형태로 생성
+   * 텍스트에서 이미지 URL 추출 (HTML + Markdown)
    * @static
-   * @param {string[]} imageUrls - 이미지 URL 목록
-   * @returns {Object[]} Slack attachment 배열
+   * @param {string} text - 분석할 텍스트
+   * @returns {string[]} 이미지 URL 목록
    */
-  static createSlackImageAttachments(imageUrls) {
-    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+  static extractImageUrls(text) {
+    if (!text || typeof text !== 'string') {
       return [];
     }
 
-    const validUrls = imageUrls.filter(ImageUtils.#isValidGitHubImageUrl);
+    const htmlImageInfos = ImageUtils.#extractImageInfoFromHtml(text);
+    const markdownImageInfos = ImageUtils.#extractImageInfoFromMarkdown(text);
 
-    return validUrls.map((url, index) => ({
-      color: '#36a64f',
-      image_url: url,
-      fallback: `첨부 이미지 ${index + 1}`,
-      title: validUrls.length > 1 ? `첨부 이미지 ${index + 1}` : '첨부 이미지',
-      title_link: url,
-    }));
+    const allUrls = [
+      ...htmlImageInfos.map((info) => info.url),
+      ...markdownImageInfos.map((info) => info.url),
+    ];
+
+    return [...new Set(allUrls)]; // 중복 제거
   }
 
   /**
-   * 코멘트 텍스트에서 이미지를 처리하여 Slack 포맷으로 변환 (통합 함수)
+   * 코멘트 텍스트에서 이미지를 처리하여 Slack 포맷으로 변환
    * @static
    * @param {string} commentText - 코멘트 텍스트
-   * @returns {Object} 변환된 텍스트와 이미지 첨부 정보
+   * @returns {Object} 변환된 텍스트와 이미지 정보
    */
   static processCommentImages(commentText) {
     try {
       if (!commentText || typeof commentText !== 'string') {
         return {
           text: commentText,
-          imageAttachments: [],
           hasImages: false,
+          imageCount: 0,
         };
       }
 
-      const imageUrls = ImageUtils.extractImageUrls(commentText);
-      const convertedText = ImageUtils.convertImagesToSlackFormat(commentText);
-      const imageAttachments = ImageUtils.createSlackImageAttachments(imageUrls);
+      const originalImageUrls = ImageUtils.extractImageUrls(commentText);
+      const validImageUrls = originalImageUrls.filter(ImageUtils.#isValidGitHubImageUrl);
+      const convertedText = ImageUtils.convertImagesToSlackLinks(commentText);
 
       Logger.debug('코멘트 이미지 처리 완료', {
         originalTextLength: commentText.length,
-        imageCount: imageUrls.length,
-        validImageCount: imageAttachments.length,
+        totalImageCount: originalImageUrls.length,
+        validImageCount: validImageUrls.length,
+        convertedTextLength: convertedText.length,
       });
 
       return {
         text: convertedText,
-        imageAttachments,
-        hasImages: imageUrls.length > 0,
+        hasImages: validImageUrls.length > 0,
+        imageCount: validImageUrls.length,
       };
     } catch (error) {
       Logger.error('코멘트 이미지 처리 실패', error);
       return {
         text: commentText, // 실패 시 원본 반환
-        imageAttachments: [],
         hasImages: false,
+        imageCount: 0,
       };
     }
   }

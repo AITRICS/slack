@@ -337,14 +337,12 @@ class CommentEventHandler extends BaseEventHandler {
       prUrl: prData.html_url || `https://github.com/${repository.full_name}/pull/${commentType.prNumber}`,
       prTitle: prData.title,
       commentUrl: comment.html_url,
-      commentBody: convertedCommentBody, // 변환된 코멘트 본문 사용
+      commentBody: imageProcessResult.text,
       codeSnippet: comment.diff_hunk,
       authorUsername,
       authorSlackName: authorSlackInfo,
       targetUsername: actualTargetUsername,
       targetSlackId,
-      imageAttachments: imageProcessResult.imageAttachments, // 이미지 첨부 추가
-      hasImages: imageProcessResult.hasImages, // 이미지 포함 여부 추가
     };
   }
 

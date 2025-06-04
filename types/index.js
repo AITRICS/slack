@@ -459,19 +459,4 @@
  * @property {string} [targetGithubUsername] - 대상 GitHub 사용자명
  */
 
-/**
- * 이미지 처리 결과
- * @typedef {Object} ImageProcessResult
- * @property {string} text - 이미지 처리된 텍스트
- * @property {Object[]} imageAttachments - Slack 이미지 첨부
- * @property {boolean} hasImages - 이미지 포함 여부
- */
-
-/**
- * 확장된 알림 데이터 (이미지 지원)
- * @typedef {NotificationData & Object} EnhancedNotificationData
- * @property {Object[]} [imageAttachments] - 이미지 첨부
- * @property {boolean} [hasImages] - 이미지 포함 여부
- */
-
 module.exports = {};

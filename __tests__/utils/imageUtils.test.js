@@ -31,37 +31,31 @@ describe('imageUtils', () => {
       [
         '<img width="628" alt="image" src="https://github.com/user-attachments/assets/5c6e8c99-b15f-4742-91a2-4d89de708f1e" />',
         ['https://github.com/user-attachments/assets/5c6e8c99-b15f-4742-91a2-4d89de708f1e'],
-        '단일 이미지 태그',
+        'HTML 이미지 태그',
       ],
       [
-        `<img width="745" alt="image" src="https://github.com/user-attachments/assets/13273685-9e58-4a0a-b47c-311648fad564" />
-         <img src="https://github.com/user-attachments/assets/another-image-url" alt="second image" />`,
+        '![image](https://github.com/user-attachments/assets/be608751-3bb1-467c-9df8-65e771ef6ced)',
+        ['https://github.com/user-attachments/assets/be608751-3bb1-467c-9df8-65e771ef6ced'],
+        'Markdown 이미지 문법',
+      ],
+      [
+        `![image](https://github.com/user-attachments/assets/image1.jpg)
+         <img src="https://github.com/user-attachments/assets/image2.png" alt="html image" />`,
         [
-          'https://github.com/user-attachments/assets/13273685-9e58-4a0a-b47c-311648fad564',
-          'https://github.com/user-attachments/assets/another-image-url',
+          'https://github.com/user-attachments/assets/image1.jpg',
+          'https://github.com/user-attachments/assets/image2.png',
         ],
-        '다중 이미지 태그',
+        'HTML + Markdown 혼합',
+      ],
+      [
+        '![external](https://example.com/image.jpg)',
+        ['https://example.com/image.jpg'],
+        '외부 이미지 URL도 추출',
       ],
       [
         '일반 텍스트 내용입니다.',
         [],
         '이미지 없는 텍스트',
-      ],
-      [
-        '<img src=\'https://github.com/user-attachments/assets/single-quote.jpg\' alt="single quote" />',
-        ['https://github.com/user-attachments/assets/single-quote.jpg'],
-        '단일 따옴표 src',
-      ],
-      [
-        `<img width="628" alt="image" src="https://github.com/user-attachments/assets/test1.jpg" />
-         <img width="628" alt="image" src="https://github.com/user-attachments/assets/test1.jpg" />`,
-        ['https://github.com/user-attachments/assets/test1.jpg'],
-        '중복 이미지 URL 제거',
-      ],
-      [
-        '<img src="https://example.com/image.jpg" alt="external image" />',
-        ['https://example.com/image.jpg'],
-        '외부 이미지 URL도 추출',
       ],
       [
         '',
@@ -73,44 +67,27 @@ describe('imageUtils', () => {
         [],
         'null 입력',
       ],
-      [
-        undefined,
-        [],
-        'undefined 입력',
-      ],
     ])('extractImageUrls: %s → %j (%s)', (input, expected, _description) => {
       expect(ImageUtils.extractImageUrls(input)).toEqual(expected);
     });
-
-    test('복잡한 HTML 구조에서 이미지 추출', () => {
-      const complexHtml = `
-        <div>
-          <p>코멘트 내용입니다.</p>
-          <img width="628" alt="image" src="https://github.com/user-attachments/assets/image1.jpg" />
-          <p>중간 텍스트</p>
-          <img src="https://github.com/user-attachments/assets/image2.png" alt="second" />
-        </div>
-      `;
-
-      const result = ImageUtils.extractImageUrls(complexHtml);
-      expect(result).toEqual([
-        'https://github.com/user-attachments/assets/image1.jpg',
-        'https://github.com/user-attachments/assets/image2.png',
-      ]);
-    });
   });
 
-  describe('convertImagesToSlackFormat', () => {
+  describe('convertImagesToSlackLinks', () => {
     test.each([
       [
-        '<img width="628" alt="image" src="https://github.com/user-attachments/assets/test.jpg" />',
-        '\n📷 *첨부 이미지:* https://github.com/user-attachments/assets/test.jpg',
-        'GitHub 이미지 변환',
+        '<img width="745" alt="image" src="https://github.com/user-attachments/assets/13273685-9e58-4a0a-b47c-311648fad564" />',
+        '<https://github.com/user-attachments/assets/13273685-9e58-4a0a-b47c-311648fad564|[첨부이미지]>',
+        'HTML 이미지를 Slack 링크로 변환',
       ],
       [
-        '코멘트 내용\n<img src="https://github.com/user-attachments/assets/test.jpg" alt="image" />\n추가 내용',
-        '코멘트 내용\n\n📷 *첨부 이미지:* https://github.com/user-attachments/assets/test.jpg\n추가 내용',
-        '텍스트와 이미지 혼합',
+        '![image](https://github.com/user-attachments/assets/test.jpg)',
+        '<https://github.com/user-attachments/assets/test.jpg|[첨부이미지]>',
+        'Markdown 이미지를 Slack 링크로 변환',
+      ],
+      [
+        '<img width="745" alt="image" src="https://github.com/user-attachments/assets/13273685-9e58-4a0a-b47c-311648fad564" />여기도 봐주세요~ 이미지 테스트',
+        '<https://github.com/user-attachments/assets/13273685-9e58-4a0a-b47c-311648fad564|[첨부이미지]>여기도 봐주세요~ 이미지 테스트',
+        '실제 사용 예시',
       ],
       [
         '<img src="https://example.com/image.jpg" alt="external" />',
@@ -132,23 +109,27 @@ describe('imageUtils', () => {
         null,
         'null 입력',
       ],
-    ])('convertImagesToSlackFormat: %s → %s (%s)', (input, expected, _description) => {
-      expect(ImageUtils.convertImagesToSlackFormat(input)).toBe(expected);
+    ])('convertImagesToSlackLinks: %s → %s (%s)', (input, expected, _description) => {
+      expect(ImageUtils.convertImagesToSlackLinks(input)).toBe(expected);
     });
 
     test('다중 GitHub 이미지 변환 및 로그 확인', () => {
-      const input = `
-        <img src="https://github.com/user-attachments/assets/image1.jpg" alt="first" />
-        <img src="https://github.com/user-attachments/assets/image2.jpg" alt="second" />
-      `;
+      const input = `텍스트 시작
+<img src="https://github.com/user-attachments/assets/image1.jpg" alt="first" />
+중간 텍스트
+![second](https://github.com/user-attachments/assets/image2.jpg)
+텍스트 끝`;
 
-      const result = ImageUtils.convertImagesToSlackFormat(input);
+      const result = ImageUtils.convertImagesToSlackLinks(input);
 
-      expect(result).toContain('📷 *첨부 이미지:* https://github.com/user-attachments/assets/image1.jpg');
-      expect(result).toContain('📷 *첨부 이미지:* https://github.com/user-attachments/assets/image2.jpg');
+      expect(result).toContain('<https://github.com/user-attachments/assets/image1.jpg|[첨부이미지]>');
+      expect(result).toContain('<https://github.com/user-attachments/assets/image2.jpg|[첨부이미지]>');
+      expect(result).toContain('텍스트 시작');
+      expect(result).toContain('중간 텍스트');
+      expect(result).toContain('텍스트 끝');
 
       expect(Logger.debug).toHaveBeenCalledWith(
-        '이미지 태그 변환 완료: 2개',
+        '이미지를 Slack 링크로 변환 완료: 2개',
         expect.objectContaining({
           originalLength: expect.any(Number),
           convertedLength: expect.any(Number),
@@ -157,94 +138,49 @@ describe('imageUtils', () => {
     });
   });
 
-  describe('createSlackImageAttachments', () => {
-    test('GitHub 이미지 URL들을 Slack attachment로 변환', () => {
-      const imageUrls = [
-        'https://github.com/user-attachments/assets/image1.jpg',
-        'https://github.com/user-attachments/assets/image2.png',
-      ];
-
-      const result = ImageUtils.createSlackImageAttachments(imageUrls);
-
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
-        color: '#36a64f',
-        image_url: 'https://github.com/user-attachments/assets/image1.jpg',
-        fallback: '첨부 이미지 1',
-        title: '첨부 이미지 1',
-        title_link: 'https://github.com/user-attachments/assets/image1.jpg',
-      });
-      expect(result[1]).toEqual({
-        color: '#36a64f',
-        image_url: 'https://github.com/user-attachments/assets/image2.png',
-        fallback: '첨부 이미지 2',
-        title: '첨부 이미지 2',
-        title_link: 'https://github.com/user-attachments/assets/image2.png',
-      });
-    });
-
-    test('단일 이미지 URL 처리', () => {
-      const imageUrls = ['https://github.com/user-attachments/assets/single.jpg'];
-
-      const result = ImageUtils.createSlackImageAttachments(imageUrls);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].title).toBe('첨부 이미지');
-      expect(result[0].fallback).toBe('첨부 이미지 1');
-    });
-
-    test.each([
-      [[], [], '빈 배열'],
-      [null, [], 'null 입력'],
-      [undefined, [], 'undefined 입력'],
-      [['https://example.com/image.jpg'], [], '유효하지 않은 URL'],
-      [
-        [
-          'https://github.com/user-attachments/assets/valid.jpg',
-          'https://example.com/invalid.jpg',
-          'https://github.com/user-attachments/assets/another-valid.png',
-        ],
-        [
-          expect.objectContaining({
-            image_url: 'https://github.com/user-attachments/assets/valid.jpg',
-          }),
-          expect.objectContaining({
-            image_url: 'https://github.com/user-attachments/assets/another-valid.png',
-          }),
-        ],
-        '유효한 URL만 필터링',
-      ],
-    ])('createSlackImageAttachments 경계값: %j → %j (%s)', (input, expected, _description) => {
-      const result = ImageUtils.createSlackImageAttachments(input);
-      expect(result).toEqual(expected);
-    });
-  });
-
   describe('processCommentImages', () => {
-    test('이미지가 포함된 코멘트 처리', () => {
-      const commentText = `
-        코멘트 내용입니다.
-        <img width="628" alt="image" src="https://github.com/user-attachments/assets/test.jpg" />
-        추가 내용
-      `;
+    test('HTML 이미지가 포함된 코멘트 처리', () => {
+      const commentText = '<img width="745" alt="image" src="https://github.com/user-attachments/assets/13273685-9e58-4a0a-b47c-311648fad564" />여기도 봐주세요~ 이미지 테스트';
 
       const result = ImageUtils.processCommentImages(commentText);
 
       expect(result.hasImages).toBe(true);
-      expect(result.imageAttachments).toHaveLength(1);
-      expect(result.text).toContain('📷 *첨부 이미지:*');
-      expect(result.imageAttachments[0]).toMatchObject({
-        image_url: 'https://github.com/user-attachments/assets/test.jpg',
-      });
+      expect(result.imageCount).toBe(1);
+      expect(result.text).toBe('<https://github.com/user-attachments/assets/13273685-9e58-4a0a-b47c-311648fad564|[첨부이미지]>여기도 봐주세요~ 이미지 테스트');
 
       expect(Logger.debug).toHaveBeenCalledWith(
         '코멘트 이미지 처리 완료',
         expect.objectContaining({
           originalTextLength: expect.any(Number),
-          imageCount: 1,
+          totalImageCount: 1,
           validImageCount: 1,
         }),
       );
+    });
+
+    test('Markdown 이미지가 포함된 코멘트 처리', () => {
+      const commentText = '![image](https://github.com/user-attachments/assets/test.jpg)\n이미지 설명';
+
+      const result = ImageUtils.processCommentImages(commentText);
+
+      expect(result.hasImages).toBe(true);
+      expect(result.imageCount).toBe(1);
+      expect(result.text).toBe('<https://github.com/user-attachments/assets/test.jpg|[첨부이미지]>\n이미지 설명');
+    });
+
+    test('다중 이미지 처리', () => {
+      const commentText = `첫 번째 이미지
+![img1](https://github.com/user-attachments/assets/image1.jpg)
+두 번째 이미지
+<img src="https://github.com/user-attachments/assets/image2.png" />`;
+
+      const result = ImageUtils.processCommentImages(commentText);
+
+      expect(result.hasImages).toBe(true);
+      expect(result.imageCount).toBe(2);
+      expect(result.text).toContain('[첨부이미지]');
+      expect(result.text).toContain('첫 번째 이미지');
+      expect(result.text).toContain('두 번째 이미지');
     });
 
     test('이미지가 없는 코멘트 처리', () => {
@@ -253,8 +189,22 @@ describe('imageUtils', () => {
       const result = ImageUtils.processCommentImages(commentText);
 
       expect(result.hasImages).toBe(false);
-      expect(result.imageAttachments).toHaveLength(0);
+      expect(result.imageCount).toBe(0);
       expect(result.text).toBe(commentText);
+    });
+
+    test('외부 이미지 포함 코멘트 처리 (GitHub 이미지만 카운트)', () => {
+      const commentText = `GitHub 이미지
+![github](https://github.com/user-attachments/assets/valid.jpg)
+외부 이미지
+![external](https://example.com/invalid.jpg)`;
+
+      const result = ImageUtils.processCommentImages(commentText);
+
+      expect(result.hasImages).toBe(true);
+      expect(result.imageCount).toBe(1); // GitHub 이미지만 카운트
+      expect(result.text).toContain('<https://github.com/user-attachments/assets/valid.jpg|[첨부이미지]>');
+      expect(result.text).toContain('![external](https://example.com/invalid.jpg)'); // 외부 이미지는 그대로
     });
 
     test.each([
@@ -265,7 +215,7 @@ describe('imageUtils', () => {
       const result = ImageUtils.processCommentImages(input);
 
       expect(result.hasImages).toBe(false);
-      expect(result.imageAttachments).toHaveLength(0);
+      expect(result.imageCount).toBe(0);
       expect(result.text).toBe(input);
     });
 
@@ -279,7 +229,7 @@ describe('imageUtils', () => {
       const result = ImageUtils.processCommentImages('test text');
 
       expect(result.hasImages).toBe(false);
-      expect(result.imageAttachments).toHaveLength(0);
+      expect(result.imageCount).toBe(0);
       expect(result.text).toBe('test text');
 
       expect(Logger.error).toHaveBeenCalledWith(
@@ -295,12 +245,17 @@ describe('imageUtils', () => {
   describe('hasImages', () => {
     test.each([
       [
-        '<img src="https://github.com/user-attachments/assets/test.jpg" alt="image" />',
+        '![image](https://github.com/user-attachments/assets/test.jpg)',
         true,
-        'GitHub 이미지 포함',
+        'Markdown GitHub 이미지 포함',
       ],
       [
-        '<img src="https://example.com/image.jpg" alt="external" />',
+        '<img src="https://github.com/user-attachments/assets/test.jpg" alt="image" />',
+        true,
+        'HTML GitHub 이미지 포함',
+      ],
+      [
+        '![external](https://example.com/image.jpg)',
         false,
         '외부 이미지는 해당 없음',
       ],
@@ -324,25 +279,63 @@ describe('imageUtils', () => {
     });
   });
 
-  describe('GitHub URL 검증 (간접 테스트)', () => {
+  describe('GitHub URL 검증', () => {
     test('유효한 GitHub 이미지 URL만 처리됨', () => {
-      const mixedUrls = [
-        'https://github.com/user-attachments/assets/valid.jpg',
-        'https://example.com/invalid.jpg',
-        'https://github.com/other-path/invalid.jpg',
-        'invalid-url',
-      ];
+      const mixedText = `
+        ![valid](https://github.com/user-attachments/assets/valid.jpg)
+        ![invalid1](https://example.com/invalid.jpg)
+        ![invalid2](https://github.com/other-path/invalid.jpg)
+      `;
 
-      const attachments = ImageUtils.createSlackImageAttachments(mixedUrls);
-      expect(attachments).toHaveLength(1);
-      expect(attachments[0].image_url).toBe('https://github.com/user-attachments/assets/valid.jpg');
+      const result = ImageUtils.convertImagesToSlackLinks(mixedText);
+
+      expect(result).toContain('<https://github.com/user-attachments/assets/valid.jpg|[첨부이미지]>');
+      expect(result).toContain('![invalid1](https://example.com/invalid.jpg)');
+      expect(result).toContain('![invalid2](https://github.com/other-path/invalid.jpg)');
+    });
+  });
+
+  describe('실제 사용 시나리오', () => {
+    test('실제 GitHub 코멘트 패턴', () => {
+      const realComment = `코멘트 내용:
+<img width="628" alt="image" src="https://github.com/user-attachments/assets/5c6e8c99-b15f-4742-91a2-4d89de708f1e" />
+여기도 봐주세요~`;
+
+      const result = ImageUtils.processCommentImages(realComment);
+
+      expect(result.hasImages).toBe(true);
+      expect(result.imageCount).toBe(1);
+      expect(result.text).toBe(`코멘트 내용:
+<https://github.com/user-attachments/assets/5c6e8c99-b15f-4742-91a2-4d89de708f1e|[첨부이미지]>
+여기도 봐주세요~`);
+    });
+
+    test('복합적인 코멘트 패턴', () => {
+      const complexComment = `버그 발견했습니다.
+
+스크린샷:
+<img width="745" alt="버그화면" src="https://github.com/user-attachments/assets/bug-screenshot.png" />
+
+그리고 로그도 첨부합니다:
+![로그파일](https://github.com/user-attachments/assets/log-file.txt)
+
+확인 부탁드립니다.`;
+
+      const result = ImageUtils.processCommentImages(complexComment);
+
+      expect(result.hasImages).toBe(true);
+      expect(result.imageCount).toBe(2);
+      expect(result.text).toContain('<https://github.com/user-attachments/assets/bug-screenshot.png|[첨부이미지]>');
+      expect(result.text).toContain('<https://github.com/user-attachments/assets/log-file.txt|[첨부이미지]>');
+      expect(result.text).toContain('버그 발견했습니다.');
+      expect(result.text).toContain('확인 부탁드립니다.');
     });
   });
 
   describe('성능 테스트', () => {
-    test('대량의 이미지 태그 처리', () => {
+    test('대량의 이미지 처리', () => {
       const manyImages = Array.from({ length: 10 }, (_, i) => (
-        `<img src="https://github.com/user-attachments/assets/image${i}.jpg" alt="image${i}" />`
+        `![image${i}](https://github.com/user-attachments/assets/image${i}.jpg)`
       )).join('\n');
 
       const start = Date.now();
@@ -350,7 +343,7 @@ describe('imageUtils', () => {
       const duration = Date.now() - start;
 
       expect(result.hasImages).toBe(true);
-      expect(result.imageAttachments).toHaveLength(10);
+      expect(result.imageCount).toBe(10);
       expect(duration).toBeLessThan(100); // 100ms 이내
     });
   });
