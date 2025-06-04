@@ -1,4 +1,3 @@
-// PayloadValidationError.test.js
 /* Jest Best Practice FYI:
   https://jestjs.io/docs/jest-object#jestisolatemodulesfn
   https://stackoverflow.com/questions/64245013/difference-between-jest-mock-and-jest-domock
@@ -319,7 +318,6 @@ describe('errors.PayloadValidationError', () => {
 
       const error = new PayloadValidationError('Validation failed', payload);
 
-      // 실제로는 애플리케이션에서 민감한 정보를 마스킹해야 함
       expect(error.details.payload.token).toBe('secret_token_123');
       expect(error.details.payload.user.email).toBe('user@example.com');
     });

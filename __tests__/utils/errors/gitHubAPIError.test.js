@@ -1,4 +1,3 @@
-// GitHubAPIError.test.js
 /* Jest Best Practice FYI:
   https://jestjs.io/docs/jest-object#jestisolatemodulesfn
   https://stackoverflow.com/questions/64245013/difference-between-jest-mock-and-jest-domock
@@ -327,9 +326,8 @@ describe('errors.GitHubAPIError', () => {
 
       const error = new GitHubAPIError('인증 실패', details);
 
-      // 실제로는 애플리케이션에서 토큰을 마스킹해야 함
       expect(error.details.maskedToken).toBe('ghp_***masked***');
-      expect(error.details.token).toBeDefined(); // 테스트에서는 원본 확인
+      expect(error.details.token).toBeDefined();
     });
   });
 

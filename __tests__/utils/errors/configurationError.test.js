@@ -1,4 +1,3 @@
-// ConfigurationError.test.js
 /* Jest Best Practice FYI:
   https://jestjs.io/docs/jest-object#jestisolatemodulesfn
   https://stackoverflow.com/questions/64245013/difference-between-jest-mock-and-jest-domock

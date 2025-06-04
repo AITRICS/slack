@@ -1,4 +1,3 @@
-// SlackAPIError.test.js
 /* Jest Best Practice FYI:
   https://jestjs.io/docs/jest-object#jestisolatemodulesfn
   https://stackoverflow.com/questions/64245013/difference-between-jest-mock-and-jest-domock
@@ -214,7 +213,6 @@ describe('errors.SlackAPIError', () => {
 
       const error = new SlackAPIError('인증 실패', details);
 
-      // 실제로는 애플리케이션에서 토큰을 마스킹해야 함
       expect(error.details.token).toBeDefined();
       expect(error.details.maskedToken).toBe('xoxb-***masked***');
     });
