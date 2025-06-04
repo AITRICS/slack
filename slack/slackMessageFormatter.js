@@ -10,13 +10,16 @@ class SlackMessageFormatter {
    * @param {string} channelId - 채널 ID
    * @param {string} text - 메시지 텍스트
    * @param {SlackAttachment[]} [attachments=[]] - 첨부 내용
+   * @param  {Object[]} [imageAttachments]
    * @returns {SlackMessage} Slack 메시지 객체
    */
-  static createMessage(channelId, text, attachments = []) {
+  static createMessage(channelId, text, attachments = [], imageAttachments = []) {
+    const allAttachments = [...attachments, ...imageAttachments];
+
     return {
       channel: channelId,
       text,
-      attachments,
+      attachments: allAttachments,
       mrkdwn: true,
     };
   }
@@ -103,6 +106,7 @@ class SlackMessageFormatter {
       authorSlackName = '',
       targetSlackId = '',
       mentionsString = '',
+      imageAttachments = [],
     } = data;
 
     // 코드 스니펫 포맷
@@ -131,7 +135,7 @@ class SlackMessageFormatter {
       mentions,
     );
 
-    return { text, attachment };
+    return { text, attachment, imageAttachments };
   }
 
   /**

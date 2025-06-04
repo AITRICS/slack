@@ -67,8 +67,8 @@ class SlackMessageService {
    */
   async sendCodeCommentMessage(data, channelId) {
     try {
-      const { text, attachment } = SlackMessageFormatter.formatCodeCommentMessage(data);
-      const message = SlackMessageFormatter.createMessage(channelId, text, [attachment]);
+      const { text, attachment, imageAttachments = [] } = SlackMessageFormatter.formatCodeCommentMessage(data);
+      const message = SlackMessageFormatter.createMessage(channelId, text, [attachment], imageAttachments);
       await this.sendMessage(message);
       Logger.info(`코드 코멘트 알림 전송 완료: ${channelId}`);
     } catch (error) {
