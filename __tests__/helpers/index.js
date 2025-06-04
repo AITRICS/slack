@@ -5,7 +5,7 @@
  * @param {Array} expectedMissingFields - 예상 누락 필드
  * @returns {Error} 발생한 에러 객체
  */
-const expectErrorWithDetails = (fn, expectedMessage, expectedMissingFields = []) => {
+function expectErrorWithDetails(fn, expectedMessage, expectedMissingFields = [], getFields = undefined) {
   let thrownError;
   expect(() => {
     try {
@@ -17,14 +17,20 @@ const expectErrorWithDetails = (fn, expectedMessage, expectedMissingFields = [])
   }).toThrow();
 
   expect(thrownError).toBeDefined();
-  expect(thrownError.message).toBe(expectedMessage);
-
-  if (expectedMissingFields.length > 0) {
-    expect(thrownError.missingFields).toEqual(expectedMissingFields);
+  if (expectedMessage !== undefined) {
+    expect(thrownError.message).toBe(expectedMessage);
   }
 
+  // 기본 accessor: details?.missingFields
+  const missingFields = typeof getFields === 'function' ?
+    getFields(thrownError) :
+    thrownError.details?.missingFields;
+
+  if (expectedMissingFields.length > 0) {
+    expect(missingFields).toEqual(expectedMissingFields);
+  }
   return thrownError;
-};
+}
 
 /**
  * 비동기 함수의 에러를 안전하게 테스트
@@ -106,7 +112,7 @@ const measurePerformance = (fn, iterations = 1) => {
   const start = process.hrtime.bigint();
   let result;
 
-  for (let i = 0; i < iterations; i++) {
+  for (let i = 0; i < iterations; i += 1) {
     result = fn();
   }
 
@@ -131,7 +137,8 @@ const measureAsyncPerformance = async (asyncFn, iterations = 1) => {
   const start = process.hrtime.bigint();
   let result;
 
-  for (let i = 0; i < iterations; i++) {
+  for (let i = 0; i < iterations; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
     result = await asyncFn();
   }
 
@@ -181,7 +188,7 @@ const createRandomData = {
    */
   string: (length = 10, charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') => {
     let result = '';
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < length; i += 1) {
       result += charset.charAt(Math.floor(Math.random() * charset.length));
     }
     return result;
@@ -235,6 +242,7 @@ const runConcurrentTests = async (testFunctions, concurrency = 4) => {
 
   for (let i = 0; i < testFunctions.length; i += concurrency) {
     const batch = testFunctions.slice(i, i + concurrency);
+    // eslint-disable-next-line no-await-in-loop
     const batchResults = await Promise.allSettled(
       batch.map((fn) => Promise.resolve().then(fn)),
     );
@@ -281,12 +289,14 @@ const runIsolated = async (testFn) => {
 const retryTest = async (testFn, maxRetries = 3, delay = 100) => {
   let lastError;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
+      // eslint-disable-next-line no-await-in-loop
       return await testFn();
     } catch (error) {
       lastError = error;
       if (attempt < maxRetries) {
+        // eslint-disable-next-line no-await-in-loop
         await wait(delay);
       }
     }

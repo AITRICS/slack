@@ -45,6 +45,7 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
         '모든 설정 누락',
       ],
     ])('DEPLOY 설정 누락: %j → %j (%s)', (inputs, expectedMissing, _description) => {
+      expect.assertions(1);
       global.testUtils.mockCoreInputs(inputs);
 
       expectErrorWithDetails(
@@ -82,7 +83,9 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
         ['IMAGE_TAG'],
         'IMAGE_TAG 누락',
       ],
-    ])('CI 설정 누락: %j → %j (%s)', (inputs, expectedMissing, _description) => {
+    ])('CI 설정 누락: %j → ' +
+      '%j (%s)', (inputs, expectedMissing, _description) => {
+      expect.assertions(1);
       global.testUtils.mockCoreInputs(inputs);
 
       expectErrorWithDetails(
@@ -139,7 +142,7 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
       } catch (error) {
         thrownError = error;
       }
-      expect(Array.isArray(thrownError?.missingFields)).toBe(true);
+      expect(Array.isArray(thrownError.details?.missingFields)).toBe(true);
     });
 
     test('부분적으로 유효한 값들', () => {
