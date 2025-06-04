@@ -11,22 +11,22 @@ jest.mock('@actions/core', () => ({
   error: jest.fn(),
 }));
 
-jest.mock('@/utils/errors', () => ({
-  ConfigurationError: class extends Error {
-    constructor(message, missingFields = []) {
-      super(message);
-      this.name = 'ConfigurationError';
-      this.missingFields = missingFields;
-    }
-  },
-  ValidationError: class extends Error {
-    constructor(message, field) {
-      super(message);
-      this.name = 'ValidationError';
-      this.field = field;
-    }
-  },
-}));
+// jest.mock('@/utils/errors', () => ({
+//   ConfigurationError: class extends Error {
+//     constructor(message, missingFields = []) {
+//       super(message);
+//       this.name = 'ConfigurationError';
+//       this.missingFields = missingFields;
+//     }
+//   },
+//   ValidationError: class extends Error {
+//     constructor(message, field) {
+//       super(message);
+//       this.name = 'ValidationError';
+//       this.field = field;
+//     }
+//   },
+// }));
 
 jest.mock('@/constants', () => ({
   ACTION_TYPES: {

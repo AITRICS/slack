@@ -15,6 +15,13 @@ module.exports = {
       node: {
         extensions: ['.js', '.json', '.mjs', '.cjs'],
       },
+      alias: {
+        map: [
+          ['@', './'], // 예: import x from '@/utils/x'
+          ['@test', './__tests__'], // 예: import x from '@test/helpers'
+        ],
+        extensions: ['.js', '.jsx', '.json'],
+      },
     },
     'import/core-modules': [
       '@octokit/plugin-retry',

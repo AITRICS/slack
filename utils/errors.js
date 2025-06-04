@@ -14,7 +14,7 @@ class SlackNotificationError extends Error {
     super(message, { cause: options.cause });
     this.name = 'SlackNotificationError';
     this.code = code;
-    this.details = details;
+    this.details = details || {}; // null이나 undefined일 때 기본값 적용
     this.timestamp = new Date().toISOString();
   }
 }
@@ -22,7 +22,7 @@ class SlackNotificationError extends Error {
 /** Slack API 오류 */
 class SlackAPIError extends SlackNotificationError {
   constructor(message, details = {}, options = {}) {
-    super(message, 'SLACK_API_ERROR', details, options);
+    super(message, 'SLACK_API_ERROR', details || {}, options); // null일 때 기본값 적용
     this.name = 'SlackAPIError';
   }
 }
@@ -30,7 +30,7 @@ class SlackAPIError extends SlackNotificationError {
 /** GitHub API 오류 */
 class GitHubAPIError extends SlackNotificationError {
   constructor(message, details = {}, options = {}) {
-    super(message, 'GITHUB_API_ERROR', details, options);
+    super(message, 'GITHUB_API_ERROR', details || {}, options); // null일 때 기본값 적용
     this.name = 'GitHubAPIError';
   }
 }
@@ -38,7 +38,7 @@ class GitHubAPIError extends SlackNotificationError {
 /** 설정 오류 */
 class ConfigurationError extends SlackNotificationError {
   constructor(message, missingFields = [], options = {}) {
-    super(message, 'CONFIGURATION_ERROR', { missingFields }, options);
+    super(message, 'CONFIGURATION_ERROR', { missingFields: missingFields || [] }, options); // null일 때 기본값 적용
     this.name = 'ConfigurationError';
   }
 }
