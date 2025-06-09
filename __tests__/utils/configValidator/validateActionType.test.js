@@ -40,7 +40,7 @@ describe('ConfigValidator.validateActionType', () => {
       ['deployment', '비슷하지만 다른 액션'],
       ['review', '불완전한 액션명'],
     ])('유효하지 않은 액션 타입: "%s" (%s)', (actionType, _description) => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validateActionType(actionType),
         getExpectedMessage(actionType),
@@ -57,7 +57,7 @@ describe('ConfigValidator.validateActionType', () => {
       [true, '불린'],
       [false, '불린 false'],
     ])('유효하지 않은 액션 타입 (기본 타입): %s (%s)', (actionType, _description) => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validateActionType(actionType),
         getExpectedMessage(actionType),
@@ -80,7 +80,7 @@ describe('ConfigValidator.validateActionType', () => {
     });
 
     test('Date 객체 타입 액션은 유효하지 않음', () => {
-      expect.assertions(1);
+      expect.hasAssertions();
       const dateAction = new Date();
       expectErrorWithDetails(
         () => ConfigValidator.validateActionType(dateAction),
@@ -92,7 +92,7 @@ describe('ConfigValidator.validateActionType', () => {
 
   describe('경계값 테스트', () => {
     test('공백으로 둘러싸인 유효한 액션 타입은 무효', () => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validateActionType(' comment '),
         '유효하지 않은 액션 타입:  comment . 가능한 값: schedule, approve, comment, review_requested, changes_requested, deploy, ci',
@@ -101,7 +101,7 @@ describe('ConfigValidator.validateActionType', () => {
     });
 
     test('탭이나 개행이 포함된 액션 타입은 무효', () => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validateActionType('comment\n'),
         '유효하지 않은 액션 타입: comment\n. 가능한 값: schedule, approve, comment, review_requested, changes_requested, deploy, ci',

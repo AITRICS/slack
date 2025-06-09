@@ -10,7 +10,7 @@ describe('ConfigValidator.validateTokenFormat', () => {
   describe('SLACK_TOKEN 검증', () => {
     test.each([
       ['xoxb-test-token', '정상적인 Bot 토큰'],
-      ['xoxb-fake-1234', '정상적인 User 토큰'],
+      ['xoxp-fake-1234', '정상적인 User 토큰'],
       [`xoxb-${'a'.repeat(50)}`, 'Bot 토큰 (충분한 길이)'],
       [`xoxp-${'a'.repeat(60)}`, 'User 토큰 (충분한 길이)'],
       ['xoxb-minimal', '최소한의 Bot 토큰'],
@@ -18,7 +18,6 @@ describe('ConfigValidator.validateTokenFormat', () => {
       ['xoxb-', '하이픈만 있는 Bot 토큰 (실제로는 유효)'],
       ['xoxp-', '하이픈만 있는 User 토큰 (실제로는 유효)'],
     ])('유효한 Slack 토큰: %s (%s)', (token, _description) => {
-      expect.assertions(1);
       expect(() => ConfigValidator.validateTokenFormat(token, 'SLACK_TOKEN')).not.toThrow();
     });
 
@@ -32,7 +31,7 @@ describe('ConfigValidator.validateTokenFormat', () => {
       ['XOXB-1234567890', ['SLACK_TOKEN'], 'Slack 토큰 형식이 올바르지 않습니다. xoxb- 또는 xoxp-로 시작해야 합니다', '대문자'],
       ['xoxb', ['SLACK_TOKEN'], 'Slack 토큰 형식이 올바르지 않습니다. xoxb- 또는 xoxp-로 시작해야 합니다', '접두사만'],
     ])('유효하지 않은 Slack 토큰: "%s" → %j (%s)', (token, expectedMissingFields, expectedMessage, _description) => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validateTokenFormat(token, 'SLACK_TOKEN'),
         expectedMessage,
@@ -48,7 +47,7 @@ describe('ConfigValidator.validateTokenFormat', () => {
       [[], '배열'],
       [true, '불린'],
     ])('유효하지 않은 Slack 토큰 타입: %s (%s)', (token, _description) => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validateTokenFormat(token, 'SLACK_TOKEN'),
         'SLACK_TOKEN이 비어있거나 유효하지 않습니다',
@@ -67,7 +66,6 @@ describe('ConfigValidator.validateTokenFormat', () => {
       ['a'.repeat(100), '긴 토큰 (100자)'],
       ['1234567890abcdefghij', '숫자와 문자 혼합 (20자)'],
     ])('유효한 GitHub 토큰: %s (%s)', (token, _description) => {
-      expect.assertions(1);
       expect(() => ConfigValidator.validateTokenFormat(token, 'GITHUB_TOKEN')).not.toThrow();
     });
 
@@ -77,7 +75,7 @@ describe('ConfigValidator.validateTokenFormat', () => {
       ['short', ['GITHUB_TOKEN'], 'GitHub 토큰이 너무 짧습니다', '너무 짧은 토큰 (5자)'],
       ['a'.repeat(19), ['GITHUB_TOKEN'], 'GitHub 토큰이 너무 짧습니다', '경계값 미만 (19자)'],
     ])('유효하지 않은 GitHub 토큰: "%s" → %j (%s)', (token, expectedMissingFields, expectedMessage, _description) => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validateTokenFormat(token, 'GITHUB_TOKEN'),
         expectedMessage,

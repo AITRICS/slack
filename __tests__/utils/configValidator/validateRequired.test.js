@@ -46,7 +46,7 @@ describe('ConfigValidator.validateRequired', () => {
       '모든 설정 누락',
     ],
   ])('필수 설정 누락: %j → %j (%s)', (inputs, expectedMissing, _description) => {
-    expect.assertions(1);
+    expect.hasAssertions();
     global.testUtils.mockCoreInputs(inputs);
 
     expectErrorWithDetails(
@@ -57,7 +57,7 @@ describe('ConfigValidator.validateRequired', () => {
   });
 
   test('null/undefined 값도 누락으로 처리', () => {
-    expect.assertions(1);
+    expect.hasAssertions();
 
     global.testUtils.mockCoreInputs({
       SLACK_TOKEN: null,
@@ -73,7 +73,7 @@ describe('ConfigValidator.validateRequired', () => {
   });
 
   test('공백 문자열은 누락으로 처리', () => {
-    expect.assertions(1);
+    expect.hasAssertions();
 
     global.testUtils.mockCoreInputs({
       SLACK_TOKEN: '   ',

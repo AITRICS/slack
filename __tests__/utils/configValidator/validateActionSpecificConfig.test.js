@@ -45,7 +45,7 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
         '모든 설정 누락',
       ],
     ])('DEPLOY 설정 누락: %j → %j (%s)', (inputs, expectedMissing, _description) => {
-      expect.assertions(1);
+      expect.hasAssertions();
       global.testUtils.mockCoreInputs(inputs);
 
       expectErrorWithDetails(
@@ -83,9 +83,8 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
         ['IMAGE_TAG'],
         'IMAGE_TAG 누락',
       ],
-    ])('CI 설정 누락: %j → ' +
-      '%j (%s)', (inputs, expectedMissing, _description) => {
-      expect.assertions(1);
+    ])('CI 설정 누락: %j → %j (%s)', (inputs, expectedMissing, _description) => {
+      expect.hasAssertions();
       global.testUtils.mockCoreInputs(inputs);
 
       expectErrorWithDetails(
@@ -142,6 +141,8 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
       } catch (error) {
         thrownError = error;
       }
+
+      expect(thrownError).not.toBeNull();
       expect(Array.isArray(thrownError.details?.missingFields)).toBe(true);
     });
 

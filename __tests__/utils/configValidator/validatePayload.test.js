@@ -41,7 +41,7 @@ describe('ConfigValidator.validatePayload', () => {
       [new Date(), ['payload'], '유효하지 않은 페이로드', 'Date'],
       ['string', ['payload'], '유효하지 않은 페이로드', '문자열'],
     ])('유효하지 않은 페이로드 타입: %s → %j (%s)', (payload, expectedMissingFields, expectedMessage, _description) => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validatePayload(payload),
         expectedMessage,
@@ -61,7 +61,7 @@ describe('ConfigValidator.validatePayload', () => {
       [{ repository: null }, ['payload.repository'], '페이로드에 repository 정보가 없습니다', 'repository가 null'],
       [{}, ['payload.repository'], '페이로드에 repository 정보가 없습니다', '빈 객체'],
     ])('repository 누락 페이로드: %j → %j (%s)', (payload, expectedMissingFields, expectedMessage, _description) => {
-      expect.assertions(1);
+      expect.hasAssertions();
       expectErrorWithDetails(
         () => ConfigValidator.validatePayload(payload),
         expectedMessage,
