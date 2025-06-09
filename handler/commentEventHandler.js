@@ -1,6 +1,7 @@
 const BaseEventHandler = require('./baseEventHandler');
 const MentionUtils = require('../utils/mentionUtils');
 const Logger = require('../utils/logger');
+const ImageUtils = require('../utils/imageUtils');
 
 /**
  * GitHub 코멘트 이벤트 처리
@@ -330,12 +331,13 @@ class CommentEventHandler extends BaseEventHandler {
     // GitHub 멘션을 Slack 멘션으로 변환
     const slackIdResolver = (usernames, property) => this.slackUserService.getSlackProperties(usernames, property);
     const convertedCommentBody = await MentionUtils.convertCommentMentions(comment.body, slackIdResolver);
+    const imageProcessResult = ImageUtils.processCommentImages(convertedCommentBody);
 
     return {
       prUrl: prData.html_url || `https://github.com/${repository.full_name}/pull/${commentType.prNumber}`,
       prTitle: prData.title,
       commentUrl: comment.html_url,
-      commentBody: convertedCommentBody, // 변환된 코멘트 본문 사용
+      commentBody: imageProcessResult.text,
       codeSnippet: comment.diff_hunk,
       authorUsername,
       authorSlackName: authorSlackInfo,

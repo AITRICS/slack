@@ -70,6 +70,13 @@ const SLACK_CONFIG = Object.freeze({
     DEPLOY_NOTIFICATION: '*GitHub Actions Deploy Notification*',
     BUILD_NOTIFICATION: '*GitHub Actions Build Notification*',
   }),
+
+  IMAGE_CONFIG: Object.freeze({
+    MAX_ATTACHMENTS: 10,
+    GITHUB_DOMAIN: 'github.com',
+    ATTACHMENT_PATH: '/user-attachments/assets/',
+    DEFAULT_COLOR: '#36a64f',
+  }),
 });
 
 // PR 리뷰 상태
