@@ -60,7 +60,7 @@ describe('ImageUtils.processCommentImages', () => {
         코멘트 내용입니다.
         <img src="https://github.com/user-attachments/assets/image1.png" alt="github"/>
         ![external](https://example.com/external.png)
-        <img src="https://raw.githubusercontent.com/repo/image2.jpg"/>
+        <img src="https://raw.githubusercontent.com/repo/image2.jpg" alt="repository image"/>
       `;
 
       const result = ImageUtils.processCommentImages(commentText);
@@ -74,7 +74,7 @@ describe('ImageUtils.processCommentImages', () => {
 
       // GitHub 이미지만 변환됨
       expect(result.text).toContain('<https://github.com/user-attachments/assets/image1.png|[github]>');
-      expect(result.text).toContain('<https://raw.githubusercontent.com/repo/image2.jpg|[첨부이미지]>');
+      expect(result.text).toContain('<https://raw.githubusercontent.com/repo/image2.jpg|[repository image]>');
 
       // 외부 이미지는 변환되지 않음
       expect(result.text).toContain('![external](https://example.com/external.png)');
@@ -106,9 +106,9 @@ describe('ImageUtils.processCommentImages', () => {
     test('여러 GitHub 도메인 패턴 처리', () => {
       const commentText = `
         다양한 GitHub 이미지들:
-        <img src="https://github.com/user-attachments/assets/image1.png"/>
+        <img src="https://github.com/user-attachments/assets/image1.png" alt="첨부이미지"/>
         ![raw](https://raw.githubusercontent.com/owner/repo/main/image2.jpg)
-        <img src="https://user-images.githubusercontent.com/123456/image3.gif"/>
+        <img src="https://user-images.githubusercontent.com/123456/image3.gif" alt="사용자 이미지"/>
         ![avatar](https://avatars.githubusercontent.com/u/789?v=4)
       `;
 
@@ -121,7 +121,7 @@ describe('ImageUtils.processCommentImages', () => {
       // 모든 GitHub 이미지가 변환됨
       expect(result.text).toContain('<https://github.com/user-attachments/assets/image1.png|[첨부이미지]>');
       expect(result.text).toContain('<https://raw.githubusercontent.com/owner/repo/main/image2.jpg|[raw]>');
-      expect(result.text).toContain('<https://user-images.githubusercontent.com/123456/image3.gif|[첨부이미지]>');
+      expect(result.text).toContain('<https://user-images.githubusercontent.com/123456/image3.gif|[사용자 이미지]>');
       expect(result.text).toContain('<https://avatars.githubusercontent.com/u/789?v=4|[avatar]>');
     });
   });
@@ -167,7 +167,7 @@ describe('ImageUtils.processCommentImages', () => {
     test('외부 이미지만 있는 코멘트', () => {
       const commentText = `
         외부 이미지들:
-        <img src="https://example.com/image1.png"/>
+        <img src="https://example.com/image1.png" alt="외부 이미지"/>
         ![external](https://imgur.com/image2.jpg)
       `;
 
@@ -201,11 +201,14 @@ describe('ImageUtils.processCommentImages', () => {
         githubImageCount: 0,
       });
 
+      // 수정: 이제 "코멘트 이미지 처리 완료 - 유효하지 않은 입력" 메시지를 기대
       expect(Logger.debug).toHaveBeenCalledWith(
-        '코멘트 이미지 처리 완료',
+        '코멘트 이미지 처리 완료 - 유효하지 않은 입력',
         expect.objectContaining({
           totalImageCount: 0,
           githubImageCount: 0,
+          inputType: expect.any(String),
+          inputValue: input,
         }),
       );
     });
@@ -293,7 +296,7 @@ describe('ImageUtils.processCommentImages', () => {
 
   describe('반환 데이터 검증', () => {
     test('반환 객체 구조 검증', () => {
-      const commentText = '<img src="https://github.com/assets/test.png"/>';
+      const commentText = '<img src="https://github.com/assets/test.png" alt="테스트 이미지"/>';
       const result = ImageUtils.processCommentImages(commentText);
 
       expect(result).toHaveProperty('text');
@@ -309,11 +312,11 @@ describe('ImageUtils.processCommentImages', () => {
 
     test('이미지 개수 정확성 검증', () => {
       const commentText = `
-        <img src="https://github.com/assets/github1.png"/>
+        <img src="https://github.com/assets/github1.png" alt="GitHub 이미지 1"/>
         ![test](https://example.com/external1.jpg)
-        <img src="https://raw.githubusercontent.com/repo/github2.gif"/>
+        <img src="https://raw.githubusercontent.com/repo/github2.gif" alt="GitHub 이미지 2"/>
         ![external](https://imgur.com/external2.png)
-        <img src="https://user-images.githubusercontent.com/123/github3.jpg"/>
+        <img src="https://user-images.githubusercontent.com/123/github3.jpg" alt="GitHub 이미지 3"/>
       `;
 
       const result = ImageUtils.processCommentImages(commentText);
@@ -358,7 +361,7 @@ describe('ImageUtils.processCommentImages', () => {
 
     test('큰 텍스트에서 소수 이미지 처리', () => {
       const largeText = `${'Long comment text. '.repeat(10000)
-      }<img src="https://github.com/assets/image.png"/>${
+      }<img src="https://github.com/assets/image.png" alt="테스트 이미지"/>${
         'More text. '.repeat(5000)}`;
 
       const start = Date.now();

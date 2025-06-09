@@ -12,7 +12,7 @@ class ImageUtils {
   static #GITHUB_IMAGE_PATTERNS = [
     /^https:\/\/github\.com\/user-attachments\/assets\//,
     /^https:\/\/raw\.githubusercontent\.com\//,
-    /^https:\/\/github\.com\/(.*\/)?assets\//, // 수정: github.com/assets/ 와 github.com/owner/repo/assets/ 둘 다 지원
+    /^https:\/\/github\.com\/(.*\/)?assets\//, // github.com/assets/ 와 github.com/owner/repo/assets/ 둘 다 지원
     /^https:\/\/user-images\.githubusercontent\.com\//,
     /^https:\/\/avatars\.githubusercontent\.com\//,
     /^https:\/\/.*\.githubusercontent\.com\//,
@@ -28,12 +28,11 @@ class ImageUtils {
   static #extractImageInfoFromHtml(text) {
     const imgTagPattern = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
     const imageInfos = [];
-    let match;
 
-    // 정규식 실행 전 lastIndex 초기화 (중요!)
-    imgTagPattern.lastIndex = 0;
+    // matchAll을 사용하여 모든 매치를 찾음
+    const matches = Array.from(text.matchAll(imgTagPattern));
 
-    while ((match = imgTagPattern.exec(text)) !== null) {
+    matches.forEach((match) => {
       const [fullMatch, url] = match;
       if (url && url.trim()) {
         // alt 속성 추출
@@ -47,7 +46,7 @@ class ImageUtils {
           position: match.index, // 텍스트 내 위치 저장
         });
       }
-    }
+    });
 
     return imageInfos;
   }
@@ -63,12 +62,11 @@ class ImageUtils {
     // 더 엄격한 Markdown 패턴 - 줄바꿈 방지로 잘못된 매칭 차단
     const markdownPattern = /!\[([^\]\n]*)\]\(([^)\n]+)\)/g;
     const imageInfos = [];
-    let match;
 
-    // 정규식 실행 전 lastIndex 초기화 (중요!)
-    markdownPattern.lastIndex = 0;
+    // matchAll을 사용하여 모든 매치를 찾음
+    const matches = Array.from(text.matchAll(markdownPattern));
 
-    while ((match = markdownPattern.exec(text)) !== null) {
+    matches.forEach((match) => {
       const [fullMatch, alt, url] = match;
       // URL 유효성 검사 강화
       if (url && url.trim() && url.trim().length > 0) {
@@ -79,7 +77,7 @@ class ImageUtils {
           position: match.index, // 텍스트 내 위치 저장
         });
       }
-    }
+    });
 
     return imageInfos;
   }
@@ -219,7 +217,15 @@ class ImageUtils {
    */
   static processCommentImages(commentText) {
     try {
+      // 유효하지 않은 입력 처리 및 로깅
       if (!commentText || typeof commentText !== 'string') {
+        Logger.debug('코멘트 이미지 처리 완료 - 유효하지 않은 입력', {
+          totalImageCount: 0,
+          githubImageCount: 0,
+          inputType: typeof commentText,
+          inputValue: commentText,
+        });
+
         return {
           text: commentText,
           hasImages: false,
@@ -285,35 +291,6 @@ class ImageUtils {
 
     const imageUrls = ImageUtils.extractImageUrls(text);
     return imageUrls.length > 0;
-  }
-
-  /**
-   * 지원되는 GitHub 이미지 패턴 목록 반환 (디버깅/설정용)
-   * @static
-   * @returns {RegExp[]} 지원되는 패턴 목록
-   */
-  static getSupportedGitHubPatterns() {
-    return [...ImageUtils.#GITHUB_IMAGE_PATTERNS];
-  }
-
-  /**
-   * 새로운 GitHub 이미지 패턴 추가 (런타임 확장)
-   * @static
-   * @param {RegExp} pattern - 추가할 패턴
-   * @returns {boolean} 추가 성공 여부
-   */
-  static addGitHubPattern(pattern) {
-    try {
-      if (pattern instanceof RegExp) {
-        ImageUtils.#GITHUB_IMAGE_PATTERNS.push(pattern);
-        Logger.debug('새로운 GitHub 이미지 패턴 추가됨', { pattern: pattern.toString() });
-        return true;
-      }
-      return false;
-    } catch (error) {
-      Logger.error('GitHub 이미지 패턴 추가 실패', error);
-      return false;
-    }
   }
 }
 

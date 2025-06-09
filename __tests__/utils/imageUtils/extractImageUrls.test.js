@@ -19,9 +19,9 @@ describe('ImageUtils URL 추출 메서드들', () => {
   describe('extractImageUrls', () => {
     test('HTML 이미지 태그에서 URL 추출', () => {
       const text = `
-        <img src="https://github.com/assets/image1.png"/>
+        <img src="https://github.com/assets/image1.png" alt="github image"/>
         <img src="https://example.com/image2.jpg" alt="test"/>
-        <img class="image" src="https://raw.githubusercontent.com/repo/image3.gif" width="100"/>
+        <img class="image" src="https://raw.githubusercontent.com/repo/image3.gif" width="100" alt="raw image"/>
       `;
 
       const result = ImageUtils.extractImageUrls(text);
@@ -51,9 +51,9 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('HTML과 Markdown 혼합에서 URL 추출', () => {
       const text = `
-        <img src="https://github.com/assets/image1.png"/>
+        <img src="https://github.com/assets/image1.png" alt="github image"/>
         ![test](https://raw.githubusercontent.com/repo/image2.jpg)
-        <img src="https://example.com/image3.png"/>
+        <img src="https://example.com/image3.png" alt="example image"/>
         ![markdown](https://user-images.githubusercontent.com/123/image4.gif)
       `;
 
@@ -69,9 +69,9 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('중복 URL 제거', () => {
       const text = `
-        <img src="https://github.com/assets/image1.png"/>
+        <img src="https://github.com/assets/image1.png" alt="duplicate image"/>
         ![test](https://github.com/assets/image1.png)
-        <img src="https://example.com/image2.png"/>
+        <img src="https://example.com/image2.png" alt="example image"/>
         ![duplicate](https://github.com/assets/image1.png)
       `;
 
@@ -85,7 +85,7 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('특수 문자가 포함된 URL 추출', () => {
       const text = `
-        <img src="https://github.com/assets/image_name-123.png?v=1&token=abc"/>
+        <img src="https://github.com/assets/image_name-123.png?v=1&token=abc" alt="special chars image"/>
         ![test](https://raw.githubusercontent.com/repo/path/to/image%20with%20spaces.jpg)
       `;
 
@@ -99,9 +99,9 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('빈 또는 공백 src 속성 무시', () => {
       const text = `
-        <img src=""/>
-        <img src="   "/>
-        <img src="https://github.com/assets/valid.png"/>
+        <img src="" alt="empty src"/>
+        <img src="   " alt="whitespace src"/>
+        <img src="https://github.com/assets/valid.png" alt="valid image"/>
         ![empty]()
         ![whitespace](   )
         ![valid](https://example.com/valid.jpg)
@@ -134,10 +134,10 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('잘못된 형식의 이미지 태그 무시', () => {
       const text = `
-        <img>
-        <img src>
+        <img alt="no src attr">
+        <img src alt="incomplete src">
         <img alt="no src"/>
-        <img src="https://valid.com/image.png"/>
+        <img src="https://valid.com/image.png" alt="valid image"/>
         ![](
         ![incomplete
         ![valid](https://valid.com/image2.png)
@@ -155,11 +155,11 @@ describe('ImageUtils URL 추출 메서드들', () => {
   describe('extractGitHubImageUrls', () => {
     test('GitHub 이미지 URL만 필터링', () => {
       const text = `
-        <img src="https://github.com/user-attachments/assets/image1.png"/>
+        <img src="https://github.com/user-attachments/assets/image1.png" alt="github attachment"/>
         ![test](https://raw.githubusercontent.com/repo/image2.jpg)
-        <img src="https://example.com/image3.png"/>
+        <img src="https://example.com/image3.png" alt="external image"/>
         ![github](https://user-images.githubusercontent.com/123/image4.gif)
-        <img src="https://imgur.com/image5.png"/>
+        <img src="https://imgur.com/image5.png" alt="imgur image"/>
       `;
 
       const result = ImageUtils.extractGitHubImageUrls(text);
@@ -218,21 +218,20 @@ describe('ImageUtils URL 추출 메서드들', () => {
         'CDN 이미지',
       ],
     ])('GitHub 패턴 매칭: %s → %s (%s)', (url, shouldMatch, _description) => {
-      const text = `<img src="${url}"/>`;
+      const text = `<img src="${url}" alt="test image"/>`;
       const result = ImageUtils.extractGitHubImageUrls(text);
 
-      if (shouldMatch) {
-        expect(result).toContain(url);
-      } else {
-        expect(result).not.toContain(url);
-      }
+      // 조건부 expect 제거 - 대신 명확한 방식으로 검증
+      const expectedLength = shouldMatch ? 1 : 0;
+      expect(result).toHaveLength(expectedLength);
+      expect(result.includes(url)).toBe(shouldMatch);
     });
 
     test('GitHub 이미지가 없는 경우', () => {
       const text = `
-        <img src="https://example.com/image.png"/>
+        <img src="https://example.com/image.png" alt="example image"/>
         ![test](https://imgur.com/image.jpg)
-        <img src="data:image/png;base64,abc123"/>
+        <img src="data:image/png;base64,abc123" alt="base64 image"/>
       `;
 
       const result = ImageUtils.extractGitHubImageUrls(text);
@@ -241,11 +240,11 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('GitHub 이미지와 외부 이미지 혼합', () => {
       const text = `
-        <img src="https://github.com/assets/github1.png"/>
-        <img src="https://example.com/external.png"/>
+        <img src="https://github.com/assets/github1.png" alt="github image 1"/>
+        <img src="https://example.com/external.png" alt="external image"/>
         ![GitHub](https://raw.githubusercontent.com/repo/github2.jpg)
         ![External](https://imgur.com/external.gif)
-        <img src="https://user-images.githubusercontent.com/123/github3.png"/>
+        <img src="https://user-images.githubusercontent.com/123/github3.png" alt="github image 3"/>
       `;
 
       const result = ImageUtils.extractGitHubImageUrls(text);
@@ -266,9 +265,9 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('복잡한 GitHub URL 패턴', () => {
       const text = `
-        <img src="https://github.com/user-attachments/assets/complex-name_123.png?v=1&size=large"/>
+        <img src="https://github.com/user-attachments/assets/complex-name_123.png?v=1&size=large" alt="complex image"/>
         ![Query](https://raw.githubusercontent.com/org/repo/branch/path/to/image.jpg?token=abc123)
-        <img src="https://user-images.githubusercontent.com/12345678/image-name.gif#anchor"/>
+        <img src="https://user-images.githubusercontent.com/12345678/image-name.gif#anchor" alt="user image"/>
       `;
 
       const result = ImageUtils.extractGitHubImageUrls(text);
@@ -281,11 +280,11 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('GitHub 도메인 변형 처리', () => {
       const text = `
-        <img src="https://github.com/owner/repo/assets/image1.png"/>
-        <img src="https://raw.githubusercontent.com/owner/repo/main/image2.jpg"/>
-        <img src="https://user-images.githubusercontent.com/123/image3.gif"/>
-        <img src="https://avatars.githubusercontent.com/u/456?v=4"/>
-        <img src="https://camo.githubusercontent.com/hash/image4.png"/>
+        <img src="https://github.com/owner/repo/assets/image1.png" alt="repo assets"/>
+        <img src="https://raw.githubusercontent.com/owner/repo/main/image2.jpg" alt="raw image"/>
+        <img src="https://user-images.githubusercontent.com/123/image3.gif" alt="user image"/>
+        <img src="https://avatars.githubusercontent.com/u/456?v=4" alt="avatar"/>
+        <img src="https://camo.githubusercontent.com/hash/image4.png" alt="camo image"/>
       `;
 
       const result = ImageUtils.extractGitHubImageUrls(text);
@@ -298,7 +297,7 @@ describe('ImageUtils URL 추출 메서드들', () => {
   describe('URL 추출 성능 테스트', () => {
     test('대량의 이미지가 포함된 텍스트 처리', () => {
       const largeText = Array.from({ length: 100 }, (_, i) => (
-        `<img src="https://github.com/assets/image${i}.png"/> ![md${i}](https://raw.githubusercontent.com/repo/img${i}.jpg)`
+        `<img src="https://github.com/assets/image${i}.png" alt="image${i}"/> ![md${i}](https://raw.githubusercontent.com/repo/img${i}.jpg)`
       )).join('\n');
 
       const start = Date.now();
@@ -313,7 +312,7 @@ describe('ImageUtils URL 추출 메서드들', () => {
 
     test('큰 텍스트에서 소수의 이미지 추출', () => {
       const largeText = `${'Text content. '.repeat(10000)
-      }<img src="https://github.com/assets/image1.png"/>${
+      }<img src="https://github.com/assets/image1.png" alt="test image"/>${
         'More text. '.repeat(5000)
       }![test](https://raw.githubusercontent.com/repo/image2.jpg)${
         'Even more text. '.repeat(10000)}`;

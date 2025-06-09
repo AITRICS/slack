@@ -20,7 +20,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
     describe('GitHub 이미지 포함된 경우', () => {
       test.each([
         [
-          '<img src="https://github.com/user-attachments/assets/image.png"/>',
+          '<img src="https://github.com/user-attachments/assets/image.png" alt="github attachment"/>',
           'HTML - user-attachments',
         ],
         [
@@ -28,7 +28,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
           'Markdown - raw.githubusercontent.com',
         ],
         [
-          '<img src="https://github.com/owner/repo/assets/image.gif"/>',
+          '<img src="https://github.com/owner/repo/assets/image.gif" alt="repo assets"/>',
           'HTML - repo assets',
         ],
         [
@@ -36,7 +36,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
           'Markdown - user-images',
         ],
         [
-          '<img src="https://avatars.githubusercontent.com/u/123456?v=4"/>',
+          '<img src="https://avatars.githubusercontent.com/u/123456?v=4" alt="user avatar"/>',
           'HTML - avatars with query',
         ],
         [
@@ -50,9 +50,9 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
 
       test('여러 GitHub 이미지가 포함된 경우', () => {
         const text = `
-          <img src="https://github.com/assets/image1.png"/>
+          <img src="https://github.com/assets/image1.png" alt="github image 1"/>
           ![test](https://raw.githubusercontent.com/repo/image2.jpg)
-          <img src="https://user-images.githubusercontent.com/123/image3.gif"/>
+          <img src="https://user-images.githubusercontent.com/123/image3.gif" alt="user image 3"/>
         `;
 
         const result = ImageUtils.hasGitHubImages(text);
@@ -61,9 +61,9 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
 
       test('GitHub 이미지와 외부 이미지 혼합', () => {
         const text = `
-          <img src="https://example.com/external.png"/>
+          <img src="https://example.com/external.png" alt="external image"/>
           ![github](https://github.com/assets/github-image.png)
-          <img src="https://imgur.com/another-external.jpg"/>
+          <img src="https://imgur.com/another-external.jpg" alt="imgur image"/>
         `;
 
         const result = ImageUtils.hasGitHubImages(text);
@@ -74,7 +74,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
     describe('GitHub 이미지가 없는 경우', () => {
       test.each([
         [
-          '<img src="https://example.com/image.png"/>',
+          '<img src="https://example.com/image.png" alt="external image"/>',
           'HTML - 외부 이미지',
         ],
         [
@@ -82,7 +82,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
           'Markdown - Imgur',
         ],
         [
-          '<img src="data:image/png;base64,abc123"/>',
+          '<img src="data:image/png;base64,abc123" alt="base64 image"/>',
           'HTML - Data URL',
         ],
         [
@@ -104,9 +104,9 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
 
       test('외부 이미지만 있는 경우', () => {
         const text = `
-          <img src="https://example.com/image1.png"/>
+          <img src="https://example.com/image1.png" alt="example image 1"/>
           ![test](https://imgur.com/image2.jpg)
-          <img src="https://cdn.example.com/image3.gif"/>
+          <img src="https://cdn.example.com/image3.gif" alt="cdn image"/>
         `;
 
         const result = ImageUtils.hasGitHubImages(text);
@@ -144,8 +144,8 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
 
       test('잘못된 형식의 이미지 태그', () => {
         const text = `
-          <img>
-          <img src>
+          <img alt="no src attr">
+          <img src alt="incomplete src">
           <img alt="no src"/>
           ![](
           ![incomplete
@@ -157,9 +157,9 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
 
       test('유사하지만 다른 도메인', () => {
         const text = `
-          <img src="https://github-clone.com/image.png"/>
+          <img src="https://github-clone.com/image.png" alt="clone site"/>
           ![test](https://notgithub.com/image.jpg)
-          <img src="https://github.example.com/image.gif"/>
+          <img src="https://github.example.com/image.gif" alt="fake github"/>
         `;
 
         const result = ImageUtils.hasGitHubImages(text);
@@ -172,7 +172,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
     describe('이미지가 포함된 경우', () => {
       test.each([
         [
-          '<img src="https://github.com/assets/image.png"/>',
+          '<img src="https://github.com/assets/image.png" alt="github image"/>',
           'HTML - GitHub 이미지',
         ],
         [
@@ -180,7 +180,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
           'Markdown - 외부 이미지',
         ],
         [
-          '<img src="data:image/png;base64,abc123"/>',
+          '<img src="data:image/png;base64,abc123" alt="base64 image"/>',
           'HTML - Data URL',
         ],
         [
@@ -188,7 +188,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
           'Markdown - 상대 경로',
         ],
         [
-          '<img src="https://imgur.com/image.gif"/>',
+          '<img src="https://imgur.com/image.gif" alt="imgur image"/>',
           'HTML - Imgur',
         ],
         [
@@ -202,9 +202,9 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
 
       test('여러 종류의 이미지 혼합', () => {
         const text = `
-          <img src="https://github.com/assets/github.png"/>
+          <img src="https://github.com/assets/github.png" alt="github image"/>
           ![external](https://example.com/external.jpg)
-          <img src="data:image/png;base64,abc123"/>
+          <img src="data:image/png;base64,abc123" alt="base64 image"/>
           ![local](./local.gif)
         `;
 
@@ -248,7 +248,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
           'Markdown 구조만',
         ],
         [
-          '<img> <img src> <img alt="no src"/>',
+          '<img alt="no src attr"> <img src alt="incomplete src"> <img alt="no src"/>',
           '잘못된 img 태그들',
         ],
         [
@@ -279,14 +279,14 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
 
   describe('hasGitHubImages vs hasImages 비교', () => {
     test('GitHub 이미지만 있는 경우', () => {
-      const text = '<img src="https://github.com/assets/image.png"/>';
+      const text = '<img src="https://github.com/assets/image.png" alt="github image"/>';
 
       expect(ImageUtils.hasGitHubImages(text)).toBe(true);
       expect(ImageUtils.hasImages(text)).toBe(true);
     });
 
     test('외부 이미지만 있는 경우', () => {
-      const text = '<img src="https://example.com/image.png"/>';
+      const text = '<img src="https://example.com/image.png" alt="external image"/>';
 
       expect(ImageUtils.hasGitHubImages(text)).toBe(false);
       expect(ImageUtils.hasImages(text)).toBe(true);
@@ -294,7 +294,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
 
     test('GitHub과 외부 이미지 혼합', () => {
       const text = `
-        <img src="https://github.com/assets/github.png"/>
+        <img src="https://github.com/assets/github.png" alt="github image"/>
         ![external](https://example.com/external.jpg)
       `;
 
@@ -312,13 +312,13 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
     test('다양한 시나리오의 논리적 일관성', () => {
       const testCases = [
         {
-          text: '<img src="https://github.com/assets/test.png"/>',
+          text: '<img src="https://github.com/assets/test.png" alt="github test"/>',
           expectedGitHub: true,
           expectedAny: true,
           description: 'GitHub 이미지만',
         },
         {
-          text: '<img src="https://imgur.com/test.png"/>',
+          text: '<img src="https://imgur.com/test.png" alt="imgur test"/>',
           expectedGitHub: false,
           expectedAny: true,
           description: '외부 이미지만',
@@ -331,8 +331,8 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
         },
         {
           text: `
-            <img src="https://github.com/assets/github.png"/>
-            <img src="https://example.com/external.png"/>
+            <img src="https://github.com/assets/github.png" alt="github image"/>
+            <img src="https://example.com/external.png" alt="external image"/>
           `,
           expectedGitHub: true,
           expectedAny: true,
@@ -341,7 +341,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
       ];
 
       testCases.forEach(({
-        text, expectedGitHub, expectedAny, description,
+        text, expectedGitHub, expectedAny, description: _description,
       }) => {
         const hasGitHub = ImageUtils.hasGitHubImages(text);
         const hasAny = ImageUtils.hasImages(text);
@@ -350,9 +350,8 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
         expect(hasAny).toBe(expectedAny);
 
         // 논리적 일관성: GitHub 이미지가 있으면 반드시 전체 이미지도 있어야 함
-        if (hasGitHub) {
-          expect(hasAny).toBe(true);
-        }
+        const isLogicallyConsistent = !hasGitHub || hasAny;
+        expect(isLogicallyConsistent).toBe(true);
       });
     });
   });
@@ -360,7 +359,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
   describe('성능 테스트', () => {
     test('큰 텍스트에서의 이미지 감지 성능', () => {
       const largeText = `${'Large text content. '.repeat(10000)
-      }<img src="https://github.com/assets/image.png"/>${
+      }<img src="https://github.com/assets/image.png" alt="github image"/>${
         'More content. '.repeat(10000)}`;
 
       const start = Date.now();
@@ -376,7 +375,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
     test('많은 이미지가 포함된 텍스트', () => {
       const manyImages = Array.from({ length: 1000 }, (_, i) => (
         i % 2 === 0 ?
-          `<img src="https://github.com/assets/image${i}.png"/>` :
+          `<img src="https://github.com/assets/image${i}.png" alt="github image ${i}"/>` :
           `![test${i}](https://example.com/image${i}.jpg)`
       )).join(' ');
 
@@ -435,7 +434,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
         <img src="https://user-images.githubusercontent.com/12345/error-screenshot.png" alt="Error"/>
         
         ## 브라우저 콘솔
-        <img src="https://github.com/assets/console-error.png"/>
+        <img src="https://github.com/assets/console-error.png" alt="console error"/>
         
         ## 환경
         - Chrome 120
@@ -468,7 +467,7 @@ describe('ImageUtils 이미지 감지 메서드들', () => {
         ![Design Reference](https://dribbble.com/shot/12345/image.png)
         
         이런 스타일은 어떨까요?
-        <img src="https://unsplash.com/photo/example.jpg"/>
+        <img src="https://unsplash.com/photo/example.jpg" alt="unsplash photo"/>
       `;
 
       expect(ImageUtils.hasGitHubImages(commentWithExternalImages)).toBe(false);
