@@ -11,17 +11,13 @@ jest.mock('@actions/core', () => ({
   error: jest.fn(),
 }));
 
-jest.mock('@/constants', () => ({
-  ACTION_TYPES: {
-    SCHEDULE: 'schedule',
-    APPROVE: 'approve',
-    COMMENT: 'comment',
-    REVIEW_REQUESTED: 'review_requested',
-    CHANGES_REQUESTED: 'changes_requested',
-    DEPLOY: 'deploy',
-    CI: 'ci',
-  },
+// ⭐ environment만 mock
+jest.mock('../config/environment', () => ({
+  get: jest.fn((key, defaultValue) => defaultValue),
+  isDebug: jest.fn(() => false),
 }));
+
+// ❌ @/constants mock 삭제됨 - 실제 파일 사용
 
 // 전역 beforeEach 설정
 beforeEach(() => {
