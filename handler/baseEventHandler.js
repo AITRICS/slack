@@ -1,5 +1,5 @@
-const Logger = require('@/utils/logger');
-const { PayloadValidationError } = require('@/utils/errors');
+const Logger = require('../utils/logger');
+const { PayloadValidationError } = require('../utils/errors');
 /**
  * 이벤트 핸들러 기본 클래스
  */

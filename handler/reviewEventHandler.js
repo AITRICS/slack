@@ -1,5 +1,5 @@
-const { REVIEW_STATES, GITHUB_CONFIG, SLACK_CHANNELS } = require('@/constants');
-const Logger = require('@/utils/logger');
+const { REVIEW_STATES, GITHUB_CONFIG, SLACK_CHANNELS } = require('../constants');
+const Logger = require('../utils/logger');
 const BaseEventHandler = require('./baseEventHandler');
 
 /**

@@ -1,6 +1,6 @@
-const { ACTION_TYPES } = require('@/constants');
-const Logger = require('@/utils/logger');
-const { SlackNotificationError } = require('@/utils/errors');
+const { ACTION_TYPES } = require('../constants');
+const Logger = require('../utils/logger');
+const { SlackNotificationError } = require('../utils/errors');
 const CommentEventHandler = require('./commentEventHandler');
 const ReviewEventHandler = require('./reviewEventHandler');
 const DeploymentEventHandler = require('./deploymentEventHandler');

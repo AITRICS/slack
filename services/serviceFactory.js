@@ -2,13 +2,13 @@ const { WebClient } = require('@slack/web-api');
 const { Octokit } = require('@octokit/rest');
 const { retry } = require('@octokit/plugin-retry');
 const { paginateRest } = require('@octokit/plugin-paginate-rest');
-const GitHubApiHelper = require('@/github/gitHubApiHelper');
-const SlackUserService = require('@/slack/slackUserService');
-const SlackChannelService = require('@/slack/slackChannelService');
-const SlackMessageService = require('@/slack/slackMessageService');
-const environment = require('@/config/environment');
-const { API_CONFIG } = require('@/constants');
-const Logger = require('@/utils/logger');
+const GitHubApiHelper = require('../github/gitHubApiHelper');
+const SlackUserService = require('../slack/slackUserService');
+const SlackChannelService = require('../slack/slackChannelService');
+const SlackMessageService = require('../slack/slackMessageService');
+const environment = require('../config/environment');
+const { API_CONFIG } = require('../constants');
+const Logger = require('../utils/logger');
 
 const EnhancedOctokit = Octokit.plugin(retry, paginateRest);
 

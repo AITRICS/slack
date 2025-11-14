@@ -1,5 +1,5 @@
-const environment = require('@/config/environment');
-const { LOG_LEVELS } = require('@/constants');
+const environment = require('../config/environment');
+const { LOG_LEVELS } = require('../constants');
 
 if (!LOG_LEVELS || !LOG_LEVELS.DEBUG) {
   throw new Error('[logger] LOG_LEVELS 미정의: constants/index.js export 확인 필요');

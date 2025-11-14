@@ -1,6 +1,6 @@
-const MentionUtils = require('@/utils/mentionUtils');
-const Logger = require('@/utils/logger');
-const ImageUtils = require('@/utils/imageUtils');
+const MentionUtils = require('../utils/mentionUtils');
+const Logger = require('../utils/logger');
+const ImageUtils = require('../utils/imageUtils');
 const BaseEventHandler = require('./baseEventHandler');
 
 /**

@@ -1,6 +1,6 @@
-const { SLACK_CHANNELS } = require('@/constants');
-const { calculateDurationInMinutes, formatDuration } = require('@/utils/timeUtils');
-const Logger = require('@/utils/logger');
+const { SLACK_CHANNELS } = require('../constants');
+const { calculateDurationInMinutes, formatDuration } = require('../utils/timeUtils');
+const Logger = require('../utils/logger');
 const BaseEventHandler = require('./baseEventHandler');
 
 /**

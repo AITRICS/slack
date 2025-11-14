@@ -1,5 +1,5 @@
 const Core = require('@actions/core');
-const { ACTION_TYPES } = require('@/constants');
+const { ACTION_TYPES } = require('../constants');
 const { ConfigurationError } = require('./errors');
 
 /**

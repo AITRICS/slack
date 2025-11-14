@@ -1,4 +1,4 @@
-const { SLACK_CONFIG, USER_PRIORITY_MAPPING } = require('@/constants');
+const { SLACK_CONFIG, USER_PRIORITY_MAPPING } = require('../constants');
 const Logger = require('./logger');
 
 /**

@@ -1,5 +1,5 @@
-const Logger = require('@/utils/logger');
-const { SlackAPIError } = require('@/utils/errors');
+const Logger = require('../utils/logger');
+const { SlackAPIError } = require('../utils/errors');
 const SlackMessageFormatter = require('./slackMessageFormatter');
 
 /**
