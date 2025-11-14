@@ -432,6 +432,7 @@ class CommentEventHandler extends BaseEventHandler {
       this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
     ]);
 
+    Logger.info(prDetails);
     // 1. 개별 요청된 리뷰어
     const requestedReviewers = (prDetails.requested_reviewers || []).map((r) => r.login);
 
