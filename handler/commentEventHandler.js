@@ -2,6 +2,7 @@ const MentionUtils = require('../utils/mentionUtils');
 const Logger = require('../utils/logger');
 const ImageUtils = require('../utils/imageUtils');
 const BaseEventHandler = require('./baseEventHandler');
+const { PayloadValidationError } = require('../utils/errors');
 
 /**
  * GitHub 코멘트 이벤트 처리
@@ -13,6 +14,19 @@ class CommentEventHandler extends BaseEventHandler {
    */
   async handleCommentEvent(payload) {
     BaseEventHandler.validatePayload(payload);
+
+    // 코멘트 객체 존재 여부 확인
+    if (!payload.comment) {
+      Logger.error('코멘트 객체가 없습니다. 잘못된 이벤트 타입일 수 있습니다.', {
+        eventType: payload.action,
+        hasReview: Boolean(payload.review),
+        hasPullRequest: Boolean(payload.pull_request),
+      });
+      throw new PayloadValidationError(
+        '코멘트 이벤트에 comment 객체가 필요합니다.',
+        payload,
+      );
+    }
 
     await this.initialize();
 
@@ -60,10 +74,25 @@ class CommentEventHandler extends BaseEventHandler {
     );
     const commentType = isCodeComment ? 'code_review' : 'pr_page';
 
-    const prNumber = payload.pull_request?.number || payload.issue?.number;
+    // PR 번호 추출 (여러 소스에서 시도)
+    let prNumber;
+    if (payload.pull_request?.number) {
+      prNumber = payload.pull_request.number;
+    } else if (payload.issue?.number) {
+      prNumber = payload.issue.number;
+    } else if (payload.comment.pull_request_url) {
+      // URL에서 PR 번호 추출: https://api.github.com/repos/OWNER/REPO/pulls/28
+      const match = payload.comment.pull_request_url.match(/\/pulls\/(\d+)$/);
+      if (match) {
+        prNumber = parseInt(match[1], 10);
+      }
+    }
 
     if (!prNumber) {
-      Logger.warn('PR 번호를 찾을 수 없습니다', { payload });
+      Logger.warn('PR 번호를 찾을 수 없습니다', {
+        payload,
+        pullRequestUrl: payload.comment.pull_request_url,
+      });
       throw new Error('PR 번호를 찾을 수 없습니다');
     }
 
@@ -87,7 +116,7 @@ class CommentEventHandler extends BaseEventHandler {
 
       const isFirstTimeComment = this.#isFirstTimeComment(
         recipients,
-        payload.pull_request.user.login,
+        payload.pull_request?.user?.login,
       );
 
       if (isFirstTimeComment) {
@@ -136,7 +165,7 @@ class CommentEventHandler extends BaseEventHandler {
   }
 
   /**
-   * 코드 코멘트 수신자 결정 (개선된 에러 처리)
+   * 코드 코멘트 수신자 결정 (개선된 버전)
    * @private
    * @param {CommentPayload} payload
    * @param {CommentTypeInfo} commentTypeInfo
@@ -169,14 +198,41 @@ class CommentEventHandler extends BaseEventHandler {
         commentTypeInfo.isCodeComment,
       );
 
-      // 스레드 참여자가 없거나 본인뿐인 경우 PR 작성자에게 알림
+      // PR 정보 가져오기 (payload에 없을 수 있음)
+      let prAuthor;
+      if (pullRequest && pullRequest.user) {
+        prAuthor = pullRequest.user.login;
+      } else {
+        Logger.debug('payload에 pull_request 없음, API로 조회 중', {
+          prNumber: commentTypeInfo.prNumber,
+          repoName: repository.name,
+        });
+        const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(
+          repository.name,
+          commentTypeInfo.prNumber,
+        );
+        prAuthor = prDetails.user.login;
+      }
+
+      // 스레드 참여자가 없거나 본인뿐인 경우
       if (threadParticipants.length <= 1) {
-        const prAuthor = pullRequest.user.login;
+        if (commentAuthor === prAuthor) {
+          // 본인 PR에 본인이 코멘트 → 리뷰어들에게 알림
+          Logger.debug('본인 PR에 본인이 코드 코멘트 → 리뷰어들에게 알림', {
+            prAuthor,
+            commentAuthor,
+          });
+          const reviewers = await this.#getAllReviewers(repository.name, commentTypeInfo.prNumber);
+          return reviewers.filter((r) => r.githubUsername !== commentAuthor);
+        }
+
+        // 다른 사람 PR에 처음 코멘트 → PR 작성자에게 알림
         return commentAuthor !== prAuthor ?
           [{ githubUsername: prAuthor }] :
           [];
       }
 
+      // 스레드에 다른 참여자들이 있는 경우
       const recipients = threadParticipants
         .filter((username) => username !== commentAuthor)
         .map((username) => ({ githubUsername: username }));
@@ -359,58 +415,12 @@ class CommentEventHandler extends BaseEventHandler {
       this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
     ]);
 
-    // 개별 리뷰어
     const requestedReviewers = (prDetails.requested_reviewers || []).map((r) => r.login);
-
-    // 실제 리뷰를 남긴 사람들
     const actualReviewers = reviews.map((review) => review.user.login);
-
-    // 팀 리뷰어 처리
-    const requestedTeams = prDetails.requested_teams || [];
-    const teamMemberUsernames = await this.#fetchAllTeamMembers(requestedTeams);
-
-    // 모든 리뷰어 통합
-    const allReviewerUsernames = [
-      ...new Set([
-        ...requestedReviewers,
-        ...actualReviewers,
-        ...teamMemberUsernames,
-      ]),
-    ];
+    const allReviewerUsernames = [...new Set([...requestedReviewers, ...actualReviewers])];
 
     const reviewerObjects = allReviewerUsernames.map((username) => ({ githubUsername: username }));
     return this.slackUserService.addSlackIdsToRecipients(reviewerObjects);
-  }
-
-  /**
-   * 여러 팀의 모든 멤버 조회
-   * @private
-   * @param {Array} requestedTeams - 요청된 팀 목록
-   * @returns {Promise<string[]>} 팀 멤버 GitHub 사용자명 목록
-   */
-  async #fetchAllTeamMembers(requestedTeams) {
-    if (!requestedTeams || requestedTeams.length === 0) {
-      return [];
-    }
-
-    try {
-      const teamMemberArrays = await Promise.all(
-        requestedTeams.map(async (team) => {
-          try {
-            const members = await this.gitHubApiHelper.fetchTeamMembers(team.slug);
-            return members.map((member) => member.login);
-          } catch (error) {
-            Logger.warn(`팀 멤버 조회 실패: ${team.slug}`, error);
-            return [];
-          }
-        }),
-      );
-
-      return teamMemberArrays.flat();
-    } catch (error) {
-      Logger.error('팀 멤버 일괄 조회 실패', error);
-      return [];
-    }
   }
 
   /**
