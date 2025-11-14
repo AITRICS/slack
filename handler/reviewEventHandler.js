@@ -73,7 +73,13 @@ class ReviewEventHandler extends BaseEventHandler {
 
     const channelId = await this.slackChannelService.selectChannel(notification.reviewerGithubUsername);
 
-    await this.slackMessageService.sendReviewRequestMessage({ ...notification, ...enriched }, channelId);
+    const formattedNotification = {
+      ...notification,
+      ...enriched,
+      targetSlackId: `<@${enriched.targetSlackId}>`,
+    };
+
+    await this.slackMessageService.sendReviewRequestMessage(formattedNotification, channelId);
     Logger.info(`리뷰 요청 알림 전송 완료: ${notification.reviewerGithubUsername}`);
   }
 
