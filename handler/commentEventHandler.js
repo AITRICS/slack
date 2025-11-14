@@ -359,12 +359,58 @@ class CommentEventHandler extends BaseEventHandler {
       this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
     ]);
 
+    // 개별 리뷰어
     const requestedReviewers = (prDetails.requested_reviewers || []).map((r) => r.login);
+
+    // 실제 리뷰를 남긴 사람들
     const actualReviewers = reviews.map((review) => review.user.login);
-    const allReviewerUsernames = [...new Set([...requestedReviewers, ...actualReviewers])];
+
+    // 팀 리뷰어 처리
+    const requestedTeams = prDetails.requested_teams || [];
+    const teamMemberUsernames = await this.#fetchAllTeamMembers(requestedTeams);
+
+    // 모든 리뷰어 통합
+    const allReviewerUsernames = [
+      ...new Set([
+        ...requestedReviewers,
+        ...actualReviewers,
+        ...teamMemberUsernames,
+      ]),
+    ];
 
     const reviewerObjects = allReviewerUsernames.map((username) => ({ githubUsername: username }));
     return this.slackUserService.addSlackIdsToRecipients(reviewerObjects);
+  }
+
+  /**
+   * 여러 팀의 모든 멤버 조회
+   * @private
+   * @param {Array} requestedTeams - 요청된 팀 목록
+   * @returns {Promise<string[]>} 팀 멤버 GitHub 사용자명 목록
+   */
+  async #fetchAllTeamMembers(requestedTeams) {
+    if (!requestedTeams || requestedTeams.length === 0) {
+      return [];
+    }
+
+    try {
+      const teamMemberArrays = await Promise.all(
+        requestedTeams.map(async (team) => {
+          try {
+            const members = await this.gitHubApiHelper.fetchTeamMembers(team.slug);
+            return members.map((member) => member.login);
+          } catch (error) {
+            Logger.warn(`팀 멤버 조회 실패: ${team.slug}`, error);
+            return [];
+          }
+        }),
+      );
+
+      return teamMemberArrays.flat();
+    } catch (error) {
+      Logger.error('팀 멤버 일괄 조회 실패', error);
+      return [];
+    }
   }
 
   /**
