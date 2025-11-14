@@ -1,5 +1,5 @@
-const { SLACK_CHANNELS, GITHUB_CONFIG } = require('../constants');
-const Logger = require('../utils/logger');
+const { SLACK_CHANNELS, GITHUB_CONFIG } = require('@/constants');
+const Logger = require('@/utils/logger');
 
 /**
  * Slack 채널 선택 서비스

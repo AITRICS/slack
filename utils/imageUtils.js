@@ -1,4 +1,4 @@
-const Logger = require('@/utils/logger');
+const Logger = require('./logger');
 
 /**
  * GitHub 이미지를 Slack 포맷으로 변환하는 유틸리티

@@ -1,5 +1,5 @@
 const Core = require('@actions/core');
-const { API_CONFIG, LOG_LEVELS } = require('../constants');
+const { API_CONFIG, LOG_LEVELS } = require('@/constants');
 
 /**
  * 환경 설정 로더

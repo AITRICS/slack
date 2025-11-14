@@ -1,6 +1,6 @@
+const { REVIEW_STATES, GITHUB_CONFIG, SLACK_CHANNELS } = require('@/constants');
+const Logger = require('@/utils/logger');
 const BaseEventHandler = require('./baseEventHandler');
-const { REVIEW_STATES, GITHUB_CONFIG, SLACK_CHANNELS } = require('../constants');
-const Logger = require('../utils/logger');
 
 /**
  * 리뷰 이벤트 처리

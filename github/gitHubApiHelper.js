@@ -1,6 +1,6 @@
-const { GITHUB_CONFIG } = require('../constants');
-const Logger = require('../utils/logger');
-const { GitHubAPIError } = require('../utils/errors');
+const { GITHUB_CONFIG } = require('@/constants');
+const Logger = require('@/utils/logger');
+const { GitHubAPIError } = require('@/utils/errors');
 
 /**
  * GitHub API 헬퍼 클래스

@@ -1,7 +1,7 @@
+const MentionUtils = require('@/utils/mentionUtils');
+const Logger = require('@/utils/logger');
+const ImageUtils = require('@/utils/imageUtils');
 const BaseEventHandler = require('./baseEventHandler');
-const MentionUtils = require('../utils/mentionUtils');
-const Logger = require('../utils/logger');
-const ImageUtils = require('../utils/imageUtils');
 
 /**
  * GitHub 코멘트 이벤트 처리

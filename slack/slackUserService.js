@@ -1,5 +1,5 @@
-const Logger = require('../utils/logger');
-const { findSlackUserProperty } = require('../utils/nameUtils');
+const Logger = require('@/utils/logger');
+const { findSlackUserProperty } = require('@/utils/nameUtils');
 
 /**
  * Slack 사용자 관리 서비스

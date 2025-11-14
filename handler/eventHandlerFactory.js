@@ -1,9 +1,9 @@
+const { ACTION_TYPES } = require('@/constants');
+const Logger = require('@/utils/logger');
+const { SlackNotificationError } = require('@/utils/errors');
 const CommentEventHandler = require('./commentEventHandler');
 const ReviewEventHandler = require('./reviewEventHandler');
 const DeploymentEventHandler = require('./deploymentEventHandler');
-const { ACTION_TYPES } = require('../constants');
-const Logger = require('../utils/logger');
-const { SlackNotificationError } = require('../utils/errors');
 
 /**
  * 이벤트 핸들러 팩토리

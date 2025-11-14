@@ -1,4 +1,4 @@
-const { SLACK_CONFIG } = require('../constants');
+const { SLACK_CONFIG } = require('@/constants');
 
 /**
  * Slack 메시지 포맷터
