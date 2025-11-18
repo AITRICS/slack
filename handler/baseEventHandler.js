@@ -73,6 +73,80 @@ class BaseEventHandler {
       url: repository.html_url,
     };
   }
+
+  /**
+   * PR의 모든 리뷰어 조회 (개별 + 팀 + 실제 리뷰어)
+   * @protected
+   * @param {string} repoName - 저장소 이름
+   * @param {number} prNumber - PR 번호
+   * @param {GitHubPullRequest} prDetails - PR 상세 정보 (필수)
+   * @returns {Promise<string[]>} GitHub 사용자명 목록
+   */
+  async fetchAllReviewers(repoName, prNumber, prDetails) {
+    const reviews = await this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber);
+
+    Logger.debug('PR 리뷰어 조회 시작', {
+      repoName,
+      prNumber,
+      author: prDetails.user?.login,
+      requestedReviewersCount: prDetails.requested_reviewers?.length || 0,
+      requestedTeamsCount: prDetails.requested_teams?.length || 0,
+      reviewsCount: reviews.length,
+    });
+
+    // 1. 개별 요청된 리뷰어
+    const requestedReviewers = (prDetails.requested_reviewers || []).map((r) => r.login);
+
+    // 2. 팀으로 요청된 리뷰어 처리
+    const teamMembers = await this.fetchTeamMembers(prDetails.requested_teams || []);
+
+    // 3. 실제 리뷰한 사람
+    const actualReviewers = reviews.map((review) => review.user.login);
+
+    // 4. 모든 리뷰어 통합 (중복 제거)
+    const allReviewerUsernames = [...new Set([
+      ...requestedReviewers,
+      ...teamMembers,
+      ...actualReviewers,
+    ])];
+
+    Logger.debug('모든 리뷰어 조회 완료', {
+      repoName,
+      prNumber,
+      individualReviewers: requestedReviewers.length,
+      teamReviewers: teamMembers.length,
+      actualReviewers: actualReviewers.length,
+      totalUnique: allReviewerUsernames.length,
+    });
+
+    return allReviewerUsernames;
+  }
+
+  /**
+   * 팀 멤버 조회
+   * @protected
+   * @param {Array<{slug: string}>} requestedTeams - 요청된 팀 목록
+   * @returns {Promise<string[]>} 팀 멤버 GitHub 사용자명 목록
+   */
+  async fetchTeamMembers(requestedTeams) {
+    if (!requestedTeams || requestedTeams.length === 0) {
+      return [];
+    }
+
+    const teamMemberPromises = requestedTeams.map(async (team) => {
+      try {
+        const members = await this.gitHubApiHelper.fetchTeamMembers(team.slug);
+        Logger.debug(`팀 멤버 조회 성공: ${team.slug} (${members.length}명)`);
+        return members.map((member) => member.login);
+      } catch (error) {
+        Logger.warn(`팀 멤버 조회 실패: ${team.slug}`, error);
+        return [];
+      }
+    });
+
+    const teamMembersArrays = await Promise.all(teamMemberPromises);
+    return teamMembersArrays.flat();
+  }
 }
 
 module.exports = BaseEventHandler;

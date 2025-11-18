@@ -311,11 +311,11 @@ class ReviewEventHandler extends BaseEventHandler {
   }
 
   /**
-   * PR의 리뷰어 상태 조회
+   * PR의 리뷰어 상태 조회 (개별 + 팀 리뷰어 포함)
    * @private
    * @param {string} repoName - 저장소명
    * @param {number} prNumber - PR 번호
-   * @returns {Promise<Object<string, string>>} 리뷰어별 상태 맵
+   * @returns {Promise<Object<string, string>>} 리뷰어별 상태 맵 (SlackID -> 상태)
    */
   async #getReviewersWithStatus(repoName, prNumber) {
     const [reviews, prDetails] = await Promise.all([
@@ -323,18 +323,20 @@ class ReviewEventHandler extends BaseEventHandler {
       this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber),
     ]);
 
-    const submitted = reviews.map((r) => r.user.login);
-    const requested = (prDetails.requested_reviewers || []).map((u) => u.login);
-    const unique = [...new Set([...submitted, ...requested])];
+    // BaseEventHandler의 공통 메서드로 모든 리뷰어 조회 (개별 + 팀 + 실제 리뷰어)
+    const allReviewerUsernames = await this.fetchAllReviewers(repoName, prNumber, prDetails);
 
-    const idMap = await this.slackUserService.getSlackProperties(unique, 'id');
+    // Slack ID 매핑
+    const idMap = await this.slackUserService.getSlackProperties(allReviewerUsernames, 'id');
     const reviewersState = {};
 
+    // 실제 리뷰한 사람의 상태 추가
     reviews.forEach((r) => {
       reviewersState[ReviewEventHandler.#getSlackMapValue(idMap, r.user.login)] = r.state || REVIEW_STATES.COMMENTED;
     });
 
-    requested.forEach((gh) => {
+    // 아직 리뷰하지 않은 사람은 AWAITING 상태로 추가
+    allReviewerUsernames.forEach((gh) => {
       const slackId = ReviewEventHandler.#getSlackMapValue(idMap, gh);
       if (!reviewersState[slackId]) {
         reviewersState[slackId] = REVIEW_STATES.AWAITING;
