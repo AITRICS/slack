@@ -11,13 +11,10 @@ jest.mock('@actions/core', () => ({
   error: jest.fn(),
 }));
 
-// ⭐ environment만 mock
 jest.mock('../config/environment', () => ({
   get: jest.fn((key, defaultValue) => defaultValue),
   isDebug: jest.fn(() => false),
 }));
-
-// ❌ @/constants mock 삭제됨 - 실제 파일 사용
 
 // 전역 beforeEach 설정
 beforeEach(() => {
