@@ -232,14 +232,13 @@ class SlackMessageFormatter {
       attachmentText,
     );
 
-    const mentions = targetSlackId ? `<@${targetSlackId}>` : '';
     const text = SlackMessageFormatter.#createMessageHeader(
       prUrl,
       prTitle,
       SLACK_CONFIG.ICONS.REVIEW_REQUEST,
       authorSlackName,
       SLACK_CONFIG.MESSAGE_TEMPLATES.REVIEW_REQUEST,
-      mentions,
+      targetSlackId,
     );
 
     return { text, attachment };

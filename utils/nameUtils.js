@@ -86,16 +86,13 @@ function createMatchCandidates(slackUser, normalizedSearchName) {
     slackUser.profile?.display_name,
   ].filter(Boolean);
 
-  return candidateNames
+  const uniqueCandidateNames = [...new Set(candidateNames)];
+
+  return uniqueCandidateNames
     .map((candidateName) => {
       const normalizedCandidate = normalizeUserName(candidateName);
+      if (!normalizedCandidate || !normalizedSearchName) return null;
 
-      // 빈 문자열이면 매칭하지 않음
-      if (!normalizedCandidate || !normalizedSearchName) {
-        return null;
-      }
-
-      // 완전 일치만 허용
       if (normalizedCandidate === normalizedSearchName) {
         return {
           user: slackUser,
@@ -103,8 +100,7 @@ function createMatchCandidates(slackUser, normalizedSearchName) {
           matchType: 'exact',
         };
       }
-
-      return null; // 완전 일치가 아니면 매칭하지 않음
+      return null;
     })
     .filter(Boolean);
 }

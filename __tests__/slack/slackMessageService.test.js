@@ -9,7 +9,8 @@ describe('SlackMessageService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockWeb = createMockSlackWeb();
-    mockPostMessage = mockWeb._mockFunctions.mockPostMessage;
+    const { mockPostMessage: postMessageMock } = mockWeb._mockFunctions;
+    mockPostMessage = postMessageMock;
     slackMessageService = new SlackMessageService(mockWeb);
   });
 
@@ -43,16 +44,19 @@ describe('SlackMessageService', () => {
 
       await slackMessageService.sendCodeCommentMessage(data, 'C12345');
 
-      expect(mockPostMessage).toHaveBeenCalledWith(expect.objectContaining({
+      const [[callArg]] = mockPostMessage.mock.calls;
+
+      expect(callArg).toEqual(expect.objectContaining({
         channel: 'C12345',
-        text: expect.stringContaining(':pencil:'),
-        text: expect.stringContaining('테스트 PR'),
         attachments: expect.arrayContaining([
           expect.objectContaining({
             color: 'good',
           }),
         ]),
       }));
+
+      expect(callArg.text).toContain(':pencil:');
+      expect(callArg.text).toContain('테스트 PR');
     });
   });
 

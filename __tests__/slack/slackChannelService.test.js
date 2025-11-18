@@ -1,5 +1,5 @@
 const SlackChannelService = require('../../slack/slackChannelService');
-const { SLACK_CHANNELS, GITHUB_CONFIG } = require('../../constants');
+const { SLACK_CHANNELS } = require('../../constants');
 
 describe('SlackChannelService', () => {
   let slackChannelService;

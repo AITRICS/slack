@@ -2,6 +2,7 @@ const MentionUtils = require('../utils/mentionUtils');
 const Logger = require('../utils/logger');
 const ImageUtils = require('../utils/imageUtils');
 const BaseEventHandler = require('./baseEventHandler');
+const { PayloadValidationError } = require('../utils/errors');
 
 /**
  * GitHub 코멘트 이벤트 처리
@@ -13,6 +14,19 @@ class CommentEventHandler extends BaseEventHandler {
    */
   async handleCommentEvent(payload) {
     BaseEventHandler.validatePayload(payload);
+
+    // 코멘트 객체 존재 여부 확인
+    if (!payload.comment) {
+      Logger.error('코멘트 객체가 없습니다. 잘못된 이벤트 타입일 수 있습니다.', {
+        eventType: payload.action,
+        hasReview: Boolean(payload.review),
+        hasPullRequest: Boolean(payload.pull_request),
+      });
+      throw new PayloadValidationError(
+        '코멘트 이벤트에 comment 객체가 필요합니다.',
+        payload,
+      );
+    }
 
     await this.initialize();
 
@@ -60,10 +74,25 @@ class CommentEventHandler extends BaseEventHandler {
     );
     const commentType = isCodeComment ? 'code_review' : 'pr_page';
 
-    const prNumber = payload.pull_request?.number || payload.issue?.number;
+    // PR 번호 추출 (여러 소스에서 시도)
+    let prNumber;
+    if (payload.pull_request?.number) {
+      prNumber = payload.pull_request.number;
+    } else if (payload.issue?.number) {
+      prNumber = payload.issue.number;
+    } else if (payload.comment.pull_request_url) {
+      // URL에서 PR 번호 추출: https://api.github.com/repos/OWNER/REPO/pulls/28
+      const match = payload.comment.pull_request_url.match(/\/pulls\/(\d+)$/);
+      if (match) {
+        prNumber = parseInt(match[1], 10);
+      }
+    }
 
     if (!prNumber) {
-      Logger.warn('PR 번호를 찾을 수 없습니다', { payload });
+      Logger.warn('PR 번호를 찾을 수 없습니다', {
+        payload,
+        pullRequestUrl: payload.comment.pull_request_url,
+      });
       throw new Error('PR 번호를 찾을 수 없습니다');
     }
 
@@ -87,7 +116,7 @@ class CommentEventHandler extends BaseEventHandler {
 
       const isFirstTimeComment = this.#isFirstTimeComment(
         recipients,
-        payload.pull_request.user.login,
+        payload.pull_request?.user?.login,
       );
 
       if (isFirstTimeComment) {
@@ -136,7 +165,7 @@ class CommentEventHandler extends BaseEventHandler {
   }
 
   /**
-   * 코드 코멘트 수신자 결정 (개선된 에러 처리)
+   * 코드 코멘트 수신자 결정 (개선된 버전)
    * @private
    * @param {CommentPayload} payload
    * @param {CommentTypeInfo} commentTypeInfo
@@ -145,6 +174,10 @@ class CommentEventHandler extends BaseEventHandler {
   async #determineCodeCommentRecipients(payload, commentTypeInfo) {
     const { repository, pull_request: pullRequest, comment } = payload;
     const commentAuthor = comment.user.login;
+    const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(
+      repository.name,
+      commentTypeInfo.prNumber,
+    );
 
     try {
       // 코멘트 존재 여부를 먼저 확인
@@ -169,20 +202,52 @@ class CommentEventHandler extends BaseEventHandler {
         commentTypeInfo.isCodeComment,
       );
 
-      // 스레드 참여자가 없거나 본인뿐인 경우 PR 작성자에게 알림
+      // PR 정보 가져오기 (payload에 없을 수 있음)
+      let prAuthor;
+      if (pullRequest && pullRequest.user) {
+        prAuthor = pullRequest.user.login;
+      } else {
+        Logger.debug('payload에 pull_request 없음, API로 조회 중', {
+          prNumber: commentTypeInfo.prNumber,
+          repoName: repository.name,
+        });
+
+        prAuthor = prDetails.user.login;
+      }
+
+      // 스레드 참여자가 없거나 본인뿐인 경우
       if (threadParticipants.length <= 1) {
-        const prAuthor = pullRequest.user.login;
+        if (commentAuthor === prAuthor) {
+          // 본인 PR에 본인이 코멘트 → 리뷰어들에게 알림
+          Logger.debug('본인 PR에 본인이 코드 코멘트 → 리뷰어들에게 알림', {
+            prAuthor,
+            commentAuthor,
+          });
+          const reviewers = await this.#getAllReviewersWithSlackIds(
+            repository.name,
+            commentTypeInfo.prNumber,
+            prDetails,
+          );
+          return reviewers.filter((r) => r.githubUsername !== commentAuthor);
+        }
+
+        // 다른 사람 PR에 처음 코멘트 → PR 작성자에게 알림
         return commentAuthor !== prAuthor ?
           [{ githubUsername: prAuthor }] :
           [];
       }
 
+      // 스레드에 다른 참여자들이 있는 경우
       const recipients = threadParticipants
         .filter((username) => username !== commentAuthor)
         .map((username) => ({ githubUsername: username }));
 
       return this.slackUserService.addSlackIdsToRecipients(recipients);
     } catch (error) {
+      if (error instanceof Error && error.message.includes('코멘트 타입 판단 오류')) {
+        throw error;
+      }
+
       Logger.error('코드 코멘트 수신자 결정 실패', error);
       throw error;
     }
@@ -217,10 +282,16 @@ class CommentEventHandler extends BaseEventHandler {
     const { repository, comment } = payload;
     const commentAuthor = comment.user.login;
 
-    const [prDetails, allReviewers] = await Promise.all([
-      this.gitHubApiHelper.fetchPullRequestDetails(repository.name, commentTypeInfo.prNumber),
-      this.#getAllReviewers(repository.name, commentTypeInfo.prNumber),
-    ]);
+    const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(
+      repository.name,
+      commentTypeInfo.prNumber,
+    );
+
+    const allReviewers = await this.#getAllReviewersWithSlackIds(
+      repository.name,
+      commentTypeInfo.prNumber,
+      prDetails,
+    );
 
     const prAuthor = prDetails.user.login;
 
@@ -230,7 +301,11 @@ class CommentEventHandler extends BaseEventHandler {
     }
 
     // 리뷰어가 코멘트 → PR 작성자 + 다른 리뷰어들에게 알림
-    const recipients = await this.#getRecipientsForReviewerComment(allReviewers, commentAuthor, prAuthor);
+    const recipients = await this.#getRecipientsForReviewerComment(
+      allReviewers,
+      commentAuthor,
+      prAuthor,
+    );
     return this.#removeDuplicateRecipients(recipients);
   }
 
@@ -242,7 +317,10 @@ class CommentEventHandler extends BaseEventHandler {
    * @param {'code'|'pr'} commentType
    */
   async #sendSingleRecipientNotification(payload, recipient, commentType) {
-    const notificationData = await this.#buildNotificationData(payload, recipient.githubUsername);
+    const notificationData = await this.#buildNotificationData(
+      payload,
+      recipient.githubUsername,
+    );
     const channelId = await this.slackChannelService.selectChannel(recipient.githubUsername);
 
     const messageMethod = commentType === 'code' ?
@@ -329,8 +407,14 @@ class CommentEventHandler extends BaseEventHandler {
     ]);
 
     // GitHub 멘션을 Slack 멘션으로 변환
-    const slackIdResolver = (usernames, property) => this.slackUserService.getSlackProperties(usernames, property);
-    const convertedCommentBody = await MentionUtils.convertCommentMentions(comment.body, slackIdResolver);
+    const slackIdResolver = (usernames, property) => this.slackUserService.getSlackProperties(
+      usernames,
+      property,
+    );
+    const convertedCommentBody = await MentionUtils.convertCommentMentions(
+      comment.body,
+      slackIdResolver,
+    );
     const imageProcessResult = ImageUtils.processCommentImages(convertedCommentBody);
 
     return {
@@ -347,22 +431,17 @@ class CommentEventHandler extends BaseEventHandler {
   }
 
   /**
-   * PR의 모든 리뷰어 조회
+   * PR의 모든 리뷰어 조회 (Slack ID 포함)
    * @private
-   * @param {string} repoName
-   * @param {number} prNumber
-   * @returns {Promise<UserMappingResult[]>}
+   * @param {string} repoName - 저장소 이름
+   * @param {number} prNumber - PR 번호
+   * @param {GitHubPullRequest} prDetails - PR 상세 정보
+   * @returns {Promise<UserMappingResult[]>} Slack ID가 추가된 리뷰어 목록
    */
-  async #getAllReviewers(repoName, prNumber) {
-    const [prDetails, reviews] = await Promise.all([
-      this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber),
-      this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
-    ]);
+  async #getAllReviewersWithSlackIds(repoName, prNumber, prDetails) {
+    const allReviewerUsernames = await this.fetchAllReviewers(repoName, prNumber, prDetails);
 
-    const requestedReviewers = (prDetails.requested_reviewers || []).map((r) => r.login);
-    const actualReviewers = reviews.map((review) => review.user.login);
-    const allReviewerUsernames = [...new Set([...requestedReviewers, ...actualReviewers])];
-
+    // Slack ID 매핑
     const reviewerObjects = allReviewerUsernames.map((username) => ({ githubUsername: username }));
     return this.slackUserService.addSlackIdsToRecipients(reviewerObjects);
   }
