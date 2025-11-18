@@ -45,6 +45,7 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
         '모든 설정 누락',
       ],
     ])('DEPLOY 설정 누락: %j → %j (%s)', (inputs, expectedMissing, _description) => {
+      expect.hasAssertions();
       global.testUtils.mockCoreInputs(inputs);
 
       expectErrorWithDetails(
@@ -83,6 +84,7 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
         'IMAGE_TAG 누락',
       ],
     ])('CI 설정 누락: %j → %j (%s)', (inputs, expectedMissing, _description) => {
+      expect.hasAssertions();
       global.testUtils.mockCoreInputs(inputs);
 
       expectErrorWithDetails(
@@ -130,18 +132,18 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
         JOB_STATUS: '',
       });
 
-      // 핵심: 에러 발생 자체는 toThrow로
       expect(() => ConfigValidator.validateActionSpecificConfig('deploy'))
         .toThrow(/deploy 액션에 필요한 설정이 누락되었습니다/);
 
-      // 추가: missingFields 타입 검증은 조건문 없이 always expect (fail-safe)
       let thrownError = null;
       try {
         ConfigValidator.validateActionSpecificConfig('deploy');
       } catch (error) {
         thrownError = error;
       }
-      expect(Array.isArray(thrownError?.missingFields)).toBe(true);
+
+      expect(thrownError).not.toBeNull();
+      expect(Array.isArray(thrownError.details?.missingFields)).toBe(true);
     });
 
     test('부분적으로 유효한 값들', () => {
@@ -157,7 +159,6 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
   });
 
   describe('성능 테스트', () => {
-    // 성공해야 하는 케이스
     test.each([
       ['comment', {}],
       ['schedule', {}],
@@ -166,7 +167,6 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
       expect(() => ConfigValidator.validateActionSpecificConfig(actionType)).not.toThrow();
     });
 
-    // 실패해야 하는 케이스
     test.each([
       ['deploy', { EC2_NAME: '' }],
       ['ci', { BRANCH_NAME: '' }],

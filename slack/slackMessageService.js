@@ -1,6 +1,6 @@
-const SlackMessageFormatter = require('./slackMessageFormatter');
 const Logger = require('../utils/logger');
 const { SlackAPIError } = require('../utils/errors');
+const SlackMessageFormatter = require('./slackMessageFormatter');
 
 /**
  * Slack 메시지 전송 서비스

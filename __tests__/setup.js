@@ -11,33 +11,9 @@ jest.mock('@actions/core', () => ({
   error: jest.fn(),
 }));
 
-jest.mock('@/utils/errors', () => ({
-  ConfigurationError: class extends Error {
-    constructor(message, missingFields = []) {
-      super(message);
-      this.name = 'ConfigurationError';
-      this.missingFields = missingFields;
-    }
-  },
-  ValidationError: class extends Error {
-    constructor(message, field) {
-      super(message);
-      this.name = 'ValidationError';
-      this.field = field;
-    }
-  },
-}));
-
-jest.mock('@/constants', () => ({
-  ACTION_TYPES: {
-    SCHEDULE: 'schedule',
-    APPROVE: 'approve',
-    COMMENT: 'comment',
-    REVIEW_REQUESTED: 'review_requested',
-    CHANGES_REQUESTED: 'changes_requested',
-    DEPLOY: 'deploy',
-    CI: 'ci',
-  },
+jest.mock('../config/environment', () => ({
+  get: jest.fn((key, defaultValue) => defaultValue),
+  isDebug: jest.fn(() => false),
 }));
 
 // 전역 beforeEach 설정

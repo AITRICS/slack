@@ -1,7 +1,7 @@
-const BaseEventHandler = require('./baseEventHandler');
 const { SLACK_CHANNELS } = require('../constants');
 const { calculateDurationInMinutes, formatDuration } = require('../utils/timeUtils');
 const Logger = require('../utils/logger');
+const BaseEventHandler = require('./baseEventHandler');
 
 /**
  * 배포 및 빌드 이벤트 처리

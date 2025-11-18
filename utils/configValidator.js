@@ -1,6 +1,6 @@
 const Core = require('@actions/core');
-const { ConfigurationError } = require('./errors');
 const { ACTION_TYPES } = require('../constants');
+const { ConfigurationError } = require('./errors');
 
 /**
  * 설정 검증 클래스

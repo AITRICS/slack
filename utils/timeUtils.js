@@ -18,6 +18,11 @@ function calculateDurationInMinutes(startTime, endTime) {
 function formatDuration(totalMinutes) {
   const minutes = Math.floor(totalMinutes);
   const seconds = Math.round((totalMinutes - minutes) * 60);
+
+  if (seconds === 60) {
+    return `${minutes + 1}분 0초`;
+  }
+
   return `${minutes}분 ${seconds}초`;
 }
 

@@ -1,5 +1,6 @@
 const GitHubApiHelper = require('../../github/gitHubApiHelper');
 const { createMockOctokit } = require('../mocks/commonMocks');
+const { GitHubAPIError } = require('../../utils/errors');
 
 describe('GitHubApiHelper', () => {
   let gitHubApiHelper;
@@ -29,15 +30,8 @@ describe('GitHubApiHelper', () => {
       const error = new Error('API Error');
       mockOctokit.teams.listMembersInOrg.mockRejectedValue(error);
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      await expect(gitHubApiHelper.fetchTeamMembers('SE')).rejects.toThrow('API Error');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error fetching member list for team slug SE:',
-        error,
-      );
-
-      consoleSpy.mockRestore();
+      await expect(gitHubApiHelper.fetchTeamMembers('SE')).rejects.toThrow(GitHubAPIError);
+      await expect(gitHubApiHelper.fetchTeamMembers('SE')).rejects.toThrow('팀 멤버 조회 실패');
     });
   });
 
@@ -105,15 +99,8 @@ describe('GitHubApiHelper', () => {
       const error = new Error('Comment not found');
       mockOctokit.rest.pulls.getReviewComment.mockRejectedValue(error);
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      await expect(gitHubApiHelper.fetchCommentAuthor('test-repo', 123)).rejects.toThrow('Comment not found');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Error fetching author of comment ID 123 in repository 'test-repo':",
-        error,
-      );
-
-      consoleSpy.mockRestore();
+      await expect(gitHubApiHelper.fetchCommentAuthor('test-repo', 123)).rejects.toThrow(GitHubAPIError);
+      await expect(gitHubApiHelper.fetchCommentAuthor('test-repo', 123)).rejects.toThrow('코멘트 작성자 조회 실패');
     });
   });
 
@@ -145,12 +132,8 @@ describe('GitHubApiHelper', () => {
       const error = new Error('User not found');
       mockOctokit.rest.users.getByUsername.mockRejectedValue(error);
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      await expect(gitHubApiHelper.fetchUserRealName('nonexistent')).rejects.toThrow('User not found');
-      expect(consoleSpy).toHaveBeenCalledWith('Error fetching GitHub user info for nonexistent:', error);
-
-      consoleSpy.mockRestore();
+      await expect(gitHubApiHelper.fetchUserRealName('nonexistent')).rejects.toThrow(GitHubAPIError);
+      await expect(gitHubApiHelper.fetchUserRealName('nonexistent')).rejects.toThrow('사용자 정보 조회 실패');
     });
   });
 
@@ -178,15 +161,8 @@ describe('GitHubApiHelper', () => {
       const error = new Error('Workflow run not found');
       mockOctokit.actions.getWorkflowRun.mockRejectedValue(error);
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      await expect(gitHubApiHelper.fetchWorkflowRunData('test-repo', '123')).rejects.toThrow('Workflow run not found');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error fetching workflow run data for run ID 123:',
-        error,
-      );
-
-      consoleSpy.mockRestore();
+      await expect(gitHubApiHelper.fetchWorkflowRunData('test-repo', '123')).rejects.toThrow(GitHubAPIError);
+      await expect(gitHubApiHelper.fetchWorkflowRunData('test-repo', '123')).rejects.toThrow('워크플로우 실행 조회 실패');
     });
   });
 });
