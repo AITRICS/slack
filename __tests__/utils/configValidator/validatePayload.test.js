@@ -137,7 +137,7 @@ describe('ConfigValidator.validatePayload', () => {
       });
       const duration = Date.now() - start;
 
-      // 완화된 기준: 100개 처리에 100ms 이내
+      // 기준: 100개 처리에 100ms 이내
       expect(duration).toBeLessThan(100);
     });
   });

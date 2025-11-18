@@ -107,7 +107,6 @@ describe('ConfigValidator.validateAll (통합 테스트)', () => {
   describe('비동기 테스트', () => {
     const validTokens = global.testUtils.createValidTokens();
 
-    // 성공 케이스
     test.each([
       {
         name: 'comment 액션 성공',
@@ -127,7 +126,6 @@ describe('ConfigValidator.validateAll (통합 테스트)', () => {
       }).not.toThrow();
     });
 
-    // 실패 케이스
     test.each([
       {
         name: 'SLACK_TOKEN 누락 실패',

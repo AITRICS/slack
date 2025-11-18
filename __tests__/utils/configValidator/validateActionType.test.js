@@ -118,7 +118,6 @@ describe('ConfigValidator.validateActionType', () => {
       },
     );
 
-    // 성공 케이스
     test.each([
       ['comment'],
       ['deploy'],
@@ -127,7 +126,6 @@ describe('ConfigValidator.validateActionType', () => {
       expect(() => ConfigValidator.validateActionType(actionType)).not.toThrow();
     });
 
-    // 실패 케이스
     test.each([
       ['invalid'],
       ['wrong'],

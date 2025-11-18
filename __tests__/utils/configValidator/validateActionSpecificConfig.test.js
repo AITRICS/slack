@@ -159,7 +159,6 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
   });
 
   describe('성능 테스트', () => {
-    // 성공해야 하는 케이스
     test.each([
       ['comment', {}],
       ['schedule', {}],
@@ -168,7 +167,6 @@ describe('ConfigValidator.validateActionSpecificConfig', () => {
       expect(() => ConfigValidator.validateActionSpecificConfig(actionType)).not.toThrow();
     });
 
-    // 실패해야 하는 케이스
     test.each([
       ['deploy', { EC2_NAME: '' }],
       ['ci', { BRANCH_NAME: '' }],
