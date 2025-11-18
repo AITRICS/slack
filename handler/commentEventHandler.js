@@ -174,6 +174,10 @@ class CommentEventHandler extends BaseEventHandler {
   async #determineCodeCommentRecipients(payload, commentTypeInfo) {
     const { repository, pull_request: pullRequest, comment } = payload;
     const commentAuthor = comment.user.login;
+    const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(
+      repository.name,
+      commentTypeInfo.prNumber,
+    );
 
     try {
       // 코멘트 존재 여부를 먼저 확인
@@ -207,10 +211,7 @@ class CommentEventHandler extends BaseEventHandler {
           prNumber: commentTypeInfo.prNumber,
           repoName: repository.name,
         });
-        const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(
-          repository.name,
-          commentTypeInfo.prNumber,
-        );
+
         prAuthor = prDetails.user.login;
       }
 
@@ -222,7 +223,7 @@ class CommentEventHandler extends BaseEventHandler {
             prAuthor,
             commentAuthor,
           });
-          const reviewers = await this.#getAllReviewers(repository.name, commentTypeInfo.prNumber);
+          const reviewers = await this.#getAllReviewers(repository.name, commentTypeInfo.prNumber, prDetails);
           return reviewers.filter((r) => r.githubUsername !== commentAuthor);
         }
 
@@ -277,10 +278,16 @@ class CommentEventHandler extends BaseEventHandler {
     const { repository, comment } = payload;
     const commentAuthor = comment.user.login;
 
-    const [prDetails, allReviewers] = await Promise.all([
-      this.gitHubApiHelper.fetchPullRequestDetails(repository.name, commentTypeInfo.prNumber),
-      this.#getAllReviewers(repository.name, commentTypeInfo.prNumber),
-    ]);
+    const prDetails = await this.gitHubApiHelper.fetchPullRequestDetails(
+      repository.name,
+      commentTypeInfo.prNumber,
+    );
+
+    const allReviewers = await this.#getAllReviewers(
+      repository.name,
+      commentTypeInfo.prNumber,
+      prDetails,
+    );
 
     const prAuthor = prDetails.user.login;
 
@@ -422,37 +429,28 @@ class CommentEventHandler extends BaseEventHandler {
   /**
    * PR의 모든 리뷰어 조회 (개별 + 팀)
    * @private
-   * @param {string} repoName
-   * @param {number} prNumber
-   * @returns {Promise<UserMappingResult[]>}
+   * @param {string} repoName - 저장소 이름
+   * @param {number} prNumber - PR 번호
+   * @param {GitHubPullRequest} prDetails - PR 상세 정보
+   * @returns {Promise<UserMappingResult[]>} Slack ID가 추가된 리뷰어 목록
    */
-  async #getAllReviewers(repoName, prNumber) {
-    const [prDetails, reviews] = await Promise.all([
-      this.gitHubApiHelper.fetchPullRequestDetails(repoName, prNumber),
-      this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber),
-    ]);
+  async #getAllReviewers(repoName, prNumber, prDetails) {
+    const reviews = await this.gitHubApiHelper.fetchPullRequestReviews(repoName, prNumber);
 
-    Logger.info('====================================================');
-    Logger.info(`prDetails: ${prDetails}`);
-    Logger.info('====================================================');
+    Logger.debug('PR 리뷰어 조회 시작', {
+      repoName,
+      prNumber,
+      author: prDetails.user?.login,
+      requestedReviewersCount: prDetails.requested_reviewers?.length || 0,
+      requestedTeamsCount: prDetails.requested_teams?.length || 0,
+      reviewsCount: reviews.length,
+    });
 
     // 1. 개별 요청된 리뷰어
     const requestedReviewers = (prDetails.requested_reviewers || []).map((r) => r.login);
 
     // 2. 팀으로 요청된 리뷰어 처리
-    const requestedTeams = prDetails.requested_teams || [];
-    const teamMemberPromises = requestedTeams.map(async (team) => {
-      try {
-        const members = await this.gitHubApiHelper.fetchTeamMembers(team.slug);
-        return members.map((member) => member.login);
-      } catch (error) {
-        Logger.warn(`팀 멤버 조회 실패: ${team.slug}`, error);
-        return [];
-      }
-    });
-
-    const teamMembersArrays = await Promise.all(teamMemberPromises);
-    const teamMembers = teamMembersArrays.flat();
+    const teamMembers = await this.#fetchTeamReviewers(prDetails.requested_teams || []);
 
     // 3. 실제 리뷰한 사람
     const actualReviewers = reviews.map((review) => review.user.login);
@@ -475,6 +473,32 @@ class CommentEventHandler extends BaseEventHandler {
 
     const reviewerObjects = allReviewerUsernames.map((username) => ({ githubUsername: username }));
     return this.slackUserService.addSlackIdsToRecipients(reviewerObjects);
+  }
+
+  /**
+   * 팀 리뷰어 멤버 조회
+   * @private
+   * @param {Array<{slug: string}>} requestedTeams - 요청된 팀 목록
+   * @returns {Promise<string[]>} 팀 멤버 GitHub 사용자명 목록
+   */
+  async #fetchTeamReviewers(requestedTeams) {
+    if (!requestedTeams || requestedTeams.length === 0) {
+      return [];
+    }
+
+    const teamMemberPromises = requestedTeams.map(async (team) => {
+      try {
+        const members = await this.gitHubApiHelper.fetchTeamMembers(team.slug);
+        Logger.debug(`팀 멤버 조회 성공: ${team.slug} (${members.length}명)`);
+        return members.map((member) => member.login);
+      } catch (error) {
+        Logger.warn(`팀 멤버 조회 실패: ${team.slug}`, error);
+        return [];
+      }
+    });
+
+    const teamMembersArrays = await Promise.all(teamMemberPromises);
+    return teamMembersArrays.flat();
   }
 
   /**
