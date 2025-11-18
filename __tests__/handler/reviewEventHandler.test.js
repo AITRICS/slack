@@ -436,7 +436,7 @@ describe('ReviewEventHandler', () => {
 
       await handler.handleScheduledReview(payload);
 
-      const messageCall = mockServices.slackMessageService.sendScheduledReviewMessage.mock.calls[0][0];
+      const [[messageCall]] = mockServices.slackMessageService.sendScheduledReviewMessage.mock.calls;
       const bodyText = messageCall.body;
 
       // 모든 리뷰어가 포함되어야 함
